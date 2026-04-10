@@ -30,18 +30,30 @@ class GoogleAuthController extends Controller
             $domain = substr(strrchr($email, '@'), 1);
 
             // Restrict domains
-            if (! in_array($domain, ['newheavenhs.cl', 'gmail.com'])) {
+            if (! in_array($domain, ['newheavenhs.cl', 'gmail.com', 'eben-ezer.cl'])) {
                 return redirect()->route('login')->with('error', 'Solo se permite el acceso a correos institucional @newheavenhs.cl o Gmail.');
             }
+
+            $school = \App\Models\School::where('domain', $domain)->first();
 
             $user = User::updateOrCreate(
                 ['email' => $email],
                 [
-                    'name' => $googleUser->getName(),
-                    'google_id' => $googleUser->getId(),
-                    'avatar' => $googleUser->getAvatar(),
+                    // Guardamos el nombre completo de Google en `nombres`.
+                    // El usuario deberá separar apellidos manualmente desde su ficha.
+                    'nombres'      => $googleUser->getName(),
+                    'apellido_pat' => null,
+                    'apellido_mat' => null,
+                    'google_id'    => $googleUser->getId(),
+                    'avatar'       => $googleUser->getAvatar(),
+                    'current_school_id' => $school?->id,
                 ]
             );
+
+            // Relacionar usuario al colegio con un rol por defecto si no están enlazados
+            if ($school && !$user->schools()->where('school_id', $school->id)->exists()) {
+                $user->schools()->attach($school->id, ['roles' => json_encode(['docente'])]); // O el rol por defecto que decidas
+            }
 
             Auth::login($user);
 

@@ -51,6 +51,8 @@
                 <flux:sidebar.collapse class="in-data-flux-sidebar-on-desktop:not-in-data-flux-sidebar-collapsed-desktop:-mr-2" />
             </flux:sidebar.header>
 
+            <livewire:admin.seleccionar-colegio />
+
             <flux:sidebar.nav>
                 <flux:sidebar.group :heading="__('Platform')">
                     <flux:sidebar.item icon="layout-grid" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>

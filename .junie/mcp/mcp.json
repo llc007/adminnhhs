@@ -6,6 +6,15 @@
                 "/Users/luisfelopez/Sites/adminnhhs/artisan",
                 "boost:mcp"
             ]
+        },
+        "herd": {
+            "command": "/Users/luisfelopez/Library/Application Support/Herd/bin/php84",
+            "args": [
+                "/Applications/Herd.app/Contents/Resources/herd-mcp.phar"
+            ],
+            "env": {
+                "SITE_PATH": "/Users/luisfelopez/Sites/adminnhhs"
+            }
         }
     }
 }

@@ -100,4 +100,45 @@ class User extends Authenticatable
     {
         return $this->hasMany(Curso::class, 'jefe_id');
     }
+
+    /**
+     * Get the entrevistas assigned to this user.
+     */
+    public function entrevistas(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Entrevista::class, 'user_id');
+    }
+
+    /**
+     * Get the active roles array for the current school.
+     */
+    public function getActiveRolesAttribute(): array
+    {
+        if (! $this->current_school_id) {
+            return [];
+        }
+
+        $school = $this->schools->where('id', $this->current_school_id)->first();
+        
+        if (! $school || ! $school->pivot->roles) {
+            return [];
+        }
+
+        $roles = json_decode($school->pivot->roles, true);
+        return is_array($roles) ? $roles : [];
+    }
+
+    /**
+     * Check if user has a specific role or any of an array of roles.
+     */
+    public function hasRole(string|array $roles): bool
+    {
+        $activeRoles = $this->active_roles;
+
+        if (is_array($roles)) {
+            return count(array_intersect($roles, $activeRoles)) > 0;
+        }
+
+        return in_array($roles, $activeRoles);
+    }
 }

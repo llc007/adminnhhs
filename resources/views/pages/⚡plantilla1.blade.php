@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 
-<html lang="es">
+<html class="light" lang="es">
 
 <head>
     <meta charset="utf-8" />
     <meta content="width=device-width, initial-scale=1.0" name="viewport" />
-    <title>Nueva Cita | Portal de Entrevistas</title>
+    <title>Historial General de Entrevistas - Liceo Pro</title>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <link
-        href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800&amp;family=Public_Sans:wght@400;500;600&amp;display=swap"
+        href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Public+Sans:wght@300;400;500;600;700&amp;display=swap"
         rel="stylesheet" />
     <link
         href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
@@ -21,291 +21,480 @@
             darkMode: "class",
             theme: {
                 extend: {
-                    colors: {
-                        "primary-fixed": "#d6e3ff",
-                        "on-error": "#ffffff",
-                        "on-error-container": "#93000a",
-                        "on-tertiary-fixed": "#291800",
-                        "tertiary": "#4d3100",
-                        "inverse-surface": "#2d3133",
-                        "surface-tint": "#1e5eac",
-                        "on-primary-fixed-variant": "#00468a",
-                        "error": "#ba1a1a",
-                        "on-secondary-fixed": "#021f29",
-                        "on-secondary-container": "#4e6874",
+                    "colors": {
                         "surface-container-high": "#e6e8eb",
-                        "on-primary-fixed": "#001b3d",
-                        "error-container": "#ffdad6",
-                        "surface": "#f7f9fc",
-                        "on-primary-container": "#9cc0ff",
-                        "on-secondary": "#ffffff",
-                        "surface-container": "#eceef1",
-                        "on-surface": "#191c1e",
-                        "on-surface-variant": "#41474e",
-                        "on-primary": "#ffffff",
-                        "outline": "#72787f",
-                        "background": "#f7f9fc",
-                        "tertiary-fixed-dim": "#f2bd74",
                         "inverse-on-surface": "#eff1f4",
-                        "surface-variant": "#e0e3e6",
-                        "primary": "#00376e",
-                        "on-tertiary": "#ffffff",
-                        "on-tertiary-fixed-variant": "#633f00",
-                        "inverse-primary": "#a8c8ff",
-                        "primary-container": "#004d97",
-                        "surface-container-low": "#f2f4f7",
-                        "tertiary-fixed": "#ffddb3",
-                        "outline-variant": "#c1c7cf",
-                        "secondary-fixed-dim": "#afcbd8",
-                        "surface-container-lowest": "#ffffff",
-                        "secondary-container": "#cbe7f5",
-                        "on-tertiary-container": "#eab66d",
-                        "surface-bright": "#f7f9fc",
                         "on-background": "#191c1e",
-                        "tertiary-container": "#6b4604",
-                        "primary-fixed-dim": "#a8c8ff",
+                        "on-primary-fixed": "#001b3d",
+                        "inverse-primary": "#a8c8ff",
+                        "on-surface": "#191c1e",
+                        "on-primary-container": "#9cc0ff",
+                        "primary-fixed": "#d6e3ff",
+                        "on-primary": "#ffffff",
+                        "inverse-surface": "#2d3133",
+                        "error-container": "#ffdad6",
                         "secondary": "#48626e",
+                        "surface-variant": "#e0e3e6",
+                        "on-error-container": "#93000a",
+                        "surface": "#f7f9fc",
+                        "on-surface-variant": "#41474e",
+                        "on-secondary": "#ffffff",
+                        "on-primary-fixed-variant": "#00468a",
+                        "secondary-fixed-dim": "#afcbd8",
+                        "on-secondary-fixed-variant": "#304a55",
+                        "tertiary-container": "#6b4604",
+                        "primary-container": "#004d97",
+                        "surface-bright": "#f7f9fc",
                         "surface-container-highest": "#e0e3e6",
-                        "secondary-fixed": "#cbe7f5",
+                        "on-secondary-container": "#4e6874",
+                        "surface-container-low": "#f2f4f7",
+                        "on-tertiary-fixed-variant": "#633f00",
+                        "tertiary-fixed": "#ffddb3",
                         "surface-dim": "#d8dadd",
-                        "on-secondary-fixed-variant": "#304a55"
+                        "primary": "#00376e",
+                        "background": "#f7f9fc",
+                        "secondary-fixed": "#cbe7f5",
+                        "outline": "#72787f",
+                        "on-tertiary-fixed": "#291800",
+                        "on-tertiary-container": "#eab66d",
+                        "error": "#ba1a1a",
+                        "on-tertiary": "#ffffff",
+                        "tertiary-fixed-dim": "#f2bd74",
+                        "tertiary": "#4d3100",
+                        "outline-variant": "#c1c7cf",
+                        "surface-container": "#eceef1",
+                        "on-error": "#ffffff",
+                        "secondary-container": "#cbe7f5",
+                        "surface-tint": "#1e5eac",
+                        "surface-container-lowest": "#ffffff",
+                        "on-secondary-fixed": "#021f29",
+                        "primary-fixed-dim": "#a8c8ff"
                     },
-                    fontFamily: {
-                        "headline": ["Manrope"],
-                        "body": ["Public Sans"],
-                        "label": ["Public Sans"]
-                    },
-                    borderRadius: {
+                    "borderRadius": {
                         "DEFAULT": "0.125rem",
                         "lg": "0.25rem",
                         "xl": "0.5rem",
                         "full": "0.75rem"
                     },
+                    "fontFamily": {
+                        "headline": ["Manrope"],
+                        "body": ["Public Sans"],
+                        "label": ["Public Sans"]
+                    }
                 },
             },
         }
     </script>
     <style>
+        body {
+            font-family: 'Public Sans', sans-serif;
+        }
+
+        h1,
+        h2,
+        h3 {
+            font-family: 'Manrope', sans-serif;
+        }
+
         .material-symbols-outlined {
             font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
         }
 
-        body {
-            font-family: 'Public Sans', sans-serif;
-            background-color: #f7f9fc;
-        }
-
-        .font-headline {
-            font-family: 'Manrope', sans-serif;
+        .btn-gradient {
+            background: linear-gradient(135deg, #00376e 0%, #004d97 100%);
         }
     </style>
 </head>
 
-<body class="bg-background text-on-surface">
-    <!-- TopAppBar -->
-    <header
-        class="fixed top-0 z-50 w-full flex justify-between items-center px-6 py-3 bg-[#f7f9fc] dark:bg-slate-900 border-b border-[#f2f4f7] dark:border-slate-800">
-        <div class="flex items-center gap-4">
-            <span class="text-xl font-bold text-[#00376e] dark:text-blue-500 font-headline">Portal de Entrevistas</span>
-            <div class="hidden md:flex ml-8 gap-6">
-                <a class="text-[#48626e] dark:text-slate-400 font-medium hover:bg-[#f2f4f7] dark:hover:bg-slate-800 transition-colors px-2 py-1 rounded"
-                    href="#">Inicio</a>
-                <a class="text-[#00376e] dark:text-blue-400 font-bold px-2 py-1" href="#">Calendario</a>
+<body class="bg-surface text-on-surface">
+    <!-- SideNavBar -->
+    <aside class="fixed left-0 top-0 h-full flex flex-col py-6 bg-[#f2f4f7] dark:bg-slate-800 w-64 z-50">
+        <div class="px-6 mb-8 flex flex-col gap-2">
+            <div class="flex items-center gap-3">
+                <img class="w-10 h-10 object-contain"
+                    data-alt="Official crest of a prestigious educational institution with gold and navy blue accents on a clean white background"
+                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuAAcjEZ9Pa1I3piGN1-TU60AJEFxOQoiHYkzwjYZl-fzxqese8FY3XEx2gyRL-pjufGUaHCXz8LbE0HSwM3u04yBnKBj-qKN_XGFOerfK0SmY8v6X3ye0NaM7GqUj_iAtO75j9hD1SGeV1PeOpVUafLlJXeKF-yOs1VkGN1p1h_W-JqjGi8DZekobTBWDYh5qkRZY4mNqTotV2ssAd80xu7_mO9LiinYCqqzGapVdq-LGNR6xq49PNCSDz322pf3oFh67dmRYL9fAo" />
+                <span class="text-lg font-black text-[#00376e] dark:text-blue-300">Liceo Pro</span>
+            </div>
+            <div>
+                <p class="text-xs font-bold text-secondary uppercase tracking-widest opacity-60">Gesti\u00f3n
+                    Institucional</p>
+                <p class="text-[10px] text-secondary">Panel de Control</p>
             </div>
         </div>
-        <div class="flex items-center gap-4">
-            <button class="p-2 text-[#48626e] hover:bg-[#f2f4f7] rounded-full transition-colors">
-                <span class="material-symbols-outlined">notifications</span>
-            </button>
-            <button class="p-2 text-[#48626e] hover:bg-[#f2f4f7] rounded-full transition-colors">
-                <span class="material-symbols-outlined">help</span>
-            </button>
-            <div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center overflow-hidden">
-                <img alt="Avatar del Usuario" class="w-full h-full object-cover"
-                    data-alt="close up of a professional male teacher smiling, neutral school background, soft cinematic lighting"
-                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuAYMSmLbFUsb5j_ttf5yx5MzUGfYnWTvVO9uqwmpuhhHwd_hP6cliC9HC1gwYEr6Lqr9DPwOX8cYfIy6r3Oge1ioZKGo6DQsrN0WpiadOAPetGIre8p7KP_a28trGUm9mTloKziurICcKBTncb7bcPLyTuiaJG7HIlnWQkcJ1MHvFUwKA40hGKBVCovk_NLDCHNZY1qB98D14-wfRQE0JXy6-rCxp1ijgBCsvi_RyPtrRFAjOcEgzZpcTjYx4gZStQqY4YlFo_a5KU" />
-            </div>
-        </div>
-    </header>
-    <!-- Sidebar (Suppressed for focused task per UX Goal, but showing layout structure) -->
-    <aside
-        class="fixed left-0 top-0 h-full w-64 bg-white dark:bg-slate-950 border-r dark:border-slate-800 flex flex-col pt-20 pb-8 hidden lg:flex">
-        <nav class="flex-1 px-4 space-y-2">
-            <div
-                class="flex items-center gap-3 text-[#48626e] dark:text-slate-400 px-4 py-3 hover:bg-[#f7f9fc] transition-transform duration-200">
+        <nav class="flex-1 flex flex-col gap-1">
+            <a class="text-[#48626e] dark:text-slate-400 px-4 py-3 mx-2 flex items-center gap-3 hover:bg-[#f7f9fc] dark:hover:bg-slate-700 transition-all scale-95 active:scale-100 duration-150"
+                href="#">
                 <span class="material-symbols-outlined">dashboard</span>
-                <span class="font-medium">Inicio</span>
-            </div>
-            <div
-                class="flex items-center gap-3 bg-[#f2f4f7] dark:bg-slate-900 text-[#00376e] dark:text-blue-400 font-bold rounded-lg px-4 py-3">
-                <span class="material-symbols-outlined">calendar_month</span>
-                <span class="font-medium">Calendario</span>
-            </div>
-            <div class="flex items-center gap-3 text-[#48626e] dark:text-slate-400 px-4 py-3 hover:bg-[#f7f9fc]">
-                <span class="material-symbols-outlined">group</span>
-                <span class="font-medium">Apoderados</span>
-            </div>
-            <div class="flex items-center gap-3 text-[#48626e] dark:text-slate-400 px-4 py-3 hover:bg-[#f7f9fc]">
-                <span class="material-symbols-outlined">analytics</span>
-                <span class="font-medium">Reportes</span>
-            </div>
-        </nav>
-        <div class="px-4 pt-4 border-t border-outline-variant/15">
-            <div class="flex items-center gap-3 text-[#48626e] px-4 py-3 hover:bg-[#f7f9fc]">
+                <span class="font-medium">Dashboard</span>
+            </a>
+            <!-- Active Tab: Entrevistas -->
+            <a class="bg-white dark:bg-slate-700 text-[#00376e] dark:text-white shadow-sm rounded-lg mx-2 px-4 py-3 flex items-center gap-3 scale-95 active:scale-100 duration-150"
+                href="#">
+                <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">calendar_month</span>
+                <span class="font-bold">Entrevistas</span>
+            </a>
+            <a class="text-[#48626e] dark:text-slate-400 px-4 py-3 mx-2 flex items-center gap-3 hover:bg-[#f7f9fc] dark:hover:bg-slate-700 transition-all scale-95 active:scale-100 duration-150"
+                href="#">
+                <span class="material-symbols-outlined">groups</span>
+                <span class="font-medium">Alumnos</span>
+            </a>
+            <a class="text-[#48626e] dark:text-slate-400 px-4 py-3 mx-2 flex items-center gap-3 hover:bg-[#f7f9fc] dark:hover:bg-slate-700 transition-all scale-95 active:scale-100 duration-150"
+                href="#">
+                <span class="material-symbols-outlined">record_voice_over</span>
+                <span class="font-medium">Docentes</span>
+            </a>
+            <a class="text-[#48626e] dark:text-slate-400 px-4 py-3 mx-2 flex items-center gap-3 hover:bg-[#f7f9fc] dark:hover:bg-slate-700 transition-all scale-95 active:scale-100 duration-150"
+                href="#">
                 <span class="material-symbols-outlined">settings</span>
-                <span class="font-medium">Configuración</span>
-            </div>
-            <div class="flex items-center gap-3 text-[#48626e] px-4 py-3 hover:bg-[#f7f9fc]">
+                <span class="font-medium">Configuraci\u00f3n</span>
+            </a>
+        </nav>
+        <div class="px-4 mt-auto">
+            <button
+                class="w-full btn-gradient text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 mb-6 shadow-md active:scale-95 transition-transform">
+                <span class="material-symbols-outlined text-sm">add</span>
+                <span>Nueva Citaci\u00f3n</span>
+            </button>
+            <a class="text-[#48626e] dark:text-slate-400 px-4 py-3 flex items-center gap-3 hover:bg-[#f7f9fc] transition-all"
+                href="#">
                 <span class="material-symbols-outlined">logout</span>
-                <span class="font-medium">Cerrar Sesión</span>
-            </div>
+                <span class="font-medium">Cerrar Sesi\u00f3n</span>
+            </a>
         </div>
     </aside>
-    <!-- Main Content Canvas -->
-    <main class="lg:ml-64 pt-20 min-h-screen flex flex-col items-center p-6 md:p-12">
-        <!-- Header Section -->
-        <div class="w-full max-w-3xl mb-12">
-            <nav class="flex items-center gap-2 text-secondary text-sm mb-4">
-                <a class="hover:text-primary transition-colors" href="#">Calendario</a>
-                <span class="material-symbols-outlined text-xs">chevron_right</span>
-                <span class="font-semibold text-on-surface">Nueva Cita</span>
-            </nav>
-            <h1 class="text-3xl font-extrabold text-primary font-headline tracking-tight">Agendar Entrevista</h1>
-            <p class="text-secondary mt-2">Complete los detalles para coordinar una nueva reunión con el apoderado.</p>
-        </div>
-        <!-- Form Bento Layout -->
-        <form class="w-full max-w-3xl space-y-8">
-            <!-- Student & Guardian Information Card -->
-            <section class="bg-surface-container-lowest rounded-xl p-8 transition-all">
-                <h2 class="text-lg font-bold text-primary font-headline mb-6 flex items-center gap-2">
-                    <span class="material-symbols-outlined">person</span>
-                    Información del Estudiante
-                </h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <!-- Student Field -->
-                    <div class="relative">
-                        <label class="block text-xs font-bold uppercase tracking-wider text-secondary mb-2"
-                            for="estudiante">Nombre del Estudiante</label>
+    <!-- Main Content Wrapper -->
+    <main class="ml-64 min-h-screen flex flex-col">
+        <!-- TopNavBar -->
+        <header class="bg-[#f7f9fc] dark:bg-slate-900 sticky top-0 z-40">
+            <div class="flex justify-between items-center w-full px-8 py-3 max-w-[1920px] mx-auto">
+                <div class="flex items-center gap-8 flex-1">
+                    <div class="relative w-full max-w-md">
+                        <span
+                            class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
                         <input
-                            class="w-full bg-surface-container-low border-0 border-b-2 border-primary-fixed focus:border-primary focus:ring-0 transition-all py-3 px-4 font-body text-on-surface"
-                            id="estudiante" name="estudiante" placeholder="Ej: Mateo Silva" type="text" />
-                    </div>
-                    <!-- Guardian Field -->
-                    <div class="relative">
-                        <label class="block text-xs font-bold uppercase tracking-wider text-secondary mb-2"
-                            for="apoderado">RUT Apoderado / Nombre</label>
-                        <input
-                            class="w-full bg-surface-container-low border-0 border-b-2 border-primary-fixed focus:border-primary focus:ring-0 transition-all py-3 px-4 font-body text-on-surface"
-                            id="apoderado" name="apoderado" placeholder="Ej: 12.345.678-9" type="text" />
+                            class="w-full pl-10 pr-4 py-2 bg-surface-container-low border-none rounded-full text-sm focus:ring-2 focus:ring-primary focus:bg-white transition-all"
+                            placeholder="Buscar historial..." type="text" />
                     </div>
                 </div>
-            </section>
-            <!-- Schedule & Logistics Bento -->
-            <section class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <!-- Date Picker Card -->
-                <div class="md:col-span-2 bg-surface-container-lowest rounded-xl p-8">
-                    <h2 class="text-lg font-bold text-primary font-headline mb-6 flex items-center gap-2">
-                        <span class="material-symbols-outlined">event</span>
-                        Fecha y Hora
-                    </h2>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                        <div>
-                            <label class="block text-xs font-bold uppercase tracking-wider text-secondary mb-2"
-                                for="fecha">Fecha</label>
-                            <input
-                                class="w-full bg-surface-container-low border-0 border-b-2 border-primary-fixed focus:border-primary focus:ring-0 transition-all py-3 px-4 font-body"
-                                id="fecha" name="fecha" type="date" />
+                <div class="flex items-center gap-6">
+                    <div class="flex items-center gap-4">
+                        <button class="text-[#48626e] hover:text-[#00376e] transition-colors relative">
+                            <span class="material-symbols-outlined">notifications</span>
+                            <span class="absolute top-0 right-0 w-2 h-2 bg-error rounded-full"></span>
+                        </button>
+                        <button class="text-[#48626e] hover:text-[#00376e] transition-colors">
+                            <span class="material-symbols-outlined">help_outline</span>
+                        </button>
+                    </div>
+                    <div class="h-8 w-px bg-surface-container-high mx-2"></div>
+                    <button
+                        class="btn-gradient text-white px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity">
+                        Descargar Reporte
+                    </button>
+                    <div class="flex items-center gap-3 ml-4">
+                        <div class="text-right">
+                            <p class="text-xs font-bold text-primary">Admin Liceo</p>
+                            <p class="text-[10px] text-secondary">Administrador Central</p>
                         </div>
-                        <div>
-                            <label class="block text-xs font-bold uppercase tracking-wider text-secondary mb-2"
-                                for="hora">Hora</label>
-                            <input
-                                class="w-full bg-surface-container-low border-0 border-b-2 border-primary-fixed focus:border-primary focus:ring-0 transition-all py-3 px-4 font-body"
-                                id="hora" name="hora" type="time" />
-                        </div>
+                        <img alt="Executive Profile" class="w-10 h-10 rounded-full border-2 border-white shadow-sm"
+                            src="https://lh3.googleusercontent.com/aida-public/AB6AXuB7BRmltJ0uvUGen0UWXxZg89RgzisBP_Y3FcC2AqZzhm4xMux-9onPTpZjAa4qEkin9SoAW6DZ3Sx7RUdHbK_DzshUysBR4JM8Qjra6qLFPTTeDI-rhk8szlgxZdzDYnuH9emoThOlzjeH_boffjbspzKGJ3YRqzgNaMG28QSoXVY0YtgdudF6CypN6SqyIwgByoHxIYyw26tFPkRSpzjN8yr7tPNwTZrpSVuolyLwzemBqHur9y_Yju_5gBixf81TBXSLQB9n3GU" />
                     </div>
                 </div>
-                <!-- Quick Action Tags Card -->
-                <div class="bg-surface-container-lowest rounded-xl p-8 flex flex-col">
-                    <h2 class="text-lg font-bold text-primary font-headline mb-6">Urgencia</h2>
-                    <div class="flex flex-col gap-3">
-                        <label class="flex items-center gap-3 cursor-pointer group">
-                            <input checked="" class="text-primary focus:ring-primary border-outline-variant"
-                                name="urgencia" type="radio" value="normal" />
-                            <span
-                                class="text-sm font-medium text-secondary group-hover:text-primary transition-colors">Normal</span>
-                        </label>
-                        <label class="flex items-center gap-3 cursor-pointer group">
-                            <input class="text-tertiary focus:ring-tertiary border-outline-variant" name="urgencia"
-                                type="radio" value="prioritario" />
-                            <span
-                                class="text-sm font-medium text-secondary group-hover:text-tertiary transition-colors">Prioritario</span>
-                        </label>
-                        <label class="flex items-center gap-3 cursor-pointer group">
-                            <input class="text-error focus:ring-error border-outline-variant" name="urgencia"
-                                type="radio" value="urgente" />
-                            <span
-                                class="text-sm font-medium text-secondary group-hover:text-error transition-colors text-error">Urgente</span>
-                        </label>
-                    </div>
+            </div>
+            <div class="bg-[#f2f4f7] dark:bg-slate-800 h-px w-full"></div>
+        </header>
+        <!-- Content Canvas -->
+        <div class="p-10 space-y-8 max-w-[1600px] mx-auto w-full">
+            <!-- Page Header -->
+            <div class="flex justify-between items-end">
+                <div>
+                    <h1 class="text-3xl font-extrabold text-primary tracking-tight mb-2">Historial General de
+                        Entrevistas</h1>
+                    <p class="text-secondary font-medium">Liceo New Heaven — Registro unificado de atención a
+                        estudiantes y apoderados.</p>
                 </div>
-            </section>
-            <!-- Reason & Notes Card -->
-            <section class="bg-surface-container-lowest rounded-xl p-8">
-                <h2 class="text-lg font-bold text-primary font-headline mb-6 flex items-center gap-2">
-                    <span class="material-symbols-outlined">subject</span>
-                    Motivo de la Entrevista
-                </h2>
-                <div class="space-y-6">
-                    <div>
-                        <label class="block text-xs font-bold uppercase tracking-wider text-secondary mb-2"
-                            for="motivo">Categoría Principal</label>
+                <div class="flex gap-3">
+                    <button
+                        class="flex items-center gap-2 bg-surface-container-low text-on-surface px-4 py-2 rounded-lg font-semibold hover:bg-surface-container-high transition-colors">
+                        <span class="material-symbols-outlined text-lg">filter_alt_off</span>
+                        <span>Limpiar</span>
+                    </button>
+                </div>
+            </div>
+            <!-- Bento Filter Section -->
+            <div class="bg-surface-container-lowest p-8 rounded-xl shadow-sm space-y-6">
+                <div class="flex items-center gap-2 text-primary font-bold mb-4">
+                    <span class="material-symbols-outlined">tune</span>
+                    <span class="uppercase tracking-widest text-xs">Panel de Filtros</span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                    <!-- Dropdown: Profesor -->
+                    <div class="flex flex-col gap-2">
+                        <label class="text-xs font-bold text-secondary uppercase tracking-tighter">Filtrar por
+                            Profesor</label>
                         <select
-                            class="w-full bg-surface-container-low border-0 border-b-2 border-primary-fixed focus:border-primary focus:ring-0 transition-all py-3 px-4 font-body"
-                            id="motivo" name="motivo">
-                            <option value="rendimiento">Rendimiento Académico</option>
-                            <option value="conducta">Conducta y Convivencia</option>
-                            <option value="asistencia">Asistencia y Puntualidad</option>
-                            <option value="personal">Asunto Personal / Familiar</option>
-                            <option value="otro">Otro</option>
+                            class="w-full bg-surface-container-low border-0 border-b-2 border-primary-fixed focus:border-primary focus:ring-0 text-sm py-3 transition-all">
+                            <option>Todos los docentes</option>
+                            <option>Elena Soto Ruiz</option>
+                            <option>Ricardo Lagos Weber</option>
+                            <option>Mar\u00eda Paz Est\u00e9vez</option>
                         </select>
                     </div>
-                    <div>
-                        <label class="block text-xs font-bold uppercase tracking-wider text-secondary mb-2"
-                            for="notas">Observaciones Adicionales</label>
-                        <textarea
-                            class="w-full bg-surface-container-low border-0 border-b-2 border-primary-fixed focus:border-primary focus:ring-0 transition-all py-3 px-4 font-body resize-none"
-                            id="notas" name="notas" placeholder="Breve descripción de los temas a tratar..." rows="4"></textarea>
+                    <!-- Dropdown: Curso -->
+                    <div class="flex flex-col gap-2">
+                        <label class="text-xs font-bold text-secondary uppercase tracking-tighter">Curso</label>
+                        <select
+                            class="w-full bg-surface-container-low border-0 border-b-2 border-primary-fixed focus:border-primary focus:ring-0 text-sm py-3 transition-all">
+                            <option>Cualquiera</option>
+                            <option>1°A</option>
+                            <option>1°B</option>
+                            <option>2°A</option>
+                            <option>4° Medio C</option>
+                        </select>
+                    </div>
+                    <!-- Date Picker -->
+                    <div class="flex flex-col gap-2">
+                        <label class="text-xs font-bold text-secondary uppercase tracking-tighter">Rango de
+                            Fechas</label>
+                        <div class="relative">
+                            <input
+                                class="w-full bg-surface-container-low border-0 border-b-2 border-primary-fixed focus:border-primary focus:ring-0 text-sm py-3 transition-all"
+                                type="date" />
+                        </div>
+                    </div>
+                    <!-- Dropdown: Estado -->
+                    <div class="flex flex-col gap-2">
+                        <label class="text-xs font-bold text-secondary uppercase tracking-tighter">Estado</label>
+                        <select
+                            class="w-full bg-surface-container-low border-0 border-b-2 border-primary-fixed focus:border-primary focus:ring-0 text-sm py-3 transition-all">
+                            <option>Todos los estados</option>
+                            <option>Realizada</option>
+                            <option>Pendiente</option>
+                            <option>Cancelada</option>
+                        </select>
                     </div>
                 </div>
-            </section>
-            <!-- Actions -->
-            <div class="flex flex-col sm:flex-row gap-4 pt-6">
-                <button
-                    class="flex-1 bg-gradient-to-br from-primary to-primary-container text-white py-4 px-8 rounded-lg font-bold tracking-wide hover:opacity-90 transition-all shadow-md flex items-center justify-center gap-2"
-                    type="submit">
-                    <span class="material-symbols-outlined">calendar_add_on</span>
-                    Confirmar y Agendar Cita
-                </button>
-                <button
-                    class="px-8 py-4 text-secondary font-bold hover:bg-surface-container-high rounded-lg transition-colors"
-                    type="button">
-                    Cancelar
-                </button>
             </div>
-        </form>
-        <!-- Footer Visual Hint -->
+            <!-- Data Table Container -->
+            <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-surface-container-low border-b border-surface-container-high">
+                            <th class="px-6 py-5 text-xs font-bold text-secondary uppercase tracking-wider">Fecha</th>
+                            <th class="px-6 py-5 text-xs font-bold text-secondary uppercase tracking-wider">Alumno</th>
+                            <th class="px-6 py-5 text-xs font-bold text-secondary uppercase tracking-wider">Profesor
+                            </th>
+                            <th class="px-6 py-5 text-xs font-bold text-secondary uppercase tracking-wider">Motivo</th>
+                            <th class="px-6 py-5 text-xs font-bold text-secondary uppercase tracking-wider">Estado</th>
+                            <th class="px-6 py-5 text-xs font-bold text-secondary uppercase tracking-wider text-right">
+                                Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-surface-container">
+                        <!-- Row 1 -->
+                        <tr class="hover:bg-surface-bright transition-colors group">
+                            <td class="px-6 py-5">
+                                <div class="flex items-center gap-3">
+                                    <span
+                                        class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">event</span>
+                                    <span class="text-sm font-semibold text-on-surface">24 Oct, 2023</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-5">
+                                <div class="flex items-center gap-3">
+                                    <div
+                                        class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center text-xs font-bold text-on-primary-fixed">
+                                        MV</div>
+                                    <span class="text-sm font-medium text-on-surface">Matías Valenzuela</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-5 text-sm text-secondary">Elena Soto Ruiz</td>
+                            <td class="px-6 py-5">
+                                <span
+                                    class="text-xs bg-surface-container text-on-secondary-container px-2 py-1 rounded font-bold uppercase">Rendimiento</span>
+                            </td>
+                            <td class="px-6 py-5">
+                                <span
+                                    class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-primary-fixed text-primary">
+                                    <span class="w-1.5 h-1.5 bg-primary rounded-full"></span>
+                                    Realizada
+                                </span>
+                            </td>
+                            <td class="px-6 py-5 text-right">
+                                <button class="text-sm font-bold text-primary hover:underline transition-all">Ver
+                                    Bitácora</button>
+                            </td>
+                        </tr>
+                        <!-- Row 2 -->
+                        <tr class="hover:bg-surface-bright transition-colors group">
+                            <td class="px-6 py-5">
+                                <div class="flex items-center gap-3">
+                                    <span
+                                        class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">event</span>
+                                    <span class="text-sm font-semibold text-on-surface">25 Oct, 2023</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-5">
+                                <div class="flex items-center gap-3">
+                                    <div
+                                        class="w-8 h-8 rounded-full bg-tertiary-fixed flex items-center justify-center text-xs font-bold text-on-tertiary-fixed">
+                                        JC</div>
+                                    <span class="text-sm font-medium text-on-surface">Javier Canales</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-5 text-sm text-secondary">Ricardo Lagos Weber</td>
+                            <td class="px-6 py-5">
+                                <span
+                                    class="text-xs bg-surface-container text-on-secondary-container px-2 py-1 rounded font-bold uppercase">Convivencia</span>
+                            </td>
+                            <td class="px-6 py-5">
+                                <span
+                                    class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-tertiary-fixed text-tertiary">
+                                    <span class="w-1.5 h-1.5 bg-tertiary rounded-full"></span>
+                                    Pendiente
+                                </span>
+                            </td>
+                            <td class="px-6 py-5 text-right">
+                                <button
+                                    class="text-sm font-bold text-primary hover:underline transition-all">Detalles</button>
+                            </td>
+                        </tr>
+                        <!-- Row 3 -->
+                        <tr class="hover:bg-surface-bright transition-colors group">
+                            <td class="px-6 py-5">
+                                <div class="flex items-center gap-3">
+                                    <span
+                                        class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">event</span>
+                                    <span class="text-sm font-semibold text-on-surface">26 Oct, 2023</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-5">
+                                <div class="flex items-center gap-3">
+                                    <div
+                                        class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center text-xs font-bold text-on-primary-fixed">
+                                        FP</div>
+                                    <span class="text-sm font-medium text-on-surface">Francisca Palma</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-5 text-sm text-secondary">Elena Soto Ruiz</td>
+                            <td class="px-6 py-5">
+                                <span
+                                    class="text-xs bg-surface-container text-on-secondary-container px-2 py-1 rounded font-bold uppercase">Personal</span>
+                            </td>
+                            <td class="px-6 py-5">
+                                <span
+                                    class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-error-container text-error">
+                                    <span class="w-1.5 h-1.5 bg-error rounded-full"></span>
+                                    Cancelada
+                                </span>
+                            </td>
+                            <td class="px-6 py-5 text-right">
+                                <button class="text-sm font-bold text-primary hover:underline transition-all">Ver
+                                    Bitácora</button>
+                            </td>
+                        </tr>
+                        <!-- Row 4 -->
+                        <tr class="hover:bg-surface-bright transition-colors group">
+                            <td class="px-6 py-5">
+                                <div class="flex items-center gap-3">
+                                    <span
+                                        class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">event</span>
+                                    <span class="text-sm font-semibold text-on-surface">27 Oct, 2023</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-5">
+                                <div class="flex items-center gap-3">
+                                    <div
+                                        class="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center text-xs font-bold text-on-secondary-fixed">
+                                        AM</div>
+                                    <span class="text-sm font-medium text-on-surface">Andr\u00e9s Molina</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-5 text-sm text-secondary">Mar\u00eda Paz Est\u00e9vez</td>
+                            <td class="px-6 py-5">
+                                <span
+                                    class="text-xs bg-surface-container text-on-secondary-container px-2 py-1 rounded font-bold uppercase">Rendimiento</span>
+                            </td>
+                            <td class="px-6 py-5">
+                                <span
+                                    class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-primary-fixed text-primary">
+                                    <span class="w-1.5 h-1.5 bg-primary rounded-full"></span>
+                                    Realizada
+                                </span>
+                            </td>
+                            <td class="px-6 py-5 text-right">
+                                <button class="text-sm font-bold text-primary hover:underline transition-all">Ver
+                                    Bitácora</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <!-- Table Footer -->
+                <div class="px-6 py-4 bg-surface-container-low flex justify-between items-center">
+                    <p class="text-xs text-secondary font-medium">Mostrando 4 de 128 registros</p>
+                    <div class="flex items-center gap-2">
+                        <button class="p-1 hover:bg-surface-container-high rounded transition-colors">
+                            <span class="material-symbols-outlined text-lg">chevron_left</span>
+                        </button>
+                        <div class="flex gap-1">
+                            <span
+                                class="w-6 h-6 flex items-center justify-center bg-primary text-white text-xs font-bold rounded">1</span>
+                            <span
+                                class="w-6 h-6 flex items-center justify-center hover:bg-surface-container-high text-xs font-bold rounded cursor-pointer">2</span>
+                            <span
+                                class="w-6 h-6 flex items-center justify-center hover:bg-surface-container-high text-xs font-bold rounded cursor-pointer">3</span>
+                        </div>
+                        <button class="p-1 hover:bg-surface-container-high rounded transition-colors">
+                            <span class="material-symbols-outlined text-lg">chevron_right</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <!-- Stats/Insights Row -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="bg-primary-container p-6 rounded-xl text-on-primary shadow-lg flex items-center gap-4">
+                    <div class="bg-white/10 p-3 rounded-lg">
+                        <span class="material-symbols-outlined text-3xl">task_alt</span>
+                    </div>
+                    <div>
+                        <p class="text-xs uppercase tracking-widest font-bold opacity-80">Cumplimiento Mensual</p>
+                        <h3 class="text-2xl font-black">94%</h3>
+                    </div>
+                </div>
+                <div
+                    class="bg-surface-container-lowest p-6 rounded-xl shadow-sm flex items-center gap-4 border-l-4 border-tertiary">
+                    <div class="bg-tertiary-fixed p-3 rounded-lg text-on-tertiary-fixed">
+                        <span class="material-symbols-outlined text-3xl">pending_actions</span>
+                    </div>
+                    <div>
+                        <p class="text-xs uppercase tracking-widest font-bold text-secondary">Pendientes</p>
+                        <h3 class="text-2xl font-black text-on-surface">12 Entrevistas</h3>
+                    </div>
+                </div>
+                <div
+                    class="bg-surface-container-lowest p-6 rounded-xl shadow-sm flex items-center gap-4 border-l-4 border-error">
+                    <div class="bg-error-container p-3 rounded-lg text-on-error-container">
+                        <span class="material-symbols-outlined text-3xl">cancel</span>
+                    </div>
+                    <div>
+                        <p class="text-xs uppercase tracking-widest font-bold text-secondary">Canceladas (Mes)</p>
+                        <h3 class="text-2xl font-black text-on-surface">4</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Footer Note -->
         <footer
-            class="mt-24 w-full max-w-3xl flex justify-between items-center text-outline text-xs uppercase tracking-widest border-t border-outline-variant/15 pt-8 mb-12">
-            <span>© 2024 Institución Educativa</span>
+            class="mt-auto px-10 py-6 border-t border-surface-container-high bg-white flex justify-between items-center">
+            <p class="text-xs text-secondary">© 2023 Liceo Pro Educational Systems. Todos los derechos reservados.</p>
             <div class="flex gap-4">
-                <span>Privacidad</span>
-                <span>Soporte</span>
+                <a class="text-xs text-primary font-bold hover:underline" href="#">Soporte T\u00e9cnico</a>
+                <a class="text-xs text-primary font-bold hover:underline" href="#">Pol\u00edticas de
+                    Privacidad</a>
             </div>
         </footer>
     </main>
-    <!-- Contextual FAB (Hidden on focused forms as per guidelines, but placed for layout completeness in code) -->
-    <!-- The FAB is suppressed here to prioritize the scheduling task focus -->
 </body>
 
 </html>

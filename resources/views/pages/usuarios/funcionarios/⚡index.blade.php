@@ -89,7 +89,7 @@ new class extends Component {
                 'password'     => \Illuminate\Support\Facades\Hash::make(\Illuminate\Support\Str::random(16)),
                 'current_school_id' => auth()->user()->current_school_id,
             ]);
-            $funcionario->schools()->attach(auth()->user()->current_school_id, ['roles' => json_encode(['funcionario'])]);
+            $funcionario->schools()->attach(auth()->user()->current_school_id, ['roles' => json_encode(['docente'])]);
         }
 
         $this->modalAbierto = false;
@@ -117,10 +117,14 @@ new class extends Component {
     {
         return \App\Models\User::query()
             ->whereHas('schools', function ($q) {
-                $q->where('school_id', auth()->user()->current_school_id);
+                $q->where('school_id', auth()->user()->current_school_id)
+                  ->whereJsonDoesntContain('school_user.roles', 'estudiante');
+                if ($this->cargo !== 'todos') {
+                    $q->whereJsonContains('school_user.roles', $this->cargo);
+                }
             })
             ->tap(fn($query) => $this->sortBy ? $query->orderBy($this->sortBy, $this->sortDirection) : $query)
-            ->paginate(5);
+            ->paginate(15);
     }
 };
 
@@ -143,8 +147,14 @@ new class extends Component {
                 </flux:subheading>
             </div>
 
-            <flux:button variant="primary" icon="plus" wire:click="abrirCrear" class="shrink-0">
-                {{ __('Nuevo Funcionario') }}</flux:button>
+            <div class="flex flex-col gap-2 shrink-0">
+                <flux:button variant="primary" icon="plus" wire:click="abrirCrear">
+                    {{ __('Nuevo Funcionario') }}
+                </flux:button>
+                <flux:button variant="ghost" icon="document-arrow-up" href="{{ route('funcionarios.carga_masiva') }}">
+                    {{ __('Carga Masiva') }}
+                </flux:button>
+            </div>
         </div>
 
         <!-- Filters Bento Grid -->
@@ -152,18 +162,20 @@ new class extends Component {
             <div class="md:col-span-8">
                 <flux:card class="h-full flex items-center">
                     <div class="flex flex-col md:flex-row items-start md:items-center gap-6 w-full">
-                        <flux:field class="flex-1 w-full overflow-hidden">
-                            <flux:label
-                                class="mb-2 uppercase tracking-widest text-[10px] font-bold text-zinc-500 dark:text-zinc-400">
-                                {{ __('Filtrar por Cargo') }}</flux:label>
-                            <flux:radio.group wire:model.live="cargo" variant="segmented"
-                                class="w-full overflow-x-auto">
-                                <flux:radio value="todos" :label="__('Todos')" />
-                                <flux:radio value="docente" :label="__('Docente')" />
-                                <flux:radio value="inspector" :label="__('Inspector')" />
-                                <flux:radio value="auxiliar" :label="__('Auxiliar')" />
-                                <flux:radio value="admin" :label="__('Admin')" />
-                            </flux:radio.group>
+                        <flux:field class="flex-1 w-full md:w-56 overflow-hidden">
+                            <flux:label class="mb-2 uppercase tracking-widest text-[10px] font-bold text-zinc-500 dark:text-zinc-400">
+                                {{ __('Filtrar por Cargo (Rol)') }}
+                            </flux:label>
+                            <flux:select wire:model.live="cargo">
+                                <flux:select.option value="todos">{{ __('Todos') }}</flux:select.option>
+                                <flux:select.option value="docente">{{ __('Docente') }}</flux:select.option>
+                                <flux:select.option value="inspector">{{ __('Inspector') }}</flux:select.option>
+                                <flux:select.option value="asistente">{{ __('Asistente') }}</flux:select.option>
+                                <flux:select.option value="psicosocial">{{ __('Psicosocial') }}</flux:select.option>
+                                <flux:select.option value="recepcion">{{ __('Recepción') }}</flux:select.option>
+                                <flux:select.option value="directivo">{{ __('Directivo') }}</flux:select.option>
+                                <flux:select.option value="administrador">{{ __('Administrador') }}</flux:select.option>
+                            </flux:select>
                         </flux:field>
 
                         <div class="h-12 w-px bg-zinc-200 dark:bg-zinc-700 hidden md:block"></div>

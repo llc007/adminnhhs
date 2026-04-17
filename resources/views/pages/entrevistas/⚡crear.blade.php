@@ -6,7 +6,11 @@ new class extends Component {
     public string $searchEstudiante = '';
     public ?int $estudianteId = null;
 
-    // Lista de resultados mostrada dinámicamente
+    // Búsqueda por curso (híbrido)
+    public string $filtroCursoId = '';
+    public bool $modalEstudiantes = false;
+
+    // Lista de resultados mostrada dinámicamente para la búsqueda rápida
     public $resultadosBusqueda = [];
 
     // Campos de la entrevista
@@ -43,6 +47,45 @@ new class extends Component {
 
         $this->searchEstudiante = $estudiante ? $estudiante->nombreCompleto() : '';
         $this->resultadosBusqueda = [];
+        $this->modalEstudiantes = false; // Cerramos el modal por si venía de ahí
+    }
+
+    public function updatedFiltroCursoId()
+    {
+        if ($this->filtroCursoId !== '') {
+            $this->modalEstudiantes = true;
+        }
+    }
+
+    public function abrirModalCurso()
+    {
+        if ($this->filtroCursoId !== '') {
+            $this->modalEstudiantes = true;
+        }
+    }
+
+    #[\Livewire\Attributes\Computed]
+    public function cursos()
+    {
+        return \App\Models\Curso::where('school_id', auth()->user()->current_school_id)
+            ->orderBy('modalidad', 'asc') // 'basica' aparece antes que 'media' por orden alfabético
+            ->orderBy('nivel')
+            ->orderBy('letra')
+            ->get();
+    }
+
+    #[\Livewire\Attributes\Computed]
+    public function alumnosDelCurso()
+    {
+        if ($this->filtroCursoId === '') {
+            return collect();
+        }
+
+        return \App\Models\Estudiante::query()
+            ->where('curso_id', $this->filtroCursoId)
+            ->where('school_id', auth()->user()->current_school_id)
+            ->orderBy('nombres_csv', 'asc')
+            ->get();
     }
 
     #[\Livewire\Attributes\Computed]
@@ -66,18 +109,28 @@ new class extends Component {
                 'notas' => ['nullable', 'string'],
             ],
             [
-                'estudianteId.required' => 'Debe seleccionar un estudiante de la lista.',
+                'estudianteId.required' => 'Debe seleccionar un estudiante.',
             ],
         );
 
-        // Por ahora lo simularemos. Luego crearemos la base de datos "Entrevistas"
+        \App\Models\Entrevista::create([
+            'school_id' => auth()->user()->current_school_id,
+            'user_id' => auth()->id(),
+            'estudiante_id' => $this->estudianteId,
+            'fecha' => $this->fecha,
+            'hora' => $this->hora,
+            'urgencia' => $this->urgencia,
+            'motivo' => $this->motivo,
+            'notas_previas' => $this->notas,
+            'estado' => 'pendiente',
+        ]);
 
-        // \App\Models\Entrevista::create([...]);
+        // Feedback al usuario local e interfaz
+        \Flux::toast('Entrevista agendada con éxito.', variant: 'success');
 
-        Flux::toast('Entrevista agendada con éxito.', 'success');
-
-        // Reset form
-        $this->reset(['estudianteId', 'searchEstudiante', 'fecha', 'hora', 'urgencia', 'motivo', 'notas']);
+        // Reset del form parcialmente para permitir agendar otra al momento
+        $this->reset(['estudianteId', 'searchEstudiante', 'filtroCursoId', 'urgencia', 'motivo', 'notas']);
+        $this->mount(); // Vuelve a resetear la hora a 09:00 y la fecha a hoy
     }
 
     public function mount()
@@ -127,17 +180,37 @@ new class extends Component {
                 <flux:heading size="lg">{{ __('Información del Estudiante') }}</flux:heading>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
-                {{-- Buscador Reactivo --}}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 relative items-end">
+
+                {{-- Selector Guiado por Curso --}}
+                <div class="w-full">
+                    <div class="flex items-end gap-2">
+                        <div class="flex-1">
+                            <flux:select wire:model.live="filtroCursoId" :label="__('1. Seleccionar por Curso')">
+                                <flux:select.option value="" disabled>{{ __('Elige un curso...') }}
+                                </flux:select.option>
+                                @foreach ($this->cursos as $cur)
+                                    <flux:select.option value="{{ $cur->id }}">{{ $cur->nombreCompleto() }}
+                                    </flux:select.option>
+                                @endforeach
+                            </flux:select>
+                        </div>
+                        <flux:button icon="users" wire:click="abrirModalCurso"
+                            class="mb-0 h-10 w-10 shrink-0 flex items-center justify-center p-0"
+                            :disabled="$filtroCursoId === ''" title="Ver lista de alumnos" />
+                    </div>
+                </div>
+
+                {{-- Buscador Global Rápido --}}
                 <div class="relative z-10 w-full">
                     <flux:input wire:model.live.debounce.300ms="searchEstudiante"
-                        :label="__('Buscar Estudiante por Nombre o RUT')" icon="magnifying-glass"
-                        placeholder="Ej: Marcelo Paz..." autocomplete="off" />
+                        :label="__('2. O búsqueda rápida libre')" icon="magnifying-glass"
+                        placeholder="Ej: Marcelo Paz (Nombre o RUT)..." autocomplete="off" />
 
                     {{-- Dropdown de resultados (se sobrepone) --}}
                     @if (count($resultadosBusqueda) > 0)
                         <div
-                            class="absolute mt-1 w-full bg-white dark:bg-zinc-800 rounded-md shadow-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden outline-none">
+                            class="absolute mt-1 w-full bg-white dark:bg-zinc-800 rounded-md shadow-lg border border-zinc-200 dark:border-zinc-700 z-50 overflow-hidden outline-none">
                             <ul class="max-h-60 overflow-y-auto">
                                 @foreach ($resultadosBusqueda as $res)
                                     <li>
@@ -161,15 +234,46 @@ new class extends Component {
 
                     <flux:error name="estudianteId" />
                 </div>
+            </div>
 
-                {{-- Apoderado Auto-completado --}}
-                <div class="pt-0 md:pt-0">
+            <flux:separator variant="subtle" class="my-6" />
+
+            {{-- Apoderado Auto-completado & Estudiante Actual --}}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                <div>
+                    @if ($this->estudiante)
+                        <div
+                            class="flex items-center gap-3 bg-zinc-50 p-4 rounded-xl border border-zinc-200 dark:bg-zinc-800/50 dark:border-zinc-700">
+                            <flux:icon.check-circle class="size-6 text-green-500" />
+                            <div>
+                                <p class="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Estudiante
+                                    Seleccionado</p>
+                                <p class="text-sm font-medium text-zinc-900 dark:text-white mt-0.5">
+                                    {{ $this->estudiante->nombreCompleto() }}</p>
+                            </div>
+                        </div>
+                    @else
+                        <div
+                            class="flex items-center gap-3 bg-red-50 p-4 rounded-xl border border-red-200 dark:bg-red-900/10 dark:border-red-800/30">
+                            <flux:icon.exclamation-circle class="size-6 text-red-500" />
+                            <div>
+                                <p
+                                    class="text-xs font-semibold text-red-600 dark:text-red-400 uppercase tracking-wider">
+                                    Estudiante Seleccionado</p>
+                                <p class="text-sm font-medium text-red-700 dark:text-red-300 mt-0.5">Pendiente de
+                                    selección</p>
+                            </div>
+                        </div>
+                    @endif
+                </div>
+
+                <div>
                     @if ($this->estudiante)
                         <flux:input :label="__('Apoderado Titular')"
                             value="{{ $this->estudiante->apoderado_nombres ? $this->estudiante->apoderado_nombres . ' ' . $this->estudiante->apoderado_apellido_pat : 'Sin apoderado registrado' }} {{ $this->estudiante->apoderado_parentesco ? '(' . $this->estudiante->apoderado_parentesco . ')' : '' }}"
                             disabled />
                     @else
-                        <flux:input :label="__('Apoderado Titular')" placeholder="Primero busque un estudiante..."
+                        <flux:input :label="__('Apoderado Titular')" placeholder="Esperando selección de estudiante..."
                             disabled />
                     @endif
                 </div>
@@ -264,4 +368,48 @@ new class extends Component {
             </flux:button>
         </div>
     </form>
+
+    {{-- Modal para seleccionar alumnos del curso --}}
+    <flux:modal wire:model="modalEstudiantes" class="md:w-[32rem]">
+        <div class="space-y-6">
+            <div>
+                <flux:heading size="lg">{{ __('Elegir Estudiante de la Nómina') }}</flux:heading>
+                <flux:text class="mt-1">{{ __('Seleccione con un clic al alumno que desea citar a entrevista.') }}
+                </flux:text>
+            </div>
+
+            <div
+                class="border border-zinc-200 dark:border-zinc-700 rounded-lg overflow-hidden flex flex-col max-h-[60vh]">
+                <div
+                    class="px-4 py-2 bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-200 dark:border-zinc-700 text-sm font-semibold flex justify-between text-zinc-600 dark:text-zinc-300">
+                    <span>Nombre del Alumno</span>
+                    <span>RUT</span>
+                </div>
+
+                <div class="overflow-y-auto w-full divide-y divide-zinc-100 dark:divide-zinc-800">
+                    @forelse($this->alumnosDelCurso as $al)
+                        <button type="button" wire:click="seleccionarEstudiante({{ $al->id }})"
+                            class="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800 focus:outline-none transition-colors group">
+                            <span
+                                class="text-sm font-medium text-zinc-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                                {{ $al->nombreCompleto() }}
+                            </span>
+                            <span class="text-xs text-zinc-500 font-mono">
+                                {{ $al->rutCompleto() ?? '-' }}
+                            </span>
+                        </button>
+                    @empty
+                        <div class="p-6 text-center text-zinc-500 text-sm">
+                            Este curso no tiene alumnos registrados o no existe.
+                        </div>
+                    @endforelse
+                </div>
+            </div>
+
+            <div class="flex justify-end">
+                <flux:button wire:click="$set('modalEstudiantes', false)" variant="ghost">{{ __('Cerrar') }}
+                </flux:button>
+            </div>
+        </div>
+    </flux:modal>
 </div>

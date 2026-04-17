@@ -51,8 +51,9 @@ class GoogleAuthController extends Controller
             );
 
             // Relacionar usuario al colegio con un rol por defecto si no están enlazados
+            // Por seguridad, todo usuario nuevo de Google asume rol 'estudiante' (que no verá la app)
             if ($school && !$user->schools()->where('school_id', $school->id)->exists()) {
-                $user->schools()->attach($school->id, ['roles' => json_encode(['docente'])]); // O el rol por defecto que decidas
+                $user->schools()->attach($school->id, ['roles' => json_encode(['estudiante'])]);
             }
 
             Auth::login($user);

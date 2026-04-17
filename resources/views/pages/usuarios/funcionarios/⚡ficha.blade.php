@@ -22,6 +22,9 @@ new class extends Component {
     public string $departamento = '';
     public string $fechaContratacion = '';
 
+    // Roles de Sistema
+    public array $roles = [];
+
     public function mount(int $id): void
     {
         $this->id = $id;
@@ -34,6 +37,7 @@ new class extends Component {
         $this->rutNumero = $funcionario->rut_numero ?? '';
         $this->rutDv = $funcionario->rut_dv ?? '';
         $this->email = $funcionario->email;
+        $this->roles = $funcionario->active_roles;
     }
 
     public function guardar(): void
@@ -51,7 +55,9 @@ new class extends Component {
             'fechaContratacion'  => ['nullable', 'date'],
         ]);
 
-        \App\Models\User::findOrFail($this->id)->update([
+        $funcionario = \App\Models\User::findOrFail($this->id);
+        
+        $funcionario->update([
             'nombres'      => $this->nombres,
             'apellido_pat' => $this->apellidoPat,
             'apellido_mat' => $this->apellidoMat ?: null,
@@ -59,6 +65,21 @@ new class extends Component {
             'rut_numero'   => $this->rutNumero ?: null,
             'rut_dv'       => $this->rutDv ? strtoupper($this->rutDv) : null,
         ]);
+
+        if (auth()->user()->hasRole(['administrador', 'superadmin'])) {
+            $nuevosRoles = empty($this->roles) ? ['estudiante'] : $this->roles;
+            if ($funcionario->current_school_id) {
+                if ($funcionario->schools()->where('school_id', $funcionario->current_school_id)->exists()) {
+                    $funcionario->schools()->updateExistingPivot($funcionario->current_school_id, [
+                        'roles' => json_encode($nuevosRoles)
+                    ]);
+                } else {
+                    $funcionario->schools()->attach($funcionario->current_school_id, [
+                        'roles' => json_encode($nuevosRoles)
+                    ]);
+                }
+            }
+        }
 
         $this->dispatch('saved');
     }
@@ -181,6 +202,34 @@ new class extends Component {
             </flux:text>
         </flux:card>
     </div>
+
+    @if(auth()->user()->hasRole(['administrador', 'superadmin']))
+    {{-- Sección 4: Roles de Acceso (Solo Admins) --}}
+    <flux:card>
+        <div class="flex items-center gap-3 mb-6">
+            <div class="p-2 bg-gradient-to-r from-red-500 to-[#00376e] text-white rounded-lg shadow-sm">
+                <flux:icon.key class="size-5" />
+            </div>
+            <div>
+                <flux:heading size="lg">{{ __('Asignación de Roles en el Sistema') }}</flux:heading>
+                <flux:subheading size="sm">{{ __('Niveles de acceso y módulos habilitados. Visibilidad restringida a Administradores.') }}</flux:subheading>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-y-4 gap-x-6">
+            <flux:checkbox wire:model="roles" value="docente" :label="__('Docente de Aula')" />
+            <flux:checkbox wire:model="roles" value="inspector" :label="__('Inspectoría')" />
+            <flux:checkbox wire:model="roles" value="asistente" :label="__('Asistente de Educación')" />
+            <flux:checkbox wire:model="roles" value="psicosocial" :label="__('Equipo Psicosocial')" />
+            <flux:checkbox wire:model="roles" value="recepcion" :label="__('Recepción / Portería')" />
+            <flux:checkbox wire:model="roles" value="directivo" :label="__('Cuerpo Directivo')" />
+            <flux:checkbox border="zinc" wire:model="roles" value="administrador" label="Admin del Colegio" />
+            @if(auth()->user()->hasRole('superadmin'))
+                <flux:checkbox wire:model="roles" value="superadmin" label="Superusuario Global" class="text-red-500 font-bold" />
+            @endif
+        </div>
+    </flux:card>
+    @endif
 
     {{-- Acciones --}}
     <div class="flex items-center justify-end gap-4 pt-4 border-t border-zinc-200 dark:border-zinc-700">

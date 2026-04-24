@@ -62,7 +62,7 @@ class GoogleAuthController extends Controller
 
             return redirect()->intended('/dashboard');
         } catch (\Exception $e) {
-            return redirect()->route('login')->with('error', 'Hubo un error al intentar iniciar sesión con Google.');
+            return redirect()->route('login')->with('error', 'Error real de Hostinger: ' . $e->getMessage());
         }
     }
 }

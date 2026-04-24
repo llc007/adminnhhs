@@ -14,6 +14,7 @@ new class extends Component {
     public string $apellidoMat = '';
     public string $rutNumero = '';
     public string $rutDv = '';
+    public string $fechaNacimiento = '';
     public string $email = '';
     public string $telefono = '';
 
@@ -36,6 +37,7 @@ new class extends Component {
         $this->apellidoMat = $funcionario->apellido_mat ?? '';
         $this->rutNumero = $funcionario->rut_numero ?? '';
         $this->rutDv = $funcionario->rut_dv ?? '';
+        $this->fechaNacimiento = $funcionario->fecha_nacimiento ?? '';
         $this->email = $funcionario->email;
         $this->roles = $funcionario->active_roles;
     }
@@ -49,6 +51,7 @@ new class extends Component {
             'email'       => ['required', 'email', Rule::unique('users', 'email')->ignore($this->id)],
             'rutNumero'   => ['nullable', 'digits_between:7,9'],
             'rutDv'       => ['nullable', 'string', 'max:1', 'regex:/^[0-9Kk]$/'],
+            'fechaNacimiento' => ['nullable', 'date'],
             'telefono'    => ['nullable', 'string', 'max:20'],
             'cargo'       => ['nullable', 'string', 'max:100'],
             'departamento'       => ['nullable', 'string', 'max:100'],
@@ -64,6 +67,7 @@ new class extends Component {
             'email'        => $this->email,
             'rut_numero'   => $this->rutNumero ?: null,
             'rut_dv'       => $this->rutDv ? strtoupper($this->rutDv) : null,
+            'fecha_nacimiento' => $this->fechaNacimiento ?: null,
         ]);
 
         if (auth()->user()->hasRole(['administrador', 'superadmin'])) {
@@ -125,11 +129,13 @@ new class extends Component {
             <flux:input wire:model="apellidoMat" :label="__('Apellido Materno')" placeholder="Ej: López" />
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
             <div class="flex gap-2 items-end">
                 <flux:input wire:model="rutNumero" :label="__('RUT')" placeholder="12345678" class="flex-1" />
                 <flux:input wire:model="rutDv" :label="__('DV')" placeholder="K" class="w-20" maxlength="1" />
             </div>
+
+            <flux:input wire:model="fechaNacimiento" :label="__('Fecha de Nacimiento')" type="date" />
 
             <flux:input wire:model="email" :label="__('Correo Electrónico')" type="email" placeholder="m.paz@colegio.cl" />
 

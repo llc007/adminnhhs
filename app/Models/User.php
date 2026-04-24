@@ -8,14 +8,14 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-
-#[Fillable(['nombres', 'apellido_pat', 'apellido_mat', 'email', 'password', 'google_id', 'avatar', 'current_school_id', 'rut_numero', 'rut_dv'])]
+#[Fillable(['nombres', 'apellido_pat', 'apellido_mat', 'email', 'password', 'google_id', 'avatar', 'current_school_id', 'rut_numero', 'rut_dv', 'fecha_nacimiento', 'telefono', 'direccion'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -96,7 +96,7 @@ class User extends Authenticatable
     /**
      * Get the cursos where this user is the docente jefe.
      */
-    public function jefeDeCursos(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function jefeDeCursos(): HasMany
     {
         return $this->hasMany(Curso::class, 'jefe_id');
     }
@@ -104,7 +104,7 @@ class User extends Authenticatable
     /**
      * Get the entrevistas assigned to this user.
      */
-    public function entrevistas(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function entrevistas(): HasMany
     {
         return $this->hasMany(Entrevista::class, 'user_id');
     }
@@ -119,12 +119,13 @@ class User extends Authenticatable
         }
 
         $school = $this->schools->where('id', $this->current_school_id)->first();
-        
+
         if (! $school || ! $school->pivot->roles) {
             return [];
         }
 
         $roles = json_decode($school->pivot->roles, true);
+
         return is_array($roles) ? $roles : [];
     }
 

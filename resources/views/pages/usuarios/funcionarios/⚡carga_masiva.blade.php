@@ -67,7 +67,16 @@ new class extends Component {
             $nombres = trim($cols[1 + $idxOffset] ?? '');
             $apellidos = trim($cols[2 + $idxOffset] ?? '');
             $correo = strtolower(trim($cols[3 + $idxOffset] ?? ''));
-            $rol = strtolower(trim($cols[4 + $idxOffset] ?? 'docente'));
+            
+            $fechaNacRaw = trim($cols[4 + $idxOffset] ?? '');
+            $fechaNacimiento = null;
+            if (!empty($fechaNacRaw)) {
+                try {
+                    $fechaNacimiento = \Carbon\Carbon::parse(str_replace('/', '-', $fechaNacRaw))->format('Y-m-d');
+                } catch (\Exception $e) { $fechaNacimiento = null; }
+            }
+
+            $rol = strtolower(trim($cols[5 + $idxOffset] ?? 'docente'));
 
             $partesApellidos = explode(' ', $apellidos, 2);
             $apellidoPat = $partesApellidos[0] ?? '';
@@ -87,6 +96,7 @@ new class extends Component {
                 'rut_numero' => $rutNumero,
                 'rut_dv' => $rutDv,
                 'email' => $correo,
+                'fecha_nacimiento' => $fechaNacimiento,
                 'rol' => $rol,
                 'estado' => $existe ? 'duplicado' : ($isValid ? 'ok' : 'error'),
             ];
@@ -117,6 +127,7 @@ new class extends Component {
                         'apellido_mat' => $fila['apellido_mat'],
                         'rut_numero' => $fila['rut_numero'],
                         'rut_dv' => $fila['rut_dv'],
+                        'fecha_nacimiento' => $fila['fecha_nacimiento'],
                         'password' => Hash::make(Str::random(16)), // Contraseña al azar
                         'current_school_id' => $schoolId,
                     ]
@@ -128,7 +139,8 @@ new class extends Component {
                         'nombres' => $fila['nombres'],
                         'apellido_pat' => $fila['apellido_pat'],
                         'rut_numero' => $fila['rut_numero'],
-                        'rut_dv' => $fila['rut_dv']
+                        'rut_dv' => $fila['rut_dv'],
+                        'fecha_nacimiento' => $fila['fecha_nacimiento'],
                     ]);
                 }
 
@@ -218,7 +230,7 @@ new class extends Component {
             <flux:card class="flex flex-col gap-4 bg-zinc-50 dark:bg-zinc-800/50">
                 <flux:heading>{{ __('Columnas esperadas') }}</flux:heading>
                 <div class="flex flex-col gap-2 text-sm text-zinc-600 dark:text-zinc-400">
-                    @foreach ([['RUT', 'Solo Nros (ej: 12345678)'], ['DV', 'Dígito (ej: K)'], ['Nombres', 'Ej: Juan Pablo'], ['Apellidos', 'Paterno Materno'], ['Correo Institucional', 'Exclusivo @newheavenhs.cl'], ['Rol', 'docente, inspector, admin']] as [$col, $desc])
+                    @foreach ([['RUT', 'Solo Nros (ej: 12345678)'], ['DV', 'Dígito (ej: K)'], ['Nombres', 'Ej: Juan Pablo'], ['Apellidos', 'Paterno Materno'], ['Correo Institucional', 'Exclusivo @newheavenhs.cl'], ['Nacimiento', 'Dia-Mes-Año o YYYY-MM-DD'], ['Rol', 'docente, inspector, admin']] as [$col, $desc])
                         <div class="flex justify-between gap-2 border-b border-zinc-200 dark:border-zinc-700 pb-1">
                             <span class="font-mono font-medium text-zinc-800 dark:text-zinc-200">{{ $col }}</span>
                             <span class="text-xs text-zinc-400 text-right">{{ $desc }}</span>
@@ -276,6 +288,7 @@ new class extends Component {
                         <flux:table.column>{{ __('Estado') }}</flux:table.column>
                         <flux:table.column>{{ __('RUT') }}</flux:table.column>
                         <flux:table.column>{{ __('Funcionario') }}</flux:table.column>
+                        <flux:table.column>{{ __('Nacimiento') }}</flux:table.column>
                         <flux:table.column>{{ __('Correo') }}</flux:table.column>
                         <flux:table.column>{{ __('Rol') }}</flux:table.column>
                     </flux:table.columns>
@@ -296,6 +309,9 @@ new class extends Component {
                                     {{ $fila['rut_numero'] }}-{{ $fila['rut_dv'] }}
                                 </flux:table.cell>
                                 <flux:table.cell class="font-medium uppercase">{{ $fila['apellido_pat'] }} {{ $fila['apellido_mat'] }}, {{ $fila['nombres'] }}</flux:table.cell>
+                                <flux:table.cell>
+                                    <span class="text-zinc-600 dark:text-zinc-400 font-mono text-xs">{{ $fila['fecha_nacimiento'] ? \Carbon\Carbon::parse($fila['fecha_nacimiento'])->format('d M, Y') : '-' }}</span>
+                                </flux:table.cell>
                                 <flux:table.cell>
                                     <span class="text-zinc-500 font-mono text-xs">{{ $fila['email'] }}</span>
                                 </flux:table.cell>

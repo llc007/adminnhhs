@@ -24,6 +24,11 @@ new class extends Component {
     public string $nuevoAdjuntoNombre = '';
     public string $nuevoAdjuntoUrl = '';
 
+    // Modal No Realizada
+    public bool $modalNoRealizada = false;
+    public string $motivoNoRealizada = '';
+    public string $estadoNoRealizada = '';
+
     public function mount(Entrevista $entrevista)
     {
         $this->entrevista = $entrevista->load(['estudiante.curso', 'user']);
@@ -113,6 +118,41 @@ new class extends Component {
         return redirect()->route('entrevistas.agenda');
     }
 
+    public function abrirModalNoRealizada()
+    {
+        $this->motivoNoRealizada = '';
+        $this->estadoNoRealizada = '';
+        $this->modalNoRealizada = true;
+    }
+
+    public function setMotivoPredeterminado($motivo, $estado)
+    {
+        $this->motivoNoRealizada = $motivo;
+        $this->estadoNoRealizada = $estado;
+    }
+
+    public function marcarNoRealizada()
+    {
+        $this->validate([
+            'motivoNoRealizada' => 'required|min:5',
+            'estadoNoRealizada' => 'required|in:ausente,cancelada',
+        ]);
+
+        if (!$this->bitacora) {
+            $this->bitacora = new Bitacora(['entrevista_id' => $this->entrevista->id]);
+        }
+        
+        $notaExtra = "MOTIVO NO REALIZADA: " . $this->motivoNoRealizada;
+        $this->bitacora->observaciones = $this->observaciones ? $this->observaciones . "\n\n" . $notaExtra : $notaExtra;
+        $this->bitacora->estado_formulario = 'no_realizada';
+        $this->bitacora->save();
+
+        $this->entrevista->update(['estado' => $this->estadoNoRealizada]);
+
+        \Flux::toast('Entrevista marcada como no realizada correctamente.', variant: 'warning');
+        return redirect()->route('entrevistas.agenda');
+    }
+
     private function guardarColeccion($estado)
     {
         if (!$this->bitacora) {
@@ -153,6 +193,9 @@ new class extends Component {
             @if(!$isRealizada)
                 <flux:button variant="ghost" class="w-full md:w-auto" wire:click="guardarBorrador">
                     {{ __('Guardar Borrador') }}
+                </flux:button>
+                <flux:button variant="danger" icon="x-circle" class="w-full md:w-auto" wire:click="abrirModalNoRealizada">
+                    {{ __('No Realizada') }}
                 </flux:button>
                 <flux:button variant="primary" icon="check-circle" class="w-full md:w-auto bg-gradient-to-br from-[#00376e] to-blue-800" wire:click="finalizarBitacora">
                     {{ __('Finalizar Entrevista') }}
@@ -435,6 +478,49 @@ new class extends Component {
                 <div class="flex justify-end gap-3 pt-2">
                     <flux:button wire:click="$set('modalAdjunto', false)" variant="ghost">Cancelar</flux:button>
                     <flux:button type="submit" variant="primary">Vincular Archivo</flux:button>
+                </div>
+            </form>
+        </div>
+    </flux:modal>
+
+    <!-- Modal No Realizada -->
+    <flux:modal wire:model="modalNoRealizada" class="md:w-[32rem]">
+        <div class="space-y-6">
+            <div>
+                <flux:heading size="lg" class="flex items-center gap-2 text-red-600">
+                    <flux:icon.x-circle class="size-5" />
+                    Marcar como No Realizada
+                </flux:heading>
+                <flux:text class="mt-1">Seleccione un motivo rápido o escriba el suyo. Esto cerrará la entrevista y afectará la hoja de vida.</flux:text>
+            </div>
+
+            <div class="flex flex-col gap-2">
+                <span class="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1">Motivos Rápidos</span>
+                <div class="flex flex-wrap gap-2">
+                    <flux:badge as="button" wire:click="setMotivoPredeterminado('Apoderado no asistió a la cita programada sin dar aviso previo.', 'ausente')" class="cursor-pointer border hover:bg-zinc-100 dark:hover:bg-zinc-700">Apoderado no asistió (Ausente)</flux:badge>
+                    <flux:badge as="button" wire:click="setMotivoPredeterminado('Apoderado avisó previamente que no asistiría.', 'cancelada')" class="cursor-pointer border hover:bg-zinc-100 dark:hover:bg-zinc-700">Avisó inasistencia (Cancelada)</flux:badge>
+                    <flux:badge as="button" wire:click="setMotivoPredeterminado('Error al agendar la cita. Entrevista anulada.', 'cancelada')" class="cursor-pointer border hover:bg-zinc-100 dark:hover:bg-zinc-700">Error al agendar (Cancelada)</flux:badge>
+                </div>
+            </div>
+
+            <form wire:submit.prevent="marcarNoRealizada" class="space-y-5">
+                <flux:select wire:model="estadoNoRealizada" label="Estado Oficial" required>
+                    <option value="" disabled>Seleccione un estado...</option>
+                    <option value="ausente">Ausente (No se presentó a la cita)</option>
+                    <option value="cancelada">Cancelada (Avisó previamente o fue error)</option>
+                </flux:select>
+
+                <flux:textarea 
+                    wire:model="motivoNoRealizada" 
+                    label="Motivo o Justificación" 
+                    placeholder="Detalle la razón exacta..." 
+                    rows="3"
+                    required 
+                />
+
+                <div class="flex justify-end gap-3 pt-2">
+                    <flux:button wire:click="$set('modalNoRealizada', false)" variant="ghost">Volver</flux:button>
+                    <flux:button type="submit" variant="danger">Confirmar y Cerrar Cita</flux:button>
                 </div>
             </form>
         </div>

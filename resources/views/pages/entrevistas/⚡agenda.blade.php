@@ -21,7 +21,7 @@ new class extends Component {
         $this->fechaSeleccionada = now()->toDateString();
     }
 
-    public function render()
+    public function with(): array
     {
         $user = Auth::user() ?? User::first();
         $dateObj = Carbon::parse($this->fechaSeleccionada);
@@ -59,14 +59,14 @@ new class extends Component {
         $totalMes = $entrevistasMes->count();
         $realizadas = $entrevistasMes->where('estado', 'realizada')->count();
 
-        return view('pages.entrevistas.agenda', [
+        return [
             'entrevistasLista' => $entrevistasLista,
             'tituloLista' => $tituloLista,
             'proxima' => $proxima,
             'user' => $user,
             'realizadas' => $realizadas,
             'totalMes' => $totalMes,
-        ]);
+        ];
     }
 };
 ?>
@@ -165,11 +165,13 @@ new class extends Component {
                 <div class="space-y-4">
                     @forelse($entrevistasLista as $cita)
                         @php
-                            $estasRendido = $cita->estado === 'realizada';
+                            $estasRendido = in_array($cita->estado, ['realizada', 'ausente', 'cancelada']);
                             $borderColors = [
                                 'pendiente' => 'border-amber-400',
                                 'ingresada' => 'border-emerald-500',
                                 'realizada' => 'border-zinc-300 dark:border-zinc-700',
+                                'ausente'   => 'border-red-400',
+                                'cancelada' => 'border-zinc-400 dark:border-zinc-600',
                             ];
                         @endphp
                         <div
@@ -197,6 +199,10 @@ new class extends Component {
                                         </flux:badge>
                                     @elseif($cita->estado === 'realizada')
                                         <flux:badge color="zinc" size="sm">Realizada</flux:badge>
+                                    @elseif($cita->estado === 'ausente')
+                                        <flux:badge color="red" size="sm">Ausente</flux:badge>
+                                    @elseif($cita->estado === 'cancelada')
+                                        <flux:badge color="zinc" size="sm">Cancelada</flux:badge>
                                     @endif
                                 </div>
                                 <p class="text-xs text-zinc-500 flex items-center gap-2">
@@ -208,7 +214,7 @@ new class extends Component {
 
                             <!-- Acciones -->
                             <div class="flex gap-2 relative">
-                                @if ($cita->estado === 'realizada')
+                                @if (in_array($cita->estado, ['realizada', 'ausente', 'cancelada']))
                                     <flux:button href="{{ route('entrevistas.bitacora', $cita->id) }}" size="sm"
                                         variant="ghost" class="text-zinc-500">
                                         <flux:icon.eye class="size-4" />

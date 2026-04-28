@@ -18,6 +18,7 @@ new class extends Component {
     public string $hora = '';
     public string $urgencia = 'normal';
     public string $motivo = '';
+    public string $lugar = 'presencial';
     public string $notas = '';
 
     public function updatedSearchEstudiante()
@@ -105,6 +106,7 @@ new class extends Component {
                 'fecha' => ['required', 'date'],
                 'hora' => ['required'],
                 'urgencia' => ['required', 'in:normal,prioritario,urgente'],
+                'lugar' => ['required', 'in:presencial,online'],
                 'motivo' => ['required', 'string'],
                 'notas' => ['nullable', 'string'],
             ],
@@ -119,6 +121,7 @@ new class extends Component {
             'estudiante_id' => $this->estudianteId,
             'fecha' => $this->fecha,
             'hora' => $this->hora,
+            'lugar' => $this->lugar === 'online' ? 'Online' : 'Presencial',
             'urgencia' => $this->urgencia,
             'motivo' => $this->motivo,
             'notas_previas' => $this->notas,
@@ -129,7 +132,7 @@ new class extends Component {
         \Flux::toast('Entrevista agendada con éxito.', variant: 'success');
 
         // Reset del form parcialmente para permitir agendar otra al momento
-        $this->reset(['estudianteId', 'searchEstudiante', 'filtroCursoId', 'urgencia', 'motivo', 'notas']);
+        $this->reset(['estudianteId', 'searchEstudiante', 'filtroCursoId', 'urgencia', 'lugar', 'motivo', 'notas']);
         $this->mount(); // Vuelve a resetear la hora a 09:00 y la fecha a hoy
     }
 
@@ -144,29 +147,17 @@ new class extends Component {
 };
 ?>
 
-<div class="flex flex-col gap-8 max-w-4xl mx-auto w-full pb-10">
-
-    {{-- Breadcrumbs + Título --}}
+<div class="flex flex-col gap-8 max-w-7xl mx-auto w-full pb-10">
     <div>
-        <flux:breadcrumbs class="mb-4">
-            <flux:breadcrumbs.item icon="calendar-days" href="#" />
-            <flux:breadcrumbs.item>{{ __('Gestión Académica') }}</flux:breadcrumbs.item>
-            <flux:breadcrumbs.item>{{ __('Agendar Entrevista') }}</flux:breadcrumbs.item>
-        </flux:breadcrumbs>
-
-        <div class="flex items-start justify-between">
-            <div>
-                <flux:heading size="xl" level="1" class="text-[#00376e] dark:text-blue-400">
-                    {{ __('Nueva Cita') }}</flux:heading>
-                <flux:subheading size="lg" class="max-w-xl">
-                    {{ __('Coordina una nueva reunión con un apoderado y agenda el box correspondiente.') }}
-                </flux:subheading>
-            </div>
-
-            <flux:button variant="ghost" icon="x-mark">
+        <x-entrevistas.header 
+            titulo="Nueva Cita" 
+            subtitulo="Coordina una nueva reunión con un apoderado y agenda el box correspondiente." 
+            icono="calendar-days" 
+        >
+            <flux:button variant="ghost" icon="x-mark" href="{{ route('entrevistas.agenda') }}" wire:navigate>
                 {{ __('Cancelar') }}
             </flux:button>
-        </div>
+        </x-entrevistas.header>
     </div>
 
     <form wire:submit="agendar" class="space-y-8">
@@ -332,7 +323,7 @@ new class extends Component {
                 </flux:card>
             </div>
 
-            {{-- Columna 2: Urgencia y box --}}
+            {{-- Columna 2: Urgencia, Modalidad y box --}}
             <div class="md:col-span-1 space-y-8">
                 <flux:card class="bg-zinc-50 dark:bg-zinc-800/50">
                     <flux:heading size="lg" class="mb-4">{{ __('Urgencia') }}</flux:heading>
@@ -341,6 +332,15 @@ new class extends Component {
                         <flux:radio value="normal" label="Normal" />
                         <flux:radio value="prioritario" label="Prioritario" />
                         <flux:radio value="urgente" label="Urgente" />
+                    </flux:radio.group>
+                </flux:card>
+
+                <flux:card class="bg-zinc-50 dark:bg-zinc-800/50">
+                    <flux:heading size="lg" class="mb-4">{{ __('Modalidad') }}</flux:heading>
+
+                    <flux:radio.group wire:model="lugar">
+                        <flux:radio value="presencial" label="Presencial (En el Colegio)" />
+                        <flux:radio value="online" label="Online (Videollamada)" />
                     </flux:radio.group>
                 </flux:card>
 

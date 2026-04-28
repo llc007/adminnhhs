@@ -29,6 +29,11 @@ new class extends Component {
     public string $motivoNoRealizada = '';
     public string $estadoNoRealizada = '';
 
+    // Modal Reagendar
+    public bool $modalReagendar = false;
+    public string $nuevaFecha = '';
+    public string $nuevaHora = '';
+
     public function mount(Entrevista $entrevista)
     {
         $this->entrevista = $entrevista->load(['estudiante.curso', 'user']);
@@ -111,11 +116,48 @@ new class extends Component {
     {
         $this->guardarColeccion('finalizado');
         
+        // Si la entrevista estaba 'ingresada' y no se había marcado salida manual, el cierre asume la salida.
+        if ($this->entrevista->estado === 'ingresada' && !str_contains($this->entrevista->mensaje_recepcion ?? '', '[SALIDA]')) {
+            $hora = now('America/Santiago')->format('H:i');
+            $notaSalida = "[SALIDA] El apoderado se retiró del recinto a las {$hora}.";
+            
+            $nuevoMensaje = $this->entrevista->mensaje_recepcion 
+                ? $this->entrevista->mensaje_recepcion . "\n\n" . $notaSalida 
+                : $notaSalida;
+
+            $this->entrevista->update(['mensaje_recepcion' => $nuevoMensaje]);
+        }
+
         // Cerrar el ciclo de vida de la entrevista
         $this->entrevista->update(['estado' => 'realizada']);
         
         \Flux::toast('Bitácora finalizada y entrevista cerrada exitosamente.', variant: 'success');
         return redirect()->route('entrevistas.agenda');
+    }
+
+    public function abrirModalReagendar()
+    {
+        $this->nuevaFecha = $this->entrevista->fecha;
+        $this->nuevaHora = \Carbon\Carbon::parse($this->entrevista->hora)->format('H:i');
+        $this->modalReagendar = true;
+    }
+
+    public function confirmarReagendamiento()
+    {
+        $this->validate([
+            'nuevaFecha' => 'required|date',
+            'nuevaHora' => 'required',
+        ]);
+
+        $this->entrevista->update([
+            'fecha' => $this->nuevaFecha,
+            'hora' => $this->nuevaHora,
+        ]);
+
+        \Flux::toast('La entrevista ha sido reagendada.', variant: 'success');
+        $this->modalReagendar = false;
+        
+        $this->entrevista->refresh();
     }
 
     public function abrirModalNoRealizada()
@@ -153,6 +195,22 @@ new class extends Component {
         return redirect()->route('entrevistas.agenda');
     }
 
+    public function reabrirBitacora()
+    {
+        if (!auth()->user()->hasRole(['administrador', 'superadmin'])) {
+            abort(403, 'No tienes permisos para reabrir bitácoras.');
+        }
+
+        $this->entrevista->update(['estado' => 'pendiente']);
+        
+        if ($this->bitacora) {
+            $this->bitacora->update(['estado_formulario' => 'borrador']);
+        }
+
+        \Flux::toast('Bitácora reabierta. El docente puede volver a editarla.', variant: 'success');
+        $this->entrevista->refresh();
+    }
+
     private function guardarColeccion($estado)
     {
         if (!$this->bitacora) {
@@ -186,24 +244,62 @@ new class extends Component {
         </div>
         
         @php
-            $isRealizada = $entrevista->estado === 'realizada';
+            $isCerrada = in_array($entrevista->estado, ['realizada', 'ausente', 'cancelada']);
         @endphp
 
         <div class="flex items-center gap-3 w-full md:w-auto">
-            @if(!$isRealizada)
-                <flux:button variant="ghost" class="w-full md:w-auto" wire:click="guardarBorrador">
+            @if(!$isCerrada)
+                <flux:button variant="ghost" class="w-full md:w-auto cursor-pointer" wire:click="abrirModalReagendar">
+                    {{ __('Reagendar') }}
+                </flux:button>
+                <flux:button variant="ghost" class="w-full md:w-auto cursor-pointer" wire:click="guardarBorrador">
                     {{ __('Guardar Borrador') }}
                 </flux:button>
-                <flux:button variant="danger" icon="x-circle" class="w-full md:w-auto" wire:click="abrirModalNoRealizada">
+                <flux:button variant="danger" icon="x-circle" class="w-full md:w-auto cursor-pointer" wire:click="abrirModalNoRealizada">
                     {{ __('No Realizada') }}
                 </flux:button>
-                <flux:button variant="primary" icon="check-circle" class="w-full md:w-auto bg-gradient-to-br from-[#00376e] to-blue-800" wire:click="finalizarBitacora">
+                <flux:button variant="primary" icon="check-circle" class="w-full md:w-auto bg-gradient-to-br from-[#00376e] to-blue-800 hover:from-blue-800 hover:to-blue-900 transition-colors cursor-pointer" wire:click="finalizarBitacora">
                     {{ __('Finalizar Entrevista') }}
                 </flux:button>
             @else
-                <flux:button variant="primary" icon="check-circle" class="w-full md:w-auto bg-emerald-600 text-white hover:bg-emerald-600 pointer-events-none opacity-90 border-0" disabled>
-                    {{ __('Entrevista Finalizada') }}
-                </flux:button>
+                @if($entrevista->estado === 'realizada')
+                    <flux:button variant="primary" icon="check-circle" class="w-full md:w-auto bg-emerald-600 text-white hover:bg-emerald-600 pointer-events-none opacity-90 border-0" disabled>
+                        {{ __('Entrevista Finalizada') }}
+                    </flux:button>
+                @else
+                    <flux:button variant="danger" icon="x-circle" class="w-full md:w-auto pointer-events-none opacity-90" disabled>
+                        {{ __('Entrevista ' . ucfirst($entrevista->estado)) }}
+                    </flux:button>
+                @endif
+                
+                @if(auth()->user()->hasRole(['administrador', 'superadmin']))
+                    <flux:modal.trigger name="reabrir-bitacora">
+                        <flux:button variant="ghost" icon="arrow-path" class="w-full md:w-auto cursor-pointer">
+                            {{ __('Reabrir Bitácora') }}
+                        </flux:button>
+                    </flux:modal.trigger>
+
+                    <flux:modal name="reabrir-bitacora" class="min-w-[22rem]">
+                        <div class="space-y-6">
+                            <div>
+                                <flux:heading size="lg">¿Reabrir bitácora?</flux:heading>
+                                <flux:text class="mt-2">
+                                    Estás a punto de reabrir esta bitácora y devolverla al estado "pendiente".<br>
+                                    Esto permitirá que el docente vuelva a editar su contenido.
+                                </flux:text>
+                            </div>
+                            <div class="flex gap-2">
+                                <flux:spacer />
+                                <flux:modal.close>
+                                    <flux:button variant="ghost">Cancelar</flux:button>
+                                </flux:modal.close>
+                                <flux:modal.close>
+                                    <flux:button variant="primary" wire:click="reabrirBitacora">Sí, reabrir</flux:button>
+                                </flux:modal.close>
+                            </div>
+                        </div>
+                    </flux:modal>
+                @endif
             @endif
         </div>
     </div>
@@ -263,7 +359,7 @@ new class extends Component {
                             wire:model.defer="resumen" 
                             rows="6" 
                             placeholder="Describa los puntos clave analizados durante la reunión. Sea objetivo y profesional..." 
-                            :disabled="$isRealizada"
+                            :disabled="$isCerrada"
                         />
                     </div>
                 </section>
@@ -289,7 +385,7 @@ new class extends Component {
                                         <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-1 leading-relaxed whitespace-pre-wrap">{{ $acuerdo['descripcion'] }}</p>
                                     @endif
                                 </div>
-                                @if(!$isRealizada)
+                                @if(!$isCerrada)
                                 <button type="button" wire:click="borrarAcuerdo({{ $index }})" class="absolute right-4 top-4 text-zinc-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">
                                     <flux:icon.trash class="size-4" />
                                 </button>
@@ -298,7 +394,7 @@ new class extends Component {
                         @endforeach
 
                         <!-- Agregar Nuevo -->
-                        @if(!$isRealizada)
+                        @if(!$isCerrada)
                         <div class="bg-white dark:bg-zinc-900 p-4 rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700 focus-within:border-[#00376e] transition-colors">
                             <p class="text-xs font-bold text-[#00376e] dark:text-blue-400 uppercase tracking-widest mb-3">Ingresar nuevo compromiso</p>
                             <div class="space-y-3">
@@ -332,7 +428,7 @@ new class extends Component {
                         wire:model.defer="observaciones" 
                         rows="4" 
                         placeholder="Notas actitudinales, estado anímico, u observaciones que no necesariamente son acuerdos concretos..." 
-                        :disabled="$isRealizada"
+                        :disabled="$isCerrada"
                     />
                 </section>
             </flux:card>
@@ -383,16 +479,23 @@ new class extends Component {
                 </div>
             </flux:card>
 
-            <!-- Insight de Portería (Si es que existiera nota en el futuro, por ahora placeholder educacional) -->
+            <!-- Insight de Recepción -->
             @if($entrevista->hora_llegada)
             <div class="bg-amber-50 dark:bg-amber-900/10 p-5 rounded-xl border border-amber-200 dark:border-amber-800/30">
                 <div class="flex items-start gap-4">
                     <flux:icon.clock class="size-6 text-amber-600 shrink-0 mt-0.5" />
-                    <div>
-                        <p class="font-bold text-sm text-amber-900 dark:text-amber-400 mb-1">Registro de Portería</p>
+                    <div class="flex-1">
+                        <p class="font-bold text-sm text-amber-900 dark:text-amber-400 mb-1">Registro de Recepción</p>
                         <p class="text-xs font-medium text-amber-700 dark:text-amber-500/80 leading-relaxed">
                             El apoderado fue registrado y derivado al recinto a las {{ \Carbon\Carbon::parse($entrevista->hora_llegada)->format('H:i') }}.
                         </p>
+
+                        @if($entrevista->mensaje_recepcion)
+                            <div class="mt-3 p-3 bg-white/50 dark:bg-amber-900/30 rounded-lg border border-amber-200/50 dark:border-amber-800/50">
+                                <p class="text-[10px] font-bold uppercase tracking-widest text-amber-800/70 dark:text-amber-500/70 mb-1">Nota de Recepcionista:</p>
+                                <p class="text-xs font-bold text-amber-900 dark:text-amber-400 whitespace-pre-wrap">"{{ $entrevista->mensaje_recepcion }}"</p>
+                            </div>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -420,7 +523,7 @@ new class extends Component {
                                 </div>
                             </div>
                             <!-- Delete Button -->
-                            @if(!$isRealizada)
+                            @if(!$isCerrada)
                             <button type="button" wire:click.stop="quitarAdjunto({{ $index }})" class="p-1.5 text-zinc-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all shrink-0 z-10" title="Desvincular archivo">
                                 <flux:icon.trash class="size-4" />
                             </button>
@@ -434,7 +537,7 @@ new class extends Component {
                     @endforelse
                 </div>
 
-                @if(!$isRealizada)
+                @if(!$isCerrada)
                 <button 
                     type="button" 
                     wire:click="abrirModalAdjunto"
@@ -521,6 +624,31 @@ new class extends Component {
                 <div class="flex justify-end gap-3 pt-2">
                     <flux:button wire:click="$set('modalNoRealizada', false)" variant="ghost">Volver</flux:button>
                     <flux:button type="submit" variant="danger">Confirmar y Cerrar Cita</flux:button>
+                </div>
+            </form>
+        </div>
+    </flux:modal>
+
+    <!-- Modal Reagendar -->
+    <flux:modal wire:model="modalReagendar" class="md:w-[28rem]">
+        <div class="space-y-6">
+            <div>
+                <flux:heading size="lg" class="flex items-center gap-2">
+                    <flux:icon.calendar-days class="size-5 text-blue-500" />
+                    Reagendar Entrevista
+                </flux:heading>
+                <flux:text class="mt-1">Cambia la fecha o la hora de la cita. Esto actualizará el registro inmediatamente.</flux:text>
+            </div>
+
+            <form wire:submit.prevent="confirmarReagendamiento" class="space-y-5">
+                <div class="grid grid-cols-2 gap-4">
+                    <flux:date-picker wire:model="nuevaFecha" label="Nueva Fecha" with-today required />
+                    <flux:time-picker wire:model="nuevaHora" label="Nueva Hora" min="08:00" max="18:30" interval="15" time-format="24-hour" required />
+                </div>
+
+                <div class="flex justify-end gap-3 pt-4">
+                    <flux:button wire:click="$set('modalReagendar', false)" variant="ghost">Cancelar</flux:button>
+                    <flux:button type="submit" variant="primary">Confirmar Cambio</flux:button>
                 </div>
             </form>
         </div>

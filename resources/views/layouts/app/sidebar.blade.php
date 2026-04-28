@@ -39,7 +39,7 @@
                 </flux:sidebar.item>
                 @endif
 
-                @if(auth()->user()->hasRole(['recepcion', 'administrador', 'directivo', 'inspector', 'superadmin']))
+                @if(auth()->user()->hasRole(['recepcion', 'administrador', 'directivo', 'inspector', 'superadmin', 'docente', 'psicosocial', 'asistente']))
                 <flux:sidebar.item icon="chat-bubble-left-right" :href="route('entrevistas.crear')" :current="request()->routeIs('entrevistas.crear')" wire:navigate>
                     {{ __('Agendar Entrevista') }}
                 </flux:sidebar.item>
@@ -78,7 +78,10 @@
 
         <flux:spacer />
 
-        <flux:dropdown position="top" align="end">
+        <div class="flex items-center gap-2">
+            <livewire:layout.notifications-bell />
+
+            <flux:dropdown position="top" align="end">
             <flux:profile :initials="auth()->user()->initials()" icon-trailing="chevron-down" />
 
             <flux:menu>
@@ -114,6 +117,7 @@
                 </form>
             </flux:menu>
         </flux:dropdown>
+        </div>
     </flux:header>
 
     {{ $slot }}

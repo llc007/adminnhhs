@@ -21,13 +21,13 @@ Route::middleware(['auth', 'verified', 'role:directivo,administrador,superadmin,
     // Entrevistas compartidas (Docentes, Profesionales)
     Route::livewire('/entrevistas/agenda', 'pages::entrevistas.agenda')->name('entrevistas.agenda');
     Route::livewire('/entrevistas/{entrevista}/bitacora', 'pages::entrevistas.bitacora')->name('entrevistas.bitacora');
+    Route::livewire('/entrevistas/crear', 'pages::entrevistas.crear')->name('entrevistas.crear');
 });
 
 // 2. Recepción, Inspectores y Administración (Gestión macro de citas)
 Route::middleware(['auth', 'verified', 'role:directivo,administrador,superadmin,inspector,recepcion'])->group(function () {
     Route::livewire('/entrevistas', 'pages::entrevistas.index')->name('entrevistas.index');
     Route::livewire('/entrevistas/recepcion', 'pages::entrevistas.recepcion')->name('entrevistas.recepcion');
-    Route::livewire('/entrevistas/crear', 'pages::entrevistas.crear')->name('entrevistas.crear');
 });
 
 // 3. Alta Administración (Asignación de perfiles, cargos y subida masiva)

@@ -91,16 +91,12 @@ new class extends Component {
 
         $entrevistas = $query->paginate(15);
 
-        // Métricas Mensuales Globales
-        $mesActual = now()->month;
-        $anioActual = now()->year;
-        $baseMetricas = Entrevista::whereMonth('fecha', $mesActual)->whereYear('fecha', $anioActual);
-
-        $totalMes = (clone $baseMetricas)->count();
-        $realizadasMes = (clone $baseMetricas)->where('estado', 'realizada')->count();
-        $pendientesMes = (clone $baseMetricas)->whereIn('estado', ['pendiente', 'ingresada'])->count();
-        // Aún no tenemos estado 'cancelada' oficial en db, pero por escalabilidad:
-        $canceladasMes = (clone $baseMetricas)->where('estado', 'cancelada')->count();
+        // Métricas dinámicas basadas en los filtros actuales
+        $baseQuery = clone $query;
+        $totalMes = (clone $baseQuery)->count();
+        $realizadasMes = (clone $baseQuery)->where('estado', 'realizada')->count();
+        $pendientesMes = (clone $baseQuery)->whereIn('estado', ['pendiente', 'ingresada'])->count();
+        $canceladasMes = (clone $baseQuery)->whereIn('estado', ['cancelada', 'ausente'])->count();
 
         $porcentaje = $totalMes > 0 ? round(($realizadasMes / $totalMes) * 100) : 0;
 
@@ -118,19 +114,17 @@ new class extends Component {
 <div class="max-w-7xl mx-auto w-full pb-12 space-y-8">
 
     <!-- Page Header -->
-    <div class="flex justify-between items-end">
-        <div>
-            <h1 class="text-3xl font-extrabold text-[#00376e] dark:text-blue-400 tracking-tight mb-2">
-                Historial General de Entrevistas
-            </h1>
-            <p class="text-zinc-500 font-medium text-sm">Registro unificado de atención a estudiantes y apoderados.</p>
-        </div>
+    <x-entrevistas.header 
+        titulo="Historial General de Entrevistas" 
+        subtitulo="Registro unificado de atención a estudiantes y apoderados." 
+        icono="document-text" 
+    >
         <div class="flex gap-3">
             <flux:button variant="ghost" icon="x-mark" wire:click="clearFilters">Limpiar</flux:button>
             <flux:button variant="primary" icon="document-arrow-down"
                 class="bg-gradient-to-br from-[#00376e] to-blue-800">Exportar (Excel)</flux:button>
         </div>
-    </div>
+    </x-entrevistas.header>
 
     <!-- Bento Filter Section -->
     <flux:card class="p-6 md:p-8 bg-zinc-50 dark:bg-zinc-800/40 shadow-sm border border-zinc-200 dark:border-zinc-700">
@@ -296,7 +290,7 @@ new class extends Component {
                 <flux:icon.check-badge class="size-8" />
             </div>
             <div>
-                <p class="text-[10px] uppercase tracking-widest font-bold opacity-80">Cumplimiento Mensual</p>
+                <p class="text-[10px] uppercase tracking-widest font-bold opacity-80">Cumplimiento (Filtro Actual)</p>
                 <h3 class="text-2xl font-black">{{ $porcentaje }}%</h3>
             </div>
         </flux:card>
@@ -306,8 +300,7 @@ new class extends Component {
                 <flux:icon.clock class="size-8" />
             </div>
             <div>
-                <p class="text-[10px] uppercase tracking-widest font-bold text-zinc-500 dark:text-zinc-400">Pendientes
-                    (Mes)</p>
+                <p class="text-[10px] uppercase tracking-widest font-bold text-zinc-500 dark:text-zinc-400">Pendientes</p>
                 <h3 class="text-2xl font-black text-zinc-900 dark:text-zinc-100">{{ $pendientesMes }}</h3>
             </div>
         </flux:card>
@@ -317,8 +310,7 @@ new class extends Component {
                 <flux:icon.x-circle class="size-8" />
             </div>
             <div>
-                <p class="text-[10px] uppercase tracking-widest font-bold text-zinc-500 dark:text-zinc-400">Canceladas
-                    (Mes)</p>
+                <p class="text-[10px] uppercase tracking-widest font-bold text-zinc-500 dark:text-zinc-400">No Realizadas</p>
                 <h3 class="text-2xl font-black text-zinc-900 dark:text-zinc-100">{{ $canceladasMes }}</h3>
             </div>
         </flux:card>

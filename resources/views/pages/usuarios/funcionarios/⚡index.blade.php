@@ -9,6 +9,7 @@ new class extends Component {
     use WithPagination;
 
     // Filtros y orden
+    public string $search = '';
     public string $cargo = 'todos';
     public string $departamento = 'todos';
     public string $sortBy = 'nombres';
@@ -123,6 +124,14 @@ new class extends Component {
                     $q->whereJsonContains('school_user.roles', $this->cargo);
                 }
             })
+            ->when(strlen($this->search) >= 2, function ($query) {
+                $query->where(function ($q) {
+                    $q->where('nombres', 'like', '%' . $this->search . '%')
+                      ->orWhere('apellido_pat', 'like', '%' . $this->search . '%')
+                      ->orWhere('apellido_mat', 'like', '%' . $this->search . '%')
+                      ->orWhere('rut_numero', 'like', '%' . $this->search . '%');
+                });
+            })
             ->tap(fn($query) => $this->sortBy ? $query->orderBy($this->sortBy, $this->sortDirection) : $query)
             ->paginate(15);
     }
@@ -162,9 +171,18 @@ new class extends Component {
             <div class="md:col-span-8">
                 <flux:card class="h-full flex items-center">
                     <div class="flex flex-col md:flex-row items-start md:items-center gap-6 w-full">
-                        <flux:field class="flex-1 w-full md:w-56 overflow-hidden">
+                        <flux:field class="flex-1 w-full md:w-64">
                             <flux:label class="mb-2 uppercase tracking-widest text-[10px] font-bold text-zinc-500 dark:text-zinc-400">
-                                {{ __('Filtrar por Cargo (Rol)') }}
+                                {{ __('Búsqueda') }}
+                            </flux:label>
+                            <flux:input wire:model.live.debounce.300ms="search" icon="magnifying-glass" placeholder="Buscar por nombre o RUT..." />
+                        </flux:field>
+
+                        <div class="h-12 w-px bg-zinc-200 dark:bg-zinc-700 hidden md:block"></div>
+
+                        <flux:field class="w-full md:w-48 overflow-hidden">
+                            <flux:label class="mb-2 uppercase tracking-widest text-[10px] font-bold text-zinc-500 dark:text-zinc-400">
+                                {{ __('Cargo (Rol)') }}
                             </flux:label>
                             <flux:select wire:model.live="cargo">
                                 <flux:select.option value="todos">{{ __('Todos') }}</flux:select.option>
@@ -202,7 +220,7 @@ new class extends Component {
                     <div>
                         <div class="text-[10px] uppercase tracking-widest font-bold opacity-70">
                             {{ __('Total Personal') }}</div>
-                        <div class="text-4xl font-bold mt-1">124</div>
+                        <div class="text-4xl font-bold mt-1">{{ $this->funcionarios->total() }}</div>
                     </div>
                     <div class="p-3 bg-white/10 rounded-full">
                         <flux:icon.users class="size-8" />
@@ -231,7 +249,7 @@ new class extends Component {
                             <flux:table.cell>
                                 <div class="flex items-center gap-3">
                                     <flux:avatar initials="{{ $funcionario->initials() }}"
-                                        src="{{ $funcionario->avatar }}" />
+                                        :src="$funcionario->avatar" />
                                     <div>
                                         <div class="text-sm font-medium text-zinc-900 dark:text-zinc-100">
                                             {{ $funcionario->nombreCompleto() }}</div>

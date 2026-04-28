@@ -8,7 +8,7 @@ use Carbon\Carbon;
 
 new class extends Component {
     public string $fechaSeleccionada;
-    public string $filtroTemporal = 'dia';
+    public string $filtroTemporal = 'semana';
 
     public function setFiltro($filtro)
     {
@@ -71,30 +71,11 @@ new class extends Component {
 };
 ?>
 <div class="max-w-7xl mx-auto w-full pb-12">
-    <!-- Header Page Context -->
-    <div class="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-            <flux:heading size="xl" class="text-[#00376e] dark:text-blue-400 font-extrabold">
-                {{ __('Panel del Docente') }}</flux:heading>
-            <p class="text-zinc-500 text-sm mt-1 flex items-center gap-2">
-                <flux:icon.calendar class="size-4" />
-                Resumen de agenda diaria y accesos rápidos
-            </p>
-        </div>
-        <div class="flex items-center gap-3">
-            <div class="text-right hidden sm:block mr-2">
-                <p class="text-xs font-bold text-[#00376e] dark:text-blue-400 leading-none">
-                    {{ trim($user->nombres . ' ' . $user->apellido_pat) ?: 'Profesor' }}</p>
-                <p class="text-[10px] text-zinc-500 uppercase mt-1">Docente Planta</p>
-            </div>
-            <div
-                class="w-10 h-10 rounded-full bg-[#00376e] text-white flex items-center justify-center font-bold relative">
-                {{ substr($user->nombres ?? 'P', 0, 1) }}
-                <span
-                    class="absolute top-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white dark:border-zinc-900 rounded-full"></span>
-            </div>
-        </div>
-    </div>
+    <x-entrevistas.header 
+        titulo="Panel del Docente" 
+        subtitulo="Resumen de agenda diaria y accesos rápidos" 
+        icono="calendar" 
+    />
 
     <div class="space-y-10">
 
@@ -111,12 +92,12 @@ new class extends Component {
                                     class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                                 <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
                             </span>
-                            El apoderado de <strong>{{ $proxima->estudiante->nombres }}</strong> ya está en la
+                            El apoderado de <strong>{{ $proxima->estudiante->nombreCompleto() ?? 'Sin nombre' }}</strong> ya está en la
                             institución esperando.
                         @else
                             <flux:icon.clock class="size-5" />
                             A las {{ \Carbon\Carbon::parse($proxima->hora)->format('H:i') }} con el apoderado de
-                            <strong>{{ $proxima->estudiante->nombres }}</strong>
+                            <strong>{{ $proxima->estudiante->nombreCompleto() ?? 'Sin nombre' }}</strong>
                         @endif
                     </p>
                 </div>
@@ -156,9 +137,9 @@ new class extends Component {
                         <span class="text-sm font-medium text-zinc-500 ml-2 capitalize">{{ $tituloLista }}</span>
                     </h3>
                     <div class="flex gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg">
-                        <flux:button size="sm" variant="{{ $filtroTemporal === 'dia' ? 'primary' : 'ghost' }}" class="text-xs px-3 {{ $filtroTemporal === 'dia' ? 'bg-[#00376e] text-white' : 'text-zinc-600' }}" wire:click="setFiltro('dia')">Día</flux:button>
-                        <flux:button size="sm" variant="{{ $filtroTemporal === 'semana' ? 'primary' : 'ghost' }}" class="text-xs px-3 {{ $filtroTemporal === 'semana' ? 'bg-[#00376e] text-white' : 'text-zinc-600' }}" wire:click="setFiltro('semana')">Semana</flux:button>
-                        <flux:button size="sm" variant="{{ $filtroTemporal === 'mes' ? 'primary' : 'ghost' }}" class="text-xs px-3 {{ $filtroTemporal === 'mes' ? 'bg-[#00376e] text-white' : 'text-zinc-600' }}" wire:click="setFiltro('mes')">Mes</flux:button>
+                        <flux:button size="sm" variant="{{ $filtroTemporal === 'dia' ? 'primary' : 'ghost' }}" class="text-xs px-3 {{ $filtroTemporal !== 'dia' ? 'text-zinc-600 dark:text-zinc-400' : '' }}" wire:click="setFiltro('dia')">Día</flux:button>
+                        <flux:button size="sm" variant="{{ $filtroTemporal === 'semana' ? 'primary' : 'ghost' }}" class="text-xs px-3 {{ $filtroTemporal !== 'semana' ? 'text-zinc-600 dark:text-zinc-400' : '' }}" wire:click="setFiltro('semana')">Semana</flux:button>
+                        <flux:button size="sm" variant="{{ $filtroTemporal === 'mes' ? 'primary' : 'ghost' }}" class="text-xs px-3 {{ $filtroTemporal !== 'mes' ? 'text-zinc-600 dark:text-zinc-400' : '' }}" wire:click="setFiltro('mes')">Mes</flux:button>
                     </div>
                 </div>
 
@@ -235,6 +216,12 @@ new class extends Component {
                             <h3 class="text-sm font-bold text-zinc-500">Sin entrevistas programadas para hoy</h3>
                         </div>
                     @endforelse
+                </div>
+
+                <div class="mt-6 flex justify-center">
+                    <flux:button href="{{ route('entrevistas.crear') }}" variant="primary" icon="plus" class="w-full sm:w-auto">
+                        Agendar Nueva Entrevista
+                    </flux:button>
                 </div>
             </div>
 

@@ -22,6 +22,7 @@ class Entrevista extends Model
         'notas_previas',
         'estado',
         'lugar',
+        'mensaje_recepcion',
     ];
 
     /**

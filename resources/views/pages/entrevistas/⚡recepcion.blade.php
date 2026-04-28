@@ -3,6 +3,8 @@
 use Livewire\Component;
 use App\Models\Entrevista;
 use App\Models\LugarAtencion;
+use App\Notifications\IngresoApoderado;
+use App\Notifications\SalidaApoderado;
 use Carbon\Carbon;
 
 new class extends Component {
@@ -11,6 +13,7 @@ new class extends Component {
     public bool $modalIngreso = false;
     public ?int $entrevistaSeleccionadaId = null;
     public string $lugarIngreso = '';
+    public string $mensajeRecepcion = '';
 
     // Filtros de tabla
     public string $filtroEstado = 'todo'; // todo, pendientes, ingresados
@@ -25,7 +28,11 @@ new class extends Component {
         return [
             'total_hoy' => (clone $baseQuery)->count(),
             'pendientes' => (clone $baseQuery)->where('estado', 'pendiente')->count(),
-            'registrados' => (clone $baseQuery)->whereIn('estado', ['ingresada', 'realizada'])->count(),
+            'registrados' => (clone $baseQuery)->where('estado', 'ingresada')
+                               ->where(function($q) {
+                                   $q->whereNull('mensaje_recepcion')
+                                     ->orWhere('mensaje_recepcion', 'not like', '%[SALIDA]%');
+                               })->count(),
         ];
     }
 
@@ -59,6 +66,7 @@ new class extends Component {
     {
         $this->entrevistaSeleccionadaId = $id;
         $this->lugarIngreso = '';
+        $this->mensajeRecepcion = '';
         $this->modalIngreso = true;
     }
 
@@ -77,13 +85,42 @@ new class extends Component {
                 'estado' => 'ingresada',
                 'lugar' => $this->lugarIngreso,
                 'hora_llegada' => now('America/Santiago')->format('H:i:s'),
+                'mensaje_recepcion' => trim($this->mensajeRecepcion) !== '' ? $this->mensajeRecepcion : null,
             ]);
+
+            if ($entrevista->user) {
+                $entrevista->user->notify(new IngresoApoderado($entrevista));
+            }
 
             \Flux::toast('Ingreso registrado exitosamente.', variant: 'success');
         }
 
         $this->modalIngreso = false;
         $this->entrevistaSeleccionadaId = null;
+    }
+
+    public function registrarSalida($id)
+    {
+        $entrevista = Entrevista::find($id);
+        
+        if ($entrevista && !str_contains($entrevista->mensaje_recepcion ?? '', '[SALIDA]')) {
+            $hora = now('America/Santiago')->format('H:i');
+            $notaSalida = "[SALIDA] El apoderado se retiró del recinto a las {$hora}.";
+            
+            $nuevoMensaje = $entrevista->mensaje_recepcion 
+                ? $entrevista->mensaje_recepcion . "\n\n" . $notaSalida 
+                : $notaSalida;
+
+            $entrevista->update([
+                'mensaje_recepcion' => $nuevoMensaje
+            ]);
+
+            if ($entrevista->user) {
+                $entrevista->user->notify(new SalidaApoderado($entrevista));
+            }
+
+            \Flux::toast('Salida registrada exitosamente.', variant: 'success');
+        }
     }
 };
 ?>
@@ -142,10 +179,10 @@ new class extends Component {
         </flux:card>
 
         <flux:card class="border-l-4 border-l-emerald-500 bg-white dark:bg-zinc-800">
-            <p class="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase tracking-wider mb-2">Ingresos Registrados</p>
+            <p class="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase tracking-wider mb-2">Visitas Activas</p>
             <p class="text-4xl font-extrabold text-zinc-900 dark:text-white">{{ str_pad($this->metricas['registrados'], 2, '0', STR_PAD_LEFT) }}</p>
             <p class="text-[11px] text-emerald-600 font-bold mt-2 flex items-center gap-1">
-                <flux:icon.check-circle class="size-4" /> Apoderados dentro
+                <flux:icon.check-circle class="size-4" /> Apoderados dentro del recinto
             </p>
         </flux:card>
     </div>
@@ -215,8 +252,13 @@ new class extends Component {
                                 @if($cita->estado === 'pendiente')
                                     <flux:badge size="sm" color="zinc" class="w-24 justify-center">Pendiente</flux:badge>
                                 @elseif($cita->estado === 'ingresada')
-                                    <flux:badge size="sm" color="emerald" class="w-24 justify-center">Ingresó</flux:badge>
-                                    <p class="text-[10px] text-zinc-500 mt-1">({{ \Carbon\Carbon::parse($cita->hora_llegada)->format('H:i') }})</p>
+                                    @if(str_contains($cita->mensaje_recepcion ?? '', '[SALIDA]'))
+                                        <flux:badge size="sm" color="amber" class="w-24 justify-center">Se Retiró</flux:badge>
+                                        <p class="text-[10px] text-zinc-500 mt-1">(Bitácora Abierta)</p>
+                                    @else
+                                        <flux:badge size="sm" color="emerald" class="w-24 justify-center">Ingresó</flux:badge>
+                                        <p class="text-[10px] text-zinc-500 mt-1">({{ \Carbon\Carbon::parse($cita->hora_llegada)->format('H:i') }})</p>
+                                    @endif
                                 @elseif($cita->estado === 'realizada')
                                     <flux:badge size="sm" color="blue" class="w-24 justify-center">Realizada</flux:badge>
                                 @else
@@ -229,9 +271,39 @@ new class extends Component {
                                         {{ __('Registrar Ingreso') }}
                                     </flux:button>
                                 @else
-                                    <div class="inline-flex items-center justify-end gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold text-xs uppercase tracking-wide bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 rounded-md">
-                                        <flux:icon.map-pin class="size-4" />
-                                        {{ $cita->lugar ?? 'Ingresado' }}
+                                    <div class="flex flex-col items-end gap-2">
+                                        <div class="inline-flex items-center justify-end gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold text-xs uppercase tracking-wide bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 rounded-md">
+                                            <flux:icon.map-pin class="size-4" />
+                                            {{ $cita->lugar ?? 'Ingresado' }}
+                                        </div>
+                                        @if(!str_contains($cita->mensaje_recepcion ?? '', '[SALIDA]') && $cita->estado !== 'realizada' && $cita->estado !== 'cancelada' && $cita->estado !== 'ausente')
+                                            <flux:modal.trigger name="confirmar-salida-{{ $cita->id }}">
+                                                <flux:button size="xs" variant="ghost">
+                                                    Marcar Salida
+                                                </flux:button>
+                                            </flux:modal.trigger>
+
+                                            <flux:modal name="confirmar-salida-{{ $cita->id }}" class="min-w-[22rem]">
+                                                <div class="space-y-6 text-left">
+                                                    <div>
+                                                        <flux:heading size="lg">¿Confirmar salida del recinto?</flux:heading>
+                                                        <flux:text class="mt-2 text-sm">
+                                                            El sistema registrará la hora exacta en que el apoderado abandonó la institución.
+                                                        </flux:text>
+                                                    </div>
+                                                    <div class="flex gap-2 justify-end">
+                                                        <flux:modal.close>
+                                                            <flux:button variant="ghost">Cancelar</flux:button>
+                                                        </flux:modal.close>
+                                                        <flux:modal.close>
+                                                            <flux:button variant="primary" wire:click="registrarSalida({{ $cita->id }})">Sí, registrar salida</flux:button>
+                                                        </flux:modal.close>
+                                                    </div>
+                                                </div>
+                                            </flux:modal>
+                                        @elseif(str_contains($cita->mensaje_recepcion ?? '', '[SALIDA]'))
+                                            <span class="text-[10px] text-zinc-400 font-bold uppercase">Se retiró</span>
+                                        @endif
                                     </div>
                                 @endif
                             </td>
@@ -278,7 +350,9 @@ new class extends Component {
                         <flux:select.option value="{{ $lugar->nombre }}">{{ $lugar->nombre }}</flux:select.option>
                     @endforeach
                 </flux:select>
-                <div class="text-xs text-zinc-500 mt-1">El sistema notificará a Inspectoría y guardará la hora exacta de llegada automáticamente.</div>
+                <div class="text-xs text-zinc-500 mt-1 mb-4">El sistema notificará a Inspectoría y guardará la hora exacta de llegada automáticamente.</div>
+
+                <flux:textarea wire:model="mensajeRecepcion" label="Mensaje para el Profesor (Opcional)" placeholder="Ej: Apoderado viene acompañado de su hijo, o 'Apoderado muy ofuscado'..." rows="2" />
 
                 <div class="flex justify-end gap-2 pt-4">
                     <flux:button wire:click="$set('modalIngreso', false)" variant="ghost">Cancelar</flux:button>

@@ -112,7 +112,7 @@ new #[Title('Profile settings')] class extends Component {
         <!-- Profile Header Card (Editorial Style) -->
         <section class="mb-10 flex flex-col md:flex-row items-center md:items-end gap-8">
             <div class="relative">
-                <div class="w-32 h-32 rounded-xl overflow-hidden shadow-sm bg-surface-container-high border-4 border-white relative">
+                <div class="w-32 h-32 rounded-xl overflow-hidden shadow-sm bg-surface-container-high border-4 border-white dark:border-zinc-900 relative">
                     @if(Auth::user()->avatar)
                         <img class="w-full h-full object-cover" src="{{ Auth::user()->avatar }}" alt="Profile Avatar" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none';this.nextElementSibling.style.display='flex';" />
                         <div class="w-full h-full bg-primary-fixed flex items-center justify-center text-primary font-bold text-4xl" style="display: none;">
@@ -139,17 +139,17 @@ new #[Title('Profile settings')] class extends Component {
         </section>
 
         <!-- Main Form Card (Bento/Editorial Style) -->
-        <div class="bg-surface-container-lowest rounded-xl shadow-sm border border-slate-100 overflow-hidden mb-8">
-            <div class="p-8 border-b border-slate-50 bg-white">
-                <h3 class="font-headline text-xl font-bold text-primary">Ficha de Datos Personales</h3>
-                <p class="text-secondary text-sm">Mantenga su información actualizada para asegurar una comunicación efectiva con la institución.</p>
+        <div class="bg-surface-container-lowest rounded-xl shadow-sm border border-slate-100 dark:border-zinc-800 overflow-hidden mb-8">
+            <div class="p-8 border-b border-slate-50 dark:border-zinc-800/50 bg-white dark:bg-zinc-900">
+                <h3 class="font-headline text-xl font-bold text-primary dark:text-zinc-100">Ficha de Datos Personales</h3>
+                <p class="text-secondary dark:text-zinc-400 text-sm">Mantenga su información actualizada para asegurar una comunicación efectiva con la institución.</p>
             </div>
-            <form wire:submit="updateProfileInformation" class="p-8 space-y-10 bg-white">
+            <form wire:submit="updateProfileInformation" class="p-8 space-y-10 bg-white dark:bg-zinc-900">
                 
                 <!-- Section 1: Identificación -->
                 <div class="grid grid-cols-1 md:grid-cols-12 gap-x-10 gap-y-8">
                     <div class="md:col-span-12">
-                        <h4 class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2 border-b border-slate-100 pb-2">Identificación Personal</h4>
+                        <h4 class="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-zinc-500 mb-2 border-b border-slate-100 dark:border-zinc-800 pb-2">Identificación Personal</h4>
                     </div>
                     
                     <div class="md:col-span-4">
@@ -176,7 +176,7 @@ new #[Title('Profile settings')] class extends Component {
                 <!-- Section 2: Contacto y Ubicación -->
                 <div class="grid grid-cols-1 md:grid-cols-12 gap-x-10 gap-y-8 pt-6">
                     <div class="md:col-span-12">
-                        <h4 class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2 border-b border-slate-100 pb-2">Contacto y Ubicación</h4>
+                        <h4 class="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-zinc-500 mb-2 border-b border-slate-100 dark:border-zinc-800 pb-2">Contacto y Ubicación</h4>
                     </div>
                     
                     <div class="md:col-span-12">
@@ -216,7 +216,7 @@ new #[Title('Profile settings')] class extends Component {
                 </div>
 
                 <!-- Actions -->
-                <div class="flex flex-col sm:flex-row items-center justify-end gap-4 pt-10 border-t border-slate-50 mt-4">
+                <div class="flex flex-col sm:flex-row items-center justify-end gap-4 pt-10 border-t border-slate-50 dark:border-zinc-800/50 mt-4">
                     <flux:button icon="check" variant="primary" type="submit" class="w-full sm:w-auto px-10" data-test="update-profile-button">
                         {{ __('Guardar Cambios') }}
                     </flux:button>

@@ -98,6 +98,18 @@ new class extends Component {
         return \App\Models\Estudiante::with('curso')->find($this->estudianteId);
     }
 
+    public $confirmarTope = false;
+
+    public function updatedHora()
+    {
+        $this->confirmarTope = false;
+    }
+
+    public function updatedFecha()
+    {
+        $this->confirmarTope = false;
+    }
+
     public function agendar()
     {
         $this->validate(
@@ -115,6 +127,19 @@ new class extends Component {
             ],
         );
 
+        // Verificar tope de horario
+        $tope = \App\Models\Entrevista::where('user_id', auth()->id())
+            ->where('fecha', $this->fecha)
+            ->where('hora', $this->hora)
+            ->whereIn('estado', ['pendiente', 'ingresada', 'en_curso'])
+            ->first();
+
+        if ($tope && !$this->confirmarTope) {
+            $this->addError('hora', '¡Advertencia! Ya tienes una entrevista con otro apoderado en esta misma fecha y hora. Vuelve a hacer clic en "Agendar" si deseas guardar de todos modos.');
+            $this->confirmarTope = true;
+            return;
+        }
+
         \App\Models\Entrevista::create([
             'school_id' => auth()->user()->current_school_id,
             'user_id' => auth()->id(),
@@ -131,8 +156,8 @@ new class extends Component {
         // Feedback al usuario local e interfaz
         \Flux::toast('Entrevista agendada con éxito.', variant: 'success');
 
-        // Reset del form parcialmente para permitir agendar otra al momento
-        $this->reset(['estudianteId', 'searchEstudiante', 'filtroCursoId', 'urgencia', 'lugar', 'motivo', 'notas']);
+        // Reset del form
+        $this->reset(['estudianteId', 'searchEstudiante', 'filtroCursoId', 'urgencia', 'lugar', 'motivo', 'notas', 'confirmarTope']);
         $this->mount(); // Vuelve a resetear la hora a 09:00 y la fecha a hoy
     }
 
@@ -360,11 +385,11 @@ new class extends Component {
         {{-- Barra de Acción --}}
         <div
             class="flex flex-col sm:flex-row justify-end items-center gap-4 pt-6 border-t border-zinc-200 dark:border-zinc-700">
-            <flux:button variant="ghost">
+            <flux:button variant="ghost" href="{{ route('entrevistas.agenda') }}" wire:navigate>
                 {{ __('Cancelar') }}
             </flux:button>
-            <flux:button type="submit" variant="primary" icon="check">
-                {{ __('Confirmar y Agendar Cita') }}
+            <flux:button type="submit" variant="primary" icon="check" :class="$confirmarTope ? 'bg-amber-600 hover:bg-amber-700 text-white border-none' : ''">
+                {{ $confirmarTope ? __('Confirmar tope de horario') : __('Confirmar y Agendar Cita') }}
             </flux:button>
         </div>
     </form>

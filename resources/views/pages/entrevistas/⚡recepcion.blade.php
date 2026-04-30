@@ -62,6 +62,38 @@ new class extends Component {
                 ->get();
     }
 
+    #[\Livewire\Attributes\Computed]
+    public function boxesStatus()
+    {
+        $hoy = now('America/Santiago')->format('Y-m-d');
+        $lugares = $this->lugares;
+        
+        // Entrevistas que están físicamente en el colegio ahora mismo
+        $activas = Entrevista::with(['user', 'estudiante'])
+            ->where('school_id', auth()->user()->current_school_id)
+            ->whereDate('fecha', $hoy)
+            ->whereIn('estado', ['ingresada', 'realizada'])
+            ->where(function($q) {
+                $q->whereNull('mensaje_recepcion')
+                  ->orWhere('mensaje_recepcion', 'not like', '%[SALIDA]%');
+            })
+            ->get();
+
+        $status = [];
+        foreach ($lugares as $lugar) {
+            $ocupante = $activas->firstWhere('lugar', $lugar->nombre);
+            
+            $status[] = (object) [
+                'id' => $lugar->id,
+                'nombre' => $lugar->nombre,
+                'ocupado' => $ocupante ? true : false,
+                'entrevista' => $ocupante
+            ];
+        }
+
+        return collect($status);
+    }
+
     public function prepararIngreso($id)
     {
         $this->entrevistaSeleccionadaId = $id;
@@ -314,6 +346,78 @@ new class extends Component {
                                 <flux:icon.calendar class="size-10 mx-auto text-zinc-300 dark:text-zinc-600 mb-3" />
                                 <p class="text-lg font-medium">No hay entrevistas agendadas para hoy</p>
                                 <p class="text-sm mt-1 text-zinc-400">Intente cambiar el filtro de visualización superior.</p>
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </flux:card>
+
+    {{-- Estado de Boxes --}}
+    <flux:card class="p-0 overflow-hidden mb-10 w-full" wire:poll.10s>
+        <div class="px-6 py-5 border-b border-zinc-200 dark:border-zinc-700 flex flex-col sm:flex-row justify-between items-center gap-4 bg-zinc-50/50 dark:bg-zinc-900/30">
+            <h4 class="text-xl font-bold text-[#00376e] dark:text-blue-400 flex items-center gap-2">
+                <flux:icon.building-office-2 class="size-6" />
+                Estado de Lugares y Boxes
+            </h4>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse min-w-[600px]">
+                <thead>
+                    <tr class="bg-zinc-100/50 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400 uppercase text-[10px] font-black tracking-widest border-b border-zinc-200 dark:border-zinc-700">
+                        <th class="px-6 py-3">Lugar / Box</th>
+                        <th class="px-6 py-3">Estado</th>
+                        <th class="px-6 py-3">Docente a cargo</th>
+                        <th class="px-6 py-3">Apoderado en interior</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
+                    @forelse($this->boxesStatus as $box)
+                        <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+                            <td class="px-6 py-4">
+                                <span class="font-bold text-zinc-900 dark:text-white">{{ $box->nombre }}</span>
+                            </td>
+                            <td class="px-6 py-4">
+                                @if($box->ocupado)
+                                    <span class="inline-flex items-center gap-1.5 py-1 px-2.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400 border border-red-200 dark:border-red-800">
+                                        <span class="size-1.5 rounded-full bg-red-500 animate-pulse"></span>
+                                        Ocupado
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center gap-1.5 py-1 px-2.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                                        <span class="size-1.5 rounded-full bg-emerald-500"></span>
+                                        Disponible
+                                    </span>
+                                @endif
+                            </td>
+                            <td class="px-6 py-4">
+                                @if($box->ocupado && $box->entrevista && $box->entrevista->user)
+                                    <p class="font-bold text-zinc-900 dark:text-zinc-200 text-sm">
+                                        {{ trim($box->entrevista->user->nombres . ' ' . $box->entrevista->user->apellido_pat) }}
+                                    </p>
+                                @else
+                                    <span class="text-zinc-400 text-sm">-</span>
+                                @endif
+                            </td>
+                            <td class="px-6 py-4">
+                                @if($box->ocupado && $box->entrevista && $box->entrevista->estudiante)
+                                    <p class="text-sm text-zinc-700 dark:text-zinc-300">
+                                        {{ $box->entrevista->estudiante->apoderado_nombres ? $box->entrevista->estudiante->apoderado_nombres . ' ' . $box->entrevista->estudiante->apoderado_apellido_pat : 'Apoderado' }}
+                                    </p>
+                                    <p class="text-[10px] text-zinc-500 font-mono mt-0.5">
+                                        Ingreso: {{ \Carbon\Carbon::parse($box->entrevista->hora_llegada)->format('H:i') }}
+                                    </p>
+                                @else
+                                    <span class="text-zinc-400 text-sm">-</span>
+                                @endif
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="4" class="px-6 py-8 text-center text-zinc-500">
+                                No hay lugares configurados en el sistema.
                             </td>
                         </tr>
                     @endforelse

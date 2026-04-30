@@ -37,14 +37,6 @@ new class extends Component {
     public function mount(Entrevista $entrevista)
     {
         $this->entrevista = $entrevista->load(['estudiante.curso', 'user']);
-        
-        $user = auth()->user();
-        $isOwner = $entrevista->user_id === $user->id;
-        $isAllowedAdmin = $user->hasRole(['administrador', 'directivo', 'superadmin', 'psicosocial']);
-        
-        if (!$isOwner && !$isAllowedAdmin) {
-            abort(403, 'Acesso Denegado: Registro confidencial. Solo el profesional a cargo o directivos pueden visualizar esta bitácora.');
-        }
 
         if ($this->entrevista->bitacora) {
             $this->bitacora = $this->entrevista->bitacora;

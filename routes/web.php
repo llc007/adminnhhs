@@ -9,7 +9,7 @@ Route::get('auth/google', [GoogleAuthController::class, 'redirectToGoogle'])->na
 Route::get('auth/google/callback', [GoogleAuthController::class, 'handleGoogleCallback'])->name('auth.google.callback');
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::view('dashboard', 'dashboard')->name('dashboard');
+    Route::livewire('dashboard', 'pages::entrevistas.dashboard')->name('dashboard');
 });
 
 // 1. Staff General (Cualquier trabajador del colegio)
@@ -17,7 +17,7 @@ Route::middleware(['auth', 'verified', 'role:directivo,administrador,superadmin,
     // Estudiantes (vistas compartidas)
     Route::livewire('/estudiantes', 'pages::usuarios.estudiantes.index')->name('estudiantes.index');
     Route::livewire('/estudiantes/ficha/{id}', 'pages::usuarios.estudiantes.ficha')->name('estudiantes.ficha');
-    
+
     // Entrevistas compartidas (Docentes, Profesionales)
     Route::livewire('/entrevistas/agenda', 'pages::entrevistas.agenda')->name('entrevistas.agenda');
     Route::livewire('/entrevistas/{entrevista}/bitacora', 'pages::entrevistas.bitacora')

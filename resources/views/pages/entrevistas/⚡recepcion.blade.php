@@ -1,6 +1,7 @@
 <?php
 
 use Livewire\Component;
+use Livewire\WithPagination;
 use App\Models\Entrevista;
 use App\Models\LugarAtencion;
 use App\Notifications\IngresoApoderado;
@@ -8,6 +9,7 @@ use App\Notifications\SalidaApoderado;
 use Carbon\Carbon;
 
 new class extends Component {
+    use WithPagination;
     
     // Configuración para el modal de ingreso
     public bool $modalIngreso = false;
@@ -16,7 +18,18 @@ new class extends Component {
     public string $mensajeRecepcion = '';
 
     // Filtros de tabla
-    public string $filtroEstado = 'todo'; // todo, pendientes, ingresados
+    public string $searchTexto = '';
+    public string $filtroDocente = 'todos';
+    public string $filtroCurso = 'todos';
+    public string $filtroTemporalidad = 'dia'; 
+    public string $filtroEstado = 'todos';
+
+    public function updated($property)
+    {
+        if (in_array($property, ['searchTexto', 'filtroDocente', 'filtroCurso', 'filtroTemporalidad', 'filtroEstado'])) {
+            $this->resetPage();
+        }
+    }
 
     #[\Livewire\Attributes\Computed]
     public function metricas()
@@ -37,20 +50,73 @@ new class extends Component {
     }
 
     #[\Livewire\Attributes\Computed]
+    public function docentes()
+    {
+        return \App\Models\User::whereHas('schools', function ($q) {
+            $q->where('school_id', auth()->user()->current_school_id)
+              ->whereJsonContains('school_user.roles', 'docente');
+        })->orderBy('nombres')->get();
+    }
+
+    #[\Livewire\Attributes\Computed]
+    public function cursos()
+    {
+        return \App\Models\Curso::where('school_id', auth()->user()->current_school_id)
+            ->orderBy('modalidad')
+            ->orderBy('nivel')
+            ->orderBy('letra')
+            ->get();
+    }
+
+    #[\Livewire\Attributes\Computed]
     public function proximasEntrevistas()
     {
-        $hoy = now('America/Santiago')->format('Y-m-d');
         $query = Entrevista::with(['estudiante.curso', 'user'])
-                   ->where('school_id', auth()->user()->current_school_id)
-                   ->whereDate('fecha', $hoy);
+                   ->where('school_id', auth()->user()->current_school_id);
+
+        $hoy = now('America/Santiago')->format('Y-m-d');
+        
+        if ($this->filtroTemporalidad === 'dia') {
+            $query->whereDate('fecha', $hoy);
+        } elseif ($this->filtroTemporalidad === 'semana') {
+            $inicioSemana = now('America/Santiago')->startOfWeek()->format('Y-m-d');
+            $finSemana = now('America/Santiago')->endOfWeek()->format('Y-m-d');
+            $query->whereBetween('fecha', [$inicioSemana, $finSemana]);
+        } elseif ($this->filtroTemporalidad === 'mes') {
+            $inicioMes = now('America/Santiago')->startOfMonth()->format('Y-m-d');
+            $finMes = now('America/Santiago')->endOfMonth()->format('Y-m-d');
+            $query->whereBetween('fecha', [$inicioMes, $finMes]);
+        }
 
         if ($this->filtroEstado === 'pendientes') {
             $query->where('estado', 'pendiente');
         } elseif ($this->filtroEstado === 'ingresados') {
             $query->whereIn('estado', ['ingresada', 'realizada']);
+        } elseif ($this->filtroEstado !== 'todos') {
+            $query->where('estado', $this->filtroEstado);
         }
 
-        return $query->orderBy('hora', 'asc')->get();
+        if ($this->filtroDocente !== 'todos') {
+            $query->where('user_id', $this->filtroDocente);
+        }
+
+        if ($this->filtroCurso !== 'todos') {
+            $query->whereHas('estudiante', function($q) {
+                $q->where('curso_id', $this->filtroCurso);
+            });
+        }
+
+        if (trim($this->searchTexto) !== '') {
+            $term = trim($this->searchTexto);
+            $query->whereHas('estudiante', function($q) use ($term) {
+                $q->where('nombres_csv', 'like', "%{$term}%")
+                  ->orWhere('rut_numero', 'like', "%{$term}%")
+                  ->orWhere('apoderado_nombres', 'like', "%{$term}%")
+                  ->orWhere('apoderado_apellido_pat', 'like', "%{$term}%");
+            });
+        }
+
+        return $query->orderBy('fecha', 'asc')->orderBy('hora', 'asc')->paginate(50);
     }
 
     #[\Livewire\Attributes\Computed]
@@ -192,47 +258,68 @@ new class extends Component {
         </div>
     </div>
 
-    {{-- Métricas Bento --}}
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-10">
-        <flux:card class="border-l-4 border-l-blue-600 bg-white dark:bg-zinc-800">
-            <p class="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase tracking-wider mb-2">Total del Día</p>
-            <p class="text-4xl font-extrabold text-zinc-900 dark:text-white">{{ str_pad($this->metricas['total_hoy'], 2, '0', STR_PAD_LEFT) }}</p>
-            <p class="text-[11px] text-blue-600 dark:text-blue-400 font-bold mt-2 flex items-center gap-1">
-                <flux:icon.calendar class="size-4" /> Actividad Normal
-            </p>
-        </flux:card>
+    {{-- Panel de Filtros --}}
+    <flux:card class="mb-6">
+        <div class="flex items-center gap-2 mb-4 text-[#00376e] dark:text-blue-400 font-bold uppercase tracking-widest text-xs">
+            <flux:icon.funnel class="size-4" />
+            {{ __('Panel de Filtros') }}
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <flux:field>
+                <flux:label class="text-xs">{{ __('Buscar Texto') }}</flux:label>
+                <flux:input wire:model.live.debounce.300ms="searchTexto" placeholder="Buscar Estudiante o Apoderado..." />
+            </flux:field>
 
-        <flux:card class="border-l-4 border-l-amber-500 bg-white dark:bg-zinc-800">
-            <p class="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase tracking-wider mb-2">Por LLegar (Pendientes)</p>
-            <p class="text-4xl font-extrabold text-zinc-900 dark:text-white">{{ str_pad($this->metricas['pendientes'], 2, '0', STR_PAD_LEFT) }}</p>
-            <p class="text-[11px] text-amber-600 font-bold mt-2 flex items-center gap-1">
-                <flux:icon.clock class="size-4" /> En espera de acceso
-            </p>
-        </flux:card>
+            <flux:field>
+                <flux:label class="text-xs">{{ __('Filtrar por Profesor') }}</flux:label>
+                <flux:select wire:model.live="filtroDocente">
+                    <flux:select.option value="todos">{{ __('Todos los docentes') }}</flux:select.option>
+                    @foreach($this->docentes as $docente)
+                        <flux:select.option value="{{ $docente->id }}">{{ $docente->nombres }} {{ $docente->apellido_pat }}</flux:select.option>
+                    @endforeach
+                </flux:select>
+            </flux:field>
 
-        <flux:card class="border-l-4 border-l-emerald-500 bg-white dark:bg-zinc-800">
-            <p class="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase tracking-wider mb-2">Visitas Activas</p>
-            <p class="text-4xl font-extrabold text-zinc-900 dark:text-white">{{ str_pad($this->metricas['registrados'], 2, '0', STR_PAD_LEFT) }}</p>
-            <p class="text-[11px] text-emerald-600 font-bold mt-2 flex items-center gap-1">
-                <flux:icon.check-circle class="size-4" /> Apoderados dentro del recinto
-            </p>
-        </flux:card>
-    </div>
+            <flux:field>
+                <flux:label class="text-xs">{{ __('Filtrar por Curso') }}</flux:label>
+                <flux:select wire:model.live="filtroCurso">
+                    <flux:select.option value="todos">{{ __('Todos los cursos') }}</flux:select.option>
+                    @foreach($this->cursos as $curso)
+                        <flux:select.option value="{{ $curso->id }}">{{ $curso->nombreCompleto() }}</flux:select.option>
+                    @endforeach
+                </flux:select>
+            </flux:field>
+
+            <flux:field>
+                <flux:label class="text-xs">{{ __('Temporalidad') }}</flux:label>
+                <flux:radio.group wire:model.live="filtroTemporalidad" variant="segmented" class="w-full">
+                    <flux:radio value="dia" label="Día" />
+                    <flux:radio value="semana" label="Semana" />
+                    <flux:radio value="mes" label="Mes" />
+                </flux:radio.group>
+            </flux:field>
+
+            <flux:field>
+                <flux:label class="text-xs">{{ __('Estado') }}</flux:label>
+                <flux:select wire:model.live="filtroEstado">
+                    <flux:select.option value="todos">{{ __('Todos los estados') }}</flux:select.option>
+                    <flux:select.option value="pendientes">{{ __('Pendientes') }}</flux:select.option>
+                    <flux:select.option value="ingresados">{{ __('Ingresados (En Recinto)') }}</flux:select.option>
+                    <flux:select.option value="realizada">{{ __('Realizadas') }}</flux:select.option>
+                    <flux:select.option value="cancelada">{{ __('Canceladas') }}</flux:select.option>
+                </flux:select>
+            </flux:field>
+        </div>
+    </flux:card>
 
     {{-- Cronograma Interactivo --}}
     <flux:card class="p-0 overflow-hidden mb-10 w-full" wire:poll.5m>
-        <div class="px-6 py-5 border-b border-zinc-200 dark:border-zinc-700 flex flex-col sm:flex-row justify-between items-center gap-4 bg-zinc-50/50 dark:bg-zinc-900/30">
+        <div class="px-6 py-5 border-b border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-900/30">
             <h4 class="text-xl font-bold text-[#00376e] dark:text-blue-400 flex items-center gap-2">
                 <flux:icon.list-bullet class="size-6" />
                 Cronograma de Entrevistas
             </h4>
-            <div class="flex gap-2">
-                <flux:radio.group wire:model.live="filtroEstado" variant="segmented" size="sm">
-                    <flux:radio value="todo" label="Todo" />
-                    <flux:radio value="pendientes" label="Pdtes" />
-                    <flux:radio value="ingresados" label="Ingresados" />
-                </flux:radio.group>
-            </div>
         </div>
 
         <div class="overflow-x-auto">
@@ -251,6 +338,9 @@ new class extends Component {
                     @forelse($this->proximasEntrevistas as $cita)
                         <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors group">
                             <td class="px-6 py-5">
+                                @if($filtroTemporalidad !== 'dia')
+                                    <p class="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{{ \Carbon\Carbon::parse($cita->fecha)->translatedFormat('d M') }}</p>
+                                @endif
                                 <span class="text-xl font-extrabold text-[#00376e] dark:text-blue-400">
                                     {{ \Carbon\Carbon::parse($cita->hora)->format('H:i') }}
                                 </span>
@@ -352,6 +442,11 @@ new class extends Component {
                 </tbody>
             </table>
         </div>
+        @if($this->proximasEntrevistas->hasPages())
+            <div class="px-6 py-4 border-t border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-900/30">
+                {{ $this->proximasEntrevistas->links() }}
+            </div>
+        @endif
     </flux:card>
 
     {{-- Estado de Boxes --}}
@@ -425,6 +520,33 @@ new class extends Component {
             </table>
         </div>
     </flux:card>
+
+    {{-- Métricas Bento --}}
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-10">
+        <flux:card class="border-l-4 border-l-blue-600 bg-white dark:bg-zinc-800">
+            <p class="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase tracking-wider mb-2">Total del Día</p>
+            <p class="text-4xl font-extrabold text-zinc-900 dark:text-white">{{ str_pad($this->metricas['total_hoy'], 2, '0', STR_PAD_LEFT) }}</p>
+            <p class="text-[11px] text-blue-600 dark:text-blue-400 font-bold mt-2 flex items-center gap-1">
+                <flux:icon.calendar class="size-4" /> Actividad Normal
+            </p>
+        </flux:card>
+
+        <flux:card class="border-l-4 border-l-amber-500 bg-white dark:bg-zinc-800">
+            <p class="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase tracking-wider mb-2">Por LLegar (Pendientes)</p>
+            <p class="text-4xl font-extrabold text-zinc-900 dark:text-white">{{ str_pad($this->metricas['pendientes'], 2, '0', STR_PAD_LEFT) }}</p>
+            <p class="text-[11px] text-amber-600 font-bold mt-2 flex items-center gap-1">
+                <flux:icon.clock class="size-4" /> En espera de acceso
+            </p>
+        </flux:card>
+
+        <flux:card class="border-l-4 border-l-emerald-500 bg-white dark:bg-zinc-800">
+            <p class="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase tracking-wider mb-2">Visitas Activas</p>
+            <p class="text-4xl font-extrabold text-zinc-900 dark:text-white">{{ str_pad($this->metricas['registrados'], 2, '0', STR_PAD_LEFT) }}</p>
+            <p class="text-[11px] text-emerald-600 font-bold mt-2 flex items-center gap-1">
+                <flux:icon.check-circle class="size-4" /> Apoderados dentro del recinto
+            </p>
+        </flux:card>
+    </div>
 
     {{-- Notas Panel (Muro Institucional) --}}
     <flux:card class="border-t-4 border-t-indigo-500 p-0 overflow-hidden">

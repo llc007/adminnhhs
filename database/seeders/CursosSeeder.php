@@ -59,10 +59,10 @@ class CursosSeeder extends Seeder
         ['modalidad' => 'basica', 'nivel' => 8, 'letra' => 'D', 'nombre_fc' => '8 BÁSICO D (110)'],
         ['modalidad' => 'basica', 'nivel' => 8, 'letra' => 'E', 'nombre_fc' => '8 BÁSICO E (110)'],
         // 1° Medio (5 paralelos)
-        ['modalidad' => 'media', 'nivel' => 1, 'letra' => 'A', 'nombre_fc' => '1 MEDIO A (310)'],
-        ['modalidad' => 'media', 'nivel' => 1, 'letra' => 'B', 'nombre_fc' => '1 MEDIO B (310)'],
+        ['modalidad' => 'media', 'nivel' => 1, 'letra' => 'A', 'nombre_fc' => '1MEDIO A (310)'],
+        ['modalidad' => 'media', 'nivel' => 1, 'letra' => 'B', 'nombre_fc' => '1MEDIO B (310)'],
         ['modalidad' => 'media', 'nivel' => 1, 'letra' => 'C', 'nombre_fc' => '1 MEDIO C (310)'],
-        ['modalidad' => 'media', 'nivel' => 1, 'letra' => 'D', 'nombre_fc' => '1 MEDIO D (310)'],
+        ['modalidad' => 'media', 'nivel' => 1, 'letra' => 'D', 'nombre_fc' => '1MEDIO D (310)'],
         ['modalidad' => 'media', 'nivel' => 1, 'letra' => 'E', 'nombre_fc' => '1 MEDIO E (310)'],
         // 2° Medio (5 paralelos)
         ['modalidad' => 'media', 'nivel' => 2, 'letra' => 'A', 'nombre_fc' => '2 MEDIO A (310)'],
@@ -103,16 +103,17 @@ class CursosSeeder extends Seeder
 
             if ($existe) {
                 $omitidos++;
+
                 continue;
             }
 
             Curso::create([
-                'school_id'       => $school->id,
+                'school_id' => $school->id,
                 'academic_year_id' => $academicYear->id,
-                'modalidad'       => Modalidad::from($datos['modalidad']),
-                'nivel'           => $datos['nivel'],
-                'letra'           => $datos['letra'],
-                'nombre_fc'       => $datos['nombre_fc'],
+                'modalidad' => Modalidad::from($datos['modalidad']),
+                'nivel' => $datos['nivel'],
+                'letra' => $datos['letra'],
+                'nombre_fc' => $datos['nombre_fc'],
             ]);
 
             $creados++;

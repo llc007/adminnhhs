@@ -2,20 +2,89 @@
 
 use Livewire\Component;
 use Livewire\WithPagination;
+use Illuminate\Validation\Rule;
 
 new class extends Component {
     use WithPagination;
 
     // Filtros y orden
-    public string $modalidad = 'todos';
     public string $cursoId = ''; // Vacío por defecto para obligar a seleccionar
     public string $search = '';
     public string $sortBy = 'nombres_csv';
     public string $sortDirection = 'asc';
 
+    // Modal crear/editar
+    public bool $modalAbierto = false;
+    public ?int $estudianteId = null;
+    public string $nombres = '';
+    public string $rutNumero = '';
+    public string $rutDv = '';
+    public string $formCursoId = '';
+    public string $apoderadoNombres = '';
+    public string $apoderadoTelefono = '';
+    public string $apoderadoEmail = '';
+    public string $apoderadoDomicilio = '';
+
     // Modal eliminar
     public bool $modalEliminar = false;
     public ?int $eliminarId = null;
+
+    public function abrirCrear(): void
+    {
+        $this->reset(['estudianteId', 'nombres', 'rutNumero', 'rutDv', 'formCursoId', 'apoderadoNombres', 'apoderadoTelefono', 'apoderadoEmail', 'apoderadoDomicilio']);
+        $this->modalAbierto = true;
+    }
+
+    public function abrirEditar(int $id): void
+    {
+        $estudiante = \App\Models\Estudiante::findOrFail($id);
+        $this->estudianteId = $estudiante->id;
+        $this->nombres = $estudiante->nombres_csv ?? '';
+        $this->rutNumero = $estudiante->rut_numero ?? '';
+        $this->rutDv = $estudiante->rut_dv ?? '';
+        $this->formCursoId = $estudiante->curso_id ?? '';
+        $this->apoderadoNombres = $estudiante->apoderado_nombres ?? '';
+        $this->apoderadoTelefono = $estudiante->apoderado_telefono ?? '';
+        $this->apoderadoEmail = $estudiante->apoderado_email ?? '';
+        $this->apoderadoDomicilio = $estudiante->apoderado_domicilio ?? '';
+        $this->modalAbierto = true;
+    }
+
+    public function guardar(): void
+    {
+        $this->validate([
+            'nombres' => ['required', 'string', 'max:255'],
+            'rutNumero' => ['nullable', 'digits_between:7,9', Rule::unique('estudiantes', 'rut_numero')->where('school_id', auth()->user()->current_school_id)->ignore($this->estudianteId)],
+            'rutDv' => ['nullable', 'string', 'max:1', 'regex:/^[0-9Kk]$/'],
+            'formCursoId' => ['required', 'exists:cursos,id'],
+            'apoderadoNombres' => ['nullable', 'string', 'max:255'],
+            'apoderadoTelefono' => ['nullable', 'string', 'max:40'],
+            'apoderadoEmail' => ['nullable', 'email', 'max:255'],
+            'apoderadoDomicilio' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $data = [
+            'school_id' => auth()->user()->current_school_id,
+            'nombres_csv' => $this->nombres,
+            'rut_numero' => $this->rutNumero ?: null,
+            'rut_dv' => $this->rutDv ? strtoupper($this->rutDv) : null,
+            'curso_id' => $this->formCursoId ?: null,
+            'apoderado_nombres' => $this->apoderadoNombres ?: null,
+            'apoderado_telefono' => $this->apoderadoTelefono ?: null,
+            'apoderado_email' => $this->apoderadoEmail ?: null,
+            'apoderado_domicilio' => $this->apoderadoDomicilio ?: null,
+        ];
+
+        if ($this->estudianteId) {
+            \App\Models\Estudiante::findOrFail($this->estudianteId)->update($data);
+        } else {
+            \App\Models\Estudiante::create($data);
+        }
+
+        $this->modalAbierto = false;
+        $this->reset(['estudianteId', 'nombres', 'rutNumero', 'rutDv', 'formCursoId', 'apoderadoNombres', 'apoderadoTelefono', 'apoderadoEmail', 'apoderadoDomicilio']);
+        $this->resetPage();
+    }
 
     public function sort(string $column): void
     {
@@ -27,11 +96,6 @@ new class extends Component {
         }
     }
 
-    public function updatedModalidad()
-    {
-        $this->cursoId = ''; // Reiniciar el curso al cambiar de modalidad
-        $this->resetPage();
-    }
 
     public function updatedCursoId()
     {
@@ -61,15 +125,11 @@ new class extends Component {
     #[\Livewire\Attributes\Computed]
     public function cursos()
     {
-        $query = \App\Models\Curso::where('school_id', auth()->user()->current_school_id)
+        return \App\Models\Curso::where('school_id', auth()->user()->current_school_id)
+            ->orderBy('modalidad')
             ->orderBy('nivel')
-            ->orderBy('letra');
-
-        if ($this->modalidad !== 'todos') {
-            $query->where('modalidad', $this->modalidad);
-        }
-
-        return $query->get();
+            ->orderBy('letra')
+            ->get();
     }
 
     #[\Livewire\Attributes\Computed]
@@ -82,15 +142,15 @@ new class extends Component {
 
         return \App\Models\Estudiante::query()
             ->with(['curso', 'user'])
-            ->where('school_id', auth()->user()->current_school_id)
+            ->where('estudiantes.school_id', auth()->user()->current_school_id)
             ->when($this->cursoId !== 'todos', function ($query) {
-                $query->where('curso_id', $this->cursoId);
+                $query->where('estudiantes.curso_id', $this->cursoId);
             })
             ->when(trim($this->search) !== '', function ($query) {
                 $search = trim($this->search);
                 $query->where(function ($q) use ($search) {
-                    $q->where('nombres_csv', 'like', "%{$search}%")
-                      ->orWhere('rut_numero', 'like', "%{$search}%")
+                    $q->where('estudiantes.nombres_csv', 'like', "%{$search}%")
+                      ->orWhere('estudiantes.rut_numero', 'like', "%{$search}%")
                       ->orWhereHas('user', function ($uq) use ($search) {
                           $uq->where('nombres', 'like', "%{$search}%")
                              ->orWhere('apellido_pat', 'like', "%{$search}%")
@@ -99,10 +159,17 @@ new class extends Component {
                 });
             })
             ->when($this->sortBy === 'nombres_csv', function ($query) {
-                $query->orderBy('nombres_csv', $this->sortDirection);
+                $query->orderBy('estudiantes.nombres_csv', $this->sortDirection);
             })
             ->when($this->sortBy === 'rut_numero', function ($query) {
-                $query->orderBy('rut_numero', $this->sortDirection);
+                $query->orderBy('estudiantes.rut_numero', $this->sortDirection);
+            })
+            ->when($this->sortBy === 'curso_id', function ($query) {
+                $query->leftJoin('cursos', 'estudiantes.curso_id', '=', 'cursos.id')
+                      ->select('estudiantes.*')
+                      ->orderBy('cursos.modalidad', $this->sortDirection)
+                      ->orderBy('cursos.nivel', $this->sortDirection)
+                      ->orderBy('cursos.letra', $this->sortDirection);
             })
             ->paginate(50); // Mostramos 50 alumnos por página pues los cursos rondan los 30-45 alumnos
     }
@@ -131,7 +198,7 @@ new class extends Component {
                 <flux:button variant="ghost" icon="document-arrow-up" href="{{ route('estudiantes.carga_masiva') }}">
                     {{ __('Importar CSV') }}
                 </flux:button>
-                <flux:button variant="primary" icon="plus" class="shrink-0">
+                <flux:button variant="primary" icon="plus" class="shrink-0" wire:click="abrirCrear">
                     {{ __('Nuevo Estudiante') }}
                 </flux:button>
             </div>
@@ -142,20 +209,7 @@ new class extends Component {
             <div class="md:col-span-8">
                 <flux:card class="h-full flex items-center">
                     <div class="flex flex-col md:flex-row items-start md:items-center gap-6 w-full">
-                        <flux:field class="flex-1 w-full overflow-hidden">
-                            <flux:label class="mb-2 uppercase tracking-widest text-[10px] font-bold text-zinc-500 dark:text-zinc-400">
-                                {{ __('Filtrar por Nivel') }}
-                            </flux:label>
-                            <flux:radio.group wire:model.live="modalidad" variant="segmented" class="w-full overflow-x-auto">
-                                <flux:radio value="todos" :label="__('Todos')" />
-                                <flux:radio value="basica" :label="__('Educación Básica')" />
-                                <flux:radio value="media" :label="__('Educación Media')" />
-                            </flux:radio.group>
-                        </flux:field>
-
-                        <div class="h-12 w-px bg-zinc-200 dark:bg-zinc-700 hidden md:block"></div>
-
-                        <flux:field class="w-full md:w-56">
+                        <flux:field class="w-full md:w-64">
                             <flux:label class="mb-2 uppercase tracking-widest text-[10px] font-bold text-zinc-500 dark:text-zinc-400">
                                 {{ __('Curso') }}
                             </flux:label>
@@ -167,6 +221,17 @@ new class extends Component {
                                 @endforeach
                             </flux:select>
                         </flux:field>
+
+                        @if($cursoId !== '')
+                            <div class="h-12 w-px bg-zinc-200 dark:bg-zinc-700 hidden md:block"></div>
+
+                            <flux:field class="flex-1 w-full overflow-hidden">
+                                <flux:label class="mb-2 uppercase tracking-widest text-[10px] font-bold text-zinc-500 dark:text-zinc-400">
+                                    {{ __('Buscar Estudiante') }}
+                                </flux:label>
+                                <flux:input wire:model.live.debounce.300ms="search" icon="magnifying-glass" :placeholder="__('Buscar por nombre o RUT...')" class="w-full" />
+                            </flux:field>
+                        @endif
                     </div>
                 </flux:card>
             </div>
@@ -199,12 +264,6 @@ new class extends Component {
                     </flux:text>
                 </div>
             @else
-                <div class="px-4 py-3 border-b border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/30 flex items-center justify-between">
-                    <div class="w-full max-w-sm">
-                        <flux:input wire:model.live.debounce.300ms="search" icon="magnifying-glass" :placeholder="__('Buscar por nombre o RUT...')" size="sm" class="w-full" />
-                    </div>
-                </div>
-
                 <flux:table :paginate="$this->estudiantes">
                     <flux:table.columns>
                         <flux:table.column sortable :sorted="$sortBy === 'nombres_csv'" :direction="$sortDirection" wire:click="sort('nombres_csv')">
@@ -213,7 +272,9 @@ new class extends Component {
                         <flux:table.column sortable :sorted="$sortBy === 'rut_numero'" :direction="$sortDirection" wire:click="sort('rut_numero')">
                             {{ __('RUT') }}
                         </flux:table.column>
-                        <flux:table.column>{{ __('Curso') }}</flux:table.column>
+                        <flux:table.column sortable :sorted="$sortBy === 'curso_id'" :direction="$sortDirection" wire:click="sort('curso_id')">
+                            {{ __('Curso') }}
+                        </flux:table.column>
                         <flux:table.column>{{ __('Apoderado') }}</flux:table.column>
                         <flux:table.column>{{ __('Estado') }}</flux:table.column>
                         <flux:table.column class="text-right">{{ __('Acciones') }}</flux:table.column>
@@ -263,7 +324,7 @@ new class extends Component {
                                 <flux:table.cell class="text-right">
                                     <div class="flex items-center justify-end gap-1">
                                     <flux:button variant="ghost" size="sm" icon="eye" :tooltip="__('Ver Ficha')" href="{{ route('estudiantes.ficha', $estudiante->id) }}" />
-                                        <flux:button variant="ghost" size="sm" icon="pencil-square" :tooltip="__('Editar')" href="#" />
+                                        <flux:button variant="ghost" size="sm" icon="pencil-square" :tooltip="__('Editar')" wire:click="abrirEditar({{ $estudiante->id }})" />
                                         <flux:button variant="ghost" size="sm" icon="trash" :tooltip="__('Eliminar')" wire:click="confirmarEliminar({{ $estudiante->id }})" />
                                     </div>
                                 </flux:table.cell>
@@ -306,6 +367,56 @@ new class extends Component {
                 <flux:spacer />
                 <flux:button wire:click="$set('modalEliminar', false)" variant="ghost">{{ __('Cancelar') }}</flux:button>
                 <flux:button wire:click="eliminar" variant="danger" class="ml-2">{{ __('Eliminar') }}</flux:button>
+            </div>
+        </div>
+    </flux:modal>
+
+    {{-- Modal Crear / Editar --}}
+    <flux:modal wire:model="modalAbierto" class="md:w-xl">
+        <div class="space-y-6">
+            <div>
+                <flux:heading size="lg">{{ $estudianteId ? __('Editar Estudiante') : __('Nuevo Estudiante') }}</flux:heading>
+                <flux:text class="mt-2">{{ $estudianteId ? __('Modifica los datos del estudiante.') : __('Ingresa los datos del nuevo estudiante.') }}</flux:text>
+            </div>
+
+            <flux:input wire:model="nombres" :label="__('Nombre Completo')" placeholder="Ej: Juan Pérez López" />
+            <flux:error name="nombres" />
+
+            <div class="grid grid-cols-2 gap-3">
+                <div class="flex gap-2">
+                    <flux:input wire:model="rutNumero" :label="__('RUT sin puntos')" placeholder="12345678" class="flex-1" />
+                    <flux:input wire:model="rutDv" :label="__('DV')" placeholder="K" class="w-20" maxlength="1" />
+                </div>
+                <flux:select wire:model="formCursoId" :label="__('Curso')">
+                    <flux:select.option value="" disabled>{{ __('Selecciona un Curso') }}</flux:select.option>
+                    @foreach ($this->cursos as $curso)
+                        <flux:select.option value="{{ $curso->id }}">{{ $curso->nombreCompleto() }}</flux:select.option>
+                    @endforeach
+                </flux:select>
+            </div>
+            <flux:error name="rutNumero" />
+            <flux:error name="rutDv" />
+            <flux:error name="formCursoId" />
+
+            <flux:separator text="Datos del Apoderado (Opcional)" />
+
+            <flux:input wire:model="apoderadoNombres" :label="__('Nombre del Apoderado')" placeholder="Ej: María López" />
+            <flux:error name="apoderadoNombres" />
+
+            <div class="grid grid-cols-2 gap-3">
+                <flux:input wire:model="apoderadoTelefono" :label="__('Teléfono')" placeholder="+56912345678" />
+                <flux:input wire:model="apoderadoEmail" type="email" :label="__('Correo Electrónico')" placeholder="maria@correo.cl" />
+            </div>
+            <flux:error name="apoderadoTelefono" />
+            <flux:error name="apoderadoEmail" />
+
+            <flux:input wire:model="apoderadoDomicilio" :label="__('Domicilio')" placeholder="Ej: Av. Los Leones 1234" />
+            <flux:error name="apoderadoDomicilio" />
+
+            <div class="flex">
+                <flux:spacer />
+                <flux:button wire:click="$set('modalAbierto', false)" variant="ghost">{{ __('Cancelar') }}</flux:button>
+                <flux:button wire:click="guardar" variant="primary" class="ml-2">{{ __('Guardar') }}</flux:button>
             </div>
         </div>
     </flux:modal>

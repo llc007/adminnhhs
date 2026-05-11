@@ -100,6 +100,8 @@ new class extends Component {
             ->get()
             ->mapWithKeys(fn($c) => [$this->normalizarTexto($c->nombre_fc) => $c]);
 
+        $rutsVistos = [];
+
         foreach ($lineas as $linea) {
             $cols = str_getcsv($linea, $separador);
             if (count($cols) < 3) {
@@ -115,8 +117,12 @@ new class extends Component {
 
             $nombreCompleto = $this->normalizarTexto($cols[0] ?? '');
 
-            // Verificar si ya existe en BD
-            $existe = Estudiante::where('school_id', $schoolId)->where('rut_numero', $rut['rut_numero'])->exists();
+            // Verificar si ya existe en BD o en el mismo archivo
+            $existeBd = Estudiante::where('school_id', $schoolId)->where('rut_numero', $rut['rut_numero'])->exists();
+            $existeArchivo = isset($rutsVistos[$rut['rut_numero']]);
+            $existe = $existeBd || $existeArchivo;
+            
+            $rutsVistos[$rut['rut_numero']] = true;
 
             $this->filas[] = [
                 'nombre_completo' => $nombreCompleto,
@@ -149,17 +155,21 @@ new class extends Component {
                     continue;
                 }
 
-                Estudiante::create([
-                    'school_id' => $schoolId,
-                    'curso_id' => $fila['curso_id'],
-                    'nombres_csv' => $fila['nombre_completo'],
-                    'rut_numero' => $fila['rut_numero'],
-                    'rut_dv' => $fila['rut_dv'],
-                    'apoderado_nombres' => $fila['apoderado'],
-                    'apoderado_telefono' => $fila['apoderado_telefono'],
-                    'apoderado_email' => $fila['apoderado_email'],
-                    'apoderado_domicilio' => $fila['apoderado_domicilio'],
-                ]);
+                Estudiante::updateOrCreate(
+                    [
+                        'school_id' => $schoolId,
+                        'rut_numero' => $fila['rut_numero'],
+                    ],
+                    [
+                        'curso_id' => $fila['curso_id'],
+                        'nombres_csv' => $fila['nombre_completo'],
+                        'rut_dv' => $fila['rut_dv'],
+                        'apoderado_nombres' => $fila['apoderado'],
+                        'apoderado_telefono' => $fila['apoderado_telefono'],
+                        'apoderado_email' => $fila['apoderado_email'],
+                        'apoderado_domicilio' => $fila['apoderado_domicilio'],
+                    ]
+                );
 
                 $importados++;
             }

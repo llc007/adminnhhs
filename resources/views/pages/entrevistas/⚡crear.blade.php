@@ -140,7 +140,7 @@ new class extends Component {
             return;
         }
 
-        \App\Models\Entrevista::create([
+        $entrevista = \App\Models\Entrevista::create([
             'school_id' => auth()->user()->current_school_id,
             'user_id' => auth()->id(),
             'estudiante_id' => $this->estudianteId,
@@ -153,8 +153,17 @@ new class extends Component {
             'estado' => 'pendiente',
         ]);
 
+        // Enviar notificación al Docente (usamos auth()->user() o el owner de la cita)
+        auth()->user()->notify(new \App\Notifications\EntrevistaAgendadaDocente($entrevista));
+
+        // Enviar notificación al Apoderado (si tiene email válido)
+        if (!empty($entrevista->estudiante->apoderado_email)) {
+            \Illuminate\Support\Facades\Notification::route('mail', $entrevista->estudiante->apoderado_email)
+                ->notify(new \App\Notifications\EntrevistaAgendadaApoderado($entrevista));
+        }
+
         // Feedback al usuario local e interfaz
-        \Flux::toast('Entrevista agendada con éxito.', variant: 'success');
+        \Flux::toast('Entrevista agendada y notificada con éxito.', variant: 'success');
 
         // Reset del form
         $this->reset(['estudianteId', 'searchEstudiante', 'filtroCursoId', 'urgencia', 'lugar', 'motivo', 'notas', 'confirmarTope']);

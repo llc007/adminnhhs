@@ -38,6 +38,13 @@ new #[Title('Profile settings')] class extends Component {
         $this->email = Auth::user()->email;
     }
 
+    public function updated($propertyName, $value): void
+    {
+        if (in_array($propertyName, ['nombres', 'apellido_pat', 'apellido_mat', 'direccion'])) {
+            $this->{$propertyName} = mb_strtoupper((string) $value, 'UTF-8');
+        }
+    }
+
     /**
      * Update the profile information for the currently authenticated user.
      */
@@ -153,13 +160,13 @@ new #[Title('Profile settings')] class extends Component {
                     </div>
                     
                     <div class="md:col-span-4">
-                        <flux:input wire:model="nombres" :label="__('Nombre(s)')" type="text" required autofocus />
+                        <flux:input wire:model="nombres" :label="__('Nombre(s)')" type="text" required autofocus class="uppercase" />
                     </div>
                     <div class="md:col-span-4">
-                        <flux:input wire:model="apellido_pat" :label="__('Apellido Paterno')" type="text" required />
+                        <flux:input wire:model="apellido_pat" :label="__('Apellido Paterno')" type="text" required class="uppercase" />
                     </div>
                     <div class="md:col-span-4">
-                        <flux:input wire:model="apellido_mat" :label="__('Apellido Materno')" type="text" />
+                        <flux:input wire:model="apellido_mat" :label="__('Apellido Materno')" type="text" class="uppercase" />
                     </div>
                     
                     <div class="md:col-span-4">
@@ -180,7 +187,7 @@ new #[Title('Profile settings')] class extends Component {
                     </div>
                     
                     <div class="md:col-span-12">
-                        <flux:input wire:model="direccion" :label="__('Dirección Particular')" type="text" placeholder="Calle, Número, Depto, Comuna" />
+                        <flux:input wire:model="direccion" :label="__('Dirección Particular')" type="text" placeholder="CALLE, NÚMERO, DEPTO, COMUNA" class="uppercase" />
                     </div>
                     
                     <div class="md:col-span-6">

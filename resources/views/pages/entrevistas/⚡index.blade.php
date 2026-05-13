@@ -260,8 +260,10 @@ new class extends Component {
                         </flux:table.cell>
 
                         <flux:table.cell class="text-right">
-                            <flux:button size="sm" variant="subtle"
-                                href="{{ route('entrevistas.bitacora', $entrevista->id) }}">Ver Bitácora</flux:button>
+                            @can('view', $entrevista)
+                                <flux:button size="sm" variant="subtle"
+                                    href="{{ route('entrevistas.bitacora', $entrevista->id) }}">Ver Bitácora</flux:button>
+                            @endcan
                         </flux:table.cell>
                     </flux:table.row>
                 @empty

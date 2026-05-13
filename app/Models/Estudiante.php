@@ -22,6 +22,20 @@ class Estudiante extends Model
     use HasFactory;
 
     /**
+     * The "booted" method of the model.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (Estudiante $estudiante) {
+            if ($estudiante->nombres_csv) $estudiante->nombres_csv = mb_strtoupper($estudiante->nombres_csv, 'UTF-8');
+            if ($estudiante->apoderado_nombres) $estudiante->apoderado_nombres = mb_strtoupper($estudiante->apoderado_nombres, 'UTF-8');
+            if ($estudiante->apoderado_apellido_pat) $estudiante->apoderado_apellido_pat = mb_strtoupper($estudiante->apoderado_apellido_pat, 'UTF-8');
+            if ($estudiante->apoderado_apellido_mat) $estudiante->apoderado_apellido_mat = mb_strtoupper($estudiante->apoderado_apellido_mat, 'UTF-8');
+            if ($estudiante->apoderado_domicilio) $estudiante->apoderado_domicilio = mb_strtoupper($estudiante->apoderado_domicilio, 'UTF-8');
+        });
+    }
+
+    /**
      * Get the user account associated with this student.
      */
     public function user(): BelongsTo

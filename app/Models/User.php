@@ -23,6 +23,19 @@ class User extends Authenticatable
     use HasFactory, Notifiable, TwoFactorAuthenticatable;
 
     /**
+     * The "booted" method of the model.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (User $user) {
+            if ($user->nombres) $user->nombres = mb_strtoupper($user->nombres, 'UTF-8');
+            if ($user->apellido_pat) $user->apellido_pat = mb_strtoupper($user->apellido_pat, 'UTF-8');
+            if ($user->apellido_mat) $user->apellido_mat = mb_strtoupper($user->apellido_mat, 'UTF-8');
+            if ($user->direccion) $user->direccion = mb_strtoupper($user->direccion, 'UTF-8');
+        });
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>

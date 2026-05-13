@@ -17,9 +17,11 @@
 
         <flux:sidebar.nav>
             <flux:sidebar.group :heading="__('Plataforma')" class="grid">
+                @if(auth()->user()->hasRole(['administrador', 'directivo', 'superadmin']))
                 <flux:sidebar.item icon="home" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>
                     {{ __('Inicio') }}
                 </flux:sidebar.item>
+                @endif
 
                 @if(auth()->user()->hasRole(['recepcion', 'directivo', 'administrador', 'superadmin', 'inspector']))
                 <flux:sidebar.item icon="building-office-2" :href="route('entrevistas.recepcion')" :current="request()->routeIs('entrevistas.recepcion')" wire:navigate>
@@ -27,19 +29,19 @@
                 </flux:sidebar.item>
                 @endif
 
-                @if(auth()->user()->hasRole(['docente', 'psicosocial', 'directivo', 'administrador', 'superadmin']))
+                @if(auth()->user()->hasRole(['docente', 'inspector', 'administrador', 'directivo', 'superadmin']))
                 <flux:sidebar.item icon="calendar-days" :href="route('entrevistas.agenda')" :current="request()->routeIs('entrevistas.agenda')" wire:navigate>
                     {{ __('Mi Agenda') }}
                 </flux:sidebar.item>
                 @endif
 
-                @if(auth()->user()->hasRole(['directivo', 'administrador', 'superadmin', 'inspector', 'recepcion']))
+                @if(auth()->user()->hasRole(['docente', 'inspector', 'administrador', 'directivo', 'superadmin']))
                 <flux:sidebar.item icon="table-cells" :href="route('entrevistas.index')" :current="request()->routeIs('entrevistas.index')" wire:navigate>
                     {{ __('Historial General') }}
                 </flux:sidebar.item>
                 @endif
 
-                @if(auth()->user()->hasRole(['recepcion', 'administrador', 'directivo', 'inspector', 'superadmin', 'docente', 'psicosocial', 'asistente']))
+                @if(auth()->user()->hasRole(['docente', 'inspector', 'administrador', 'directivo', 'superadmin']))
                 <flux:sidebar.item icon="chat-bubble-left-right" :href="route('entrevistas.crear')" :current="request()->routeIs('entrevistas.crear')" wire:navigate>
                     {{ __('Agendar Entrevista') }}
                 </flux:sidebar.item>
@@ -47,7 +49,7 @@
             </flux:sidebar.group>
 
             <flux:sidebar.group :heading="__('Gestión Académica')" class="grid mt-4">
-                @if(auth()->user()->hasRole(['directivo', 'administrador', 'superadmin', 'inspector', 'docente', 'asistente', 'psicosocial']))
+                @if(auth()->user()->hasRole(['directivo', 'administrador', 'superadmin', 'inspector', 'docente', 'asistente', 'psicosocial', 'recepcion']))
                 <flux:sidebar.item icon="users" :href="route('estudiantes.index')" :current="request()->routeIs('estudiantes.*')" wire:navigate>
                     {{ __('Estudiantes') }}
                 </flux:sidebar.item>

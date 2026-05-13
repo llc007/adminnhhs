@@ -57,8 +57,14 @@ new class extends Component {
         $this->apoderadoRutDv = $estudiante->apoderado_rut_dv ?? '';
         $this->apoderadoEmail = $estudiante->apoderado_email ?? '';
         $this->apoderadoTelefono = $estudiante->apoderado_telefono ?? '';
-        $this->apoderadoParentesco = $estudiante->apoderado_parentesco ?? '';
         $this->apoderadoDomicilio = $estudiante->apoderado_domicilio ?? '';
+    }
+
+    public function updated($propertyName, $value): void
+    {
+        if (in_array($propertyName, ['nombresCsv', 'apoderadoNombres', 'apoderadoApellidoPat', 'apoderadoApellidoMat', 'apoderadoDomicilio'])) {
+            $this->{$propertyName} = mb_strtoupper((string) $value, 'UTF-8');
+        }
     }
 
     #[\Livewire\Attributes\Computed]
@@ -75,7 +81,7 @@ new class extends Component {
         $this->validate([
             'nombresCsv'          => ['nullable', 'string', 'max:255'],
             'rutNumero'           => ['nullable', 'digits_between:7,9'],
-            'rutDv'               => ['nullable', 'string', 'max:1', 'regex:/^[0-9Kk]$/'],
+            'rutDv'               => ['nullable', 'max:1', 'regex:/^[0-9Kk]$/'],
             'fechaNacimiento'     => ['nullable', 'date'],
             'genero'              => ['nullable', 'string', 'max:20'],
             'cursoId'             => ['nullable', 'exists:cursos,id'],
@@ -84,7 +90,7 @@ new class extends Component {
             'apoderadoApellidoPat'=> ['nullable', 'string', 'max:255'],
             'apoderadoApellidoMat'=> ['nullable', 'string', 'max:255'],
             'apoderadoRutNumero'  => ['nullable', 'digits_between:7,9'],
-            'apoderadoRutDv'      => ['nullable', 'string', 'max:1', 'regex:/^[0-9Kk]$/'],
+            'apoderadoRutDv'      => ['nullable', 'max:1', 'regex:/^[0-9Kk]$/'],
             'apoderadoEmail'      => ['nullable', 'email', 'max:255'],
             'apoderadoTelefono'   => ['nullable', 'string', 'max:20'],
             'apoderadoParentesco' => ['nullable', 'string', 'max:50'],
@@ -165,7 +171,7 @@ new class extends Component {
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div class="md:col-span-2">
-                <flux:input wire:model="nombresCsv" :label="__('Nombre Completo (Importado)')" placeholder="Ej: Marcela Paz Rodríguez López" />
+                <flux:input wire:model="nombresCsv" :label="__('Nombre Completo (Importado)')" placeholder="EJ: MARCELA PAZ RODRÍGUEZ LÓPEZ" class="uppercase" />
                 <flux:text class="mt-1 text-xs">{{ __('Nombre importado inicialmente. Se actualizará con el nombre real de su cuenta Google cuando inicie sesión.') }}</flux:text>
             </div>
 
@@ -221,9 +227,9 @@ new class extends Component {
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <flux:input wire:model="apoderadoNombres" :label="__('Nombre(s)')" placeholder="Nombre apoderado" />
-            <flux:input wire:model="apoderadoApellidoPat" :label="__('Apellido Paterno')" placeholder="" />
-            <flux:input wire:model="apoderadoApellidoMat" :label="__('Apellido Materno')" placeholder="" />
+            <flux:input wire:model="apoderadoNombres" :label="__('Nombre(s)')" placeholder="EJ: MARÍA PAZ" class="uppercase" />
+            <flux:input wire:model="apoderadoApellidoPat" :label="__('Apellido Paterno')" placeholder="EJ: RODRÍGUEZ" class="uppercase" />
+            <flux:input wire:model="apoderadoApellidoMat" :label="__('Apellido Materno')" placeholder="EJ: LÓPEZ" class="uppercase" />
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
@@ -238,7 +244,7 @@ new class extends Component {
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
             <flux:input wire:model="apoderadoEmail" :label="__('Correo Electrónico (Personal)')" type="email" placeholder="apoderado@gmail.com" />
-            <flux:input wire:model="apoderadoDomicilio" :label="__('Domicilio Registrado')" placeholder="Ej: Los Pinos 123, Villa San Rafael" />
+            <flux:input wire:model="apoderadoDomicilio" :label="__('Domicilio Registrado')" placeholder="EJ: LOS PINOS 123, VILLA SAN RAFAEL" class="uppercase" />
         </div>
     </flux:card>
 

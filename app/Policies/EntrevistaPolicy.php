@@ -4,7 +4,6 @@ namespace App\Policies;
 
 use App\Models\Entrevista;
 use App\Models\User;
-use Illuminate\Auth\Access\Response;
 
 class EntrevistaPolicy
 {
@@ -21,13 +20,13 @@ class EntrevistaPolicy
      */
     public function view(User $user, Entrevista $entrevista): bool
     {
-        // El dueño siempre puede verla
+        // El creador siempre puede ver su propia entrevista (incluyendo inspectoria)
         if ($user->id === $entrevista->user_id) {
             return true;
         }
 
-        // Directivos, administradores y psicosocial pueden verlas todas
-        if ($user->hasRole(['administrador', 'directivo', 'superadmin', 'psicosocial', 'recepcion'])) {
+        // Solo directivos y administradores pueden ver TODAS las bitácoras
+        if ($user->hasRole(['administrador', 'directivo', 'superadmin'])) {
             return true;
         }
 
@@ -47,14 +46,13 @@ class EntrevistaPolicy
      */
     public function update(User $user, Entrevista $entrevista): bool
     {
-        // Solo el dueño original (profesor/profesional asignado) puede llenar o editar su bitácora
+        // Solo el creador puede llenar o editar su propia bitácora
         if ($user->id === $entrevista->user_id) {
             return true;
         }
 
-        // Un administrador/directivo puede llegar a editarla en casos extremos, pero por defecto dejémoslo solo al dueño
-        // Si quieres que directivos editen bitácoras ajenas, descomenta lo siguiente:
-        if ($user->hasRole(['administrador', 'superadmin'])) {
+        // Directivos y administradores pueden editar cualquier bitácora
+        if ($user->hasRole(['administrador', 'directivo', 'superadmin'])) {
             return true;
         }
 

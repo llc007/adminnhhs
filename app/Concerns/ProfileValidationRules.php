@@ -19,7 +19,7 @@ trait ProfileValidationRules
             'apellido_pat' => ['required', 'string', 'max:255'],
             'apellido_mat' => ['nullable', 'string', 'max:255'],
             'rut_numero' => ['nullable', 'digits_between:7,9'],
-            'rut_dv' => ['nullable', 'string', 'max:1', 'regex:/^[0-9Kk]$/'],
+            'rut_dv' => ['nullable', 'max:1', 'regex:/^[0-9Kk]$/'],
             'fecha_nacimiento' => ['nullable', 'date'],
             'telefono' => ['nullable', 'string', 'max:20'],
             'direccion' => ['nullable', 'string', 'max:255'],

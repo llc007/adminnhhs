@@ -50,12 +50,19 @@ new class extends Component {
         $this->modalAbierto = true;
     }
 
+    public function updated($propertyName, $value): void
+    {
+        if (in_array($propertyName, ['nombres', 'apoderadoNombres', 'apoderadoDomicilio'])) {
+            $this->{$propertyName} = mb_strtoupper((string) $value, 'UTF-8');
+        }
+    }
+
     public function guardar(): void
     {
         $this->validate([
             'nombres' => ['required', 'string', 'max:255'],
             'rutNumero' => ['nullable', 'digits_between:7,9', Rule::unique('estudiantes', 'rut_numero')->where('school_id', auth()->user()->current_school_id)->ignore($this->estudianteId)],
-            'rutDv' => ['nullable', 'string', 'max:1', 'regex:/^[0-9Kk]$/'],
+            'rutDv' => ['nullable', 'max:1', 'regex:/^[0-9Kk]$/'],
             'formCursoId' => ['required', 'exists:cursos,id'],
             'apoderadoNombres' => ['nullable', 'string', 'max:255'],
             'apoderadoTelefono' => ['nullable', 'string', 'max:40'],
@@ -67,7 +74,7 @@ new class extends Component {
             'school_id' => auth()->user()->current_school_id,
             'nombres_csv' => $this->nombres,
             'rut_numero' => $this->rutNumero ?: null,
-            'rut_dv' => $this->rutDv ? strtoupper($this->rutDv) : null,
+            'rut_dv' => $this->rutDv !== '' ? strtoupper($this->rutDv) : null,
             'curso_id' => $this->formCursoId ?: null,
             'apoderado_nombres' => $this->apoderadoNombres ?: null,
             'apoderado_telefono' => $this->apoderadoTelefono ?: null,
@@ -379,7 +386,8 @@ new class extends Component {
                 <flux:text class="mt-2">{{ $estudianteId ? __('Modifica los datos del estudiante.') : __('Ingresa los datos del nuevo estudiante.') }}</flux:text>
             </div>
 
-            <flux:input wire:model="nombres" :label="__('Nombre Completo')" placeholder="Ej: Juan Pérez López" />
+            <flux:input wire:model="nombres" :label="__('Nombre Completo')" placeholder="EJ: JUAN PÉREZ LÓPEZ"
+                x-on:input="$event.target.value = $event.target.value.toLocaleUpperCase(); $wire.set('nombres', $event.target.value)" />
             <flux:error name="nombres" />
 
             <div class="grid grid-cols-2 gap-3">
@@ -400,7 +408,8 @@ new class extends Component {
 
             <flux:separator text="Datos del Apoderado (Opcional)" />
 
-            <flux:input wire:model="apoderadoNombres" :label="__('Nombre del Apoderado')" placeholder="Ej: María López" />
+            <flux:input wire:model="apoderadoNombres" :label="__('Nombre del Apoderado')" placeholder="EJ: MARÍA LÓPEZ"
+                x-on:input="$event.target.value = $event.target.value.toLocaleUpperCase(); $wire.set('apoderadoNombres', $event.target.value)" />
             <flux:error name="apoderadoNombres" />
 
             <div class="grid grid-cols-2 gap-3">
@@ -410,7 +419,8 @@ new class extends Component {
             <flux:error name="apoderadoTelefono" />
             <flux:error name="apoderadoEmail" />
 
-            <flux:input wire:model="apoderadoDomicilio" :label="__('Domicilio')" placeholder="Ej: Av. Los Leones 1234" />
+            <flux:input wire:model="apoderadoDomicilio" :label="__('Domicilio')" placeholder="EJ: AV. LOS LEONES 1234"
+                x-on:input="$event.target.value = $event.target.value.toLocaleUpperCase(); $wire.set('apoderadoDomicilio', $event.target.value)" />
             <flux:error name="apoderadoDomicilio" />
 
             <div class="flex">

@@ -102,11 +102,13 @@ new class extends Component {
                     </p>
                 </div>
                 <div class="relative z-10 w-full md:w-auto">
+                    @can('view', $proxima)
                     <flux:button href="{{ route('entrevistas.bitacora', $proxima->id) }}" variant="ghost"
                         class="w-full md:w-auto bg-white/10 hover:bg-white/20 text-white border-0 font-bold px-6 py-2">
                         <flux:icon.document-text class="size-4 mr-2" />
                         Comenzar Bitácora
                     </flux:button>
+                    @endcan
                 </div>
                 <!-- Abstract decor -->
                 <div
@@ -195,18 +197,20 @@ new class extends Component {
 
                             <!-- Acciones -->
                             <div class="flex gap-2 relative">
-                                @if (in_array($cita->estado, ['realizada', 'ausente', 'cancelada']))
-                                    <flux:button href="{{ route('entrevistas.bitacora', $cita->id) }}" size="sm"
-                                        variant="ghost" class="text-zinc-500">
-                                        <flux:icon.eye class="size-4" />
-                                    </flux:button>
-                                @else
-                                    <flux:button href="{{ route('entrevistas.bitacora', $cita->id) }}" size="sm"
-                                        variant="subtle"
-                                        class="opacity-0 group-hover:opacity-100 transition-all font-bold text-[#00376e] bg-blue-50 dark:bg-blue-900/40">
-                                        Llenar Bitácora
-                                    </flux:button>
-                                @endif
+                                @can('view', $cita)
+                                    @if (in_array($cita->estado, ['realizada', 'ausente', 'cancelada']))
+                                        <flux:button href="{{ route('entrevistas.bitacora', $cita->id) }}" size="sm"
+                                            variant="ghost" class="text-zinc-500">
+                                            <flux:icon.eye class="size-4" />
+                                        </flux:button>
+                                    @else
+                                        <flux:button href="{{ route('entrevistas.bitacora', $cita->id) }}" size="sm"
+                                            variant="subtle"
+                                            class="opacity-0 group-hover:opacity-100 transition-all font-bold text-[#00376e] bg-blue-50 dark:bg-blue-900/40">
+                                            Llenar Bitácora
+                                        </flux:button>
+                                    @endif
+                                @endcan
                             </div>
                         </div>
                     @empty

@@ -58,6 +58,13 @@ new class extends Component {
         $this->modalAbierto = true;
     }
 
+    public function updated($propertyName, $value): void
+    {
+        if (in_array($propertyName, ['nombres', 'apellidoPat', 'apellidoMat'])) {
+            $this->{$propertyName} = mb_strtoupper((string) $value, 'UTF-8');
+        }
+    }
+
     public function guardar(): void
     {
         $this->validate([
@@ -66,7 +73,7 @@ new class extends Component {
             'apellidoMat' => ['nullable', 'string', 'max:255'],
             'email'       => ['required', 'email', Rule::unique('users', 'email')->ignore($this->funcionarioId)],
             'rutNumero'   => ['nullable', 'digits_between:7,9'],
-            'rutDv'       => ['nullable', 'string', 'max:1', 'regex:/^[0-9Kk]$/'],
+            'rutDv'       => ['nullable', 'max:1', 'regex:/^[0-9Kk]$/'],
         ]);
 
         if ($this->funcionarioId) {
@@ -77,7 +84,7 @@ new class extends Component {
                 'apellido_mat' => $this->apellidoMat ?: null,
                 'email'        => $this->email,
                 'rut_numero'   => $this->rutNumero ?: null,
-                'rut_dv'       => $this->rutDv ? strtoupper($this->rutDv) : null,
+                'rut_dv'       => $this->rutDv !== '' ? strtoupper($this->rutDv) : null,
             ]);
         } else {
             $funcionario = \App\Models\User::create([
@@ -86,7 +93,7 @@ new class extends Component {
                 'apellido_mat' => $this->apellidoMat ?: null,
                 'email'        => $this->email,
                 'rut_numero'   => $this->rutNumero ?: null,
-                'rut_dv'       => $this->rutDv ? strtoupper($this->rutDv) : null,
+                'rut_dv'       => $this->rutDv !== '' ? strtoupper($this->rutDv) : null,
                 'password'     => \Illuminate\Support\Facades\Hash::make(\Illuminate\Support\Str::random(16)),
                 'current_school_id' => auth()->user()->current_school_id,
             ]);
@@ -302,9 +309,12 @@ new class extends Component {
             </div>
 
             <div class="grid grid-cols-3 gap-3">
-                <flux:input wire:model="nombres" :label="__('Nombre(s)')" placeholder="Juan" />
-                <flux:input wire:model="apellidoPat" :label="__('Apellido Paterno')" placeholder="Pérez" />
-                <flux:input wire:model="apellidoMat" :label="__('Apellido Materno')" placeholder="López" />
+                <flux:input wire:model="nombres" :label="__('Nombre(s)')" placeholder="JUAN"
+                    x-on:input="$event.target.value = $event.target.value.toLocaleUpperCase(); $wire.set('nombres', $event.target.value)" />
+                <flux:input wire:model="apellidoPat" :label="__('Apellido Paterno')" placeholder="PÉREZ"
+                    x-on:input="$event.target.value = $event.target.value.toLocaleUpperCase(); $wire.set('apellidoPat', $event.target.value)" />
+                <flux:input wire:model="apellidoMat" :label="__('Apellido Materno')" placeholder="LÓPEZ"
+                    x-on:input="$event.target.value = $event.target.value.toLocaleUpperCase(); $wire.set('apellidoMat', $event.target.value)" />
             </div>
             <flux:error name="nombres" />
             <flux:error name="apellidoPat" />

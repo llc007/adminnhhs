@@ -1,27 +1,30 @@
 <?php
 
-use Livewire\Component;
-use Livewire\Attributes\Title;
-use Livewire\Attributes\Url;
+use App\Models\User;
+use Flux\Flux;
 use Illuminate\Validation\Rule;
+use Livewire\Component;
 
-new class extends Component {
+new class extends Component
+{
     public ?int $id = null;
 
     // Información personal
     public string $nombres = '';
-    public string $apellidoPat = '';
-    public string $apellidoMat = '';
-    public string $rutNumero = '';
-    public string $rutDv = '';
-    public string $fechaNacimiento = '';
-    public string $email = '';
-    public string $telefono = '';
 
-    // Información profesional
-    public string $cargo = '';
-    public string $departamento = '';
-    public string $fechaContratacion = '';
+    public string $apellidoPat = '';
+
+    public string $apellidoMat = '';
+
+    public string $rutNumero = '';
+
+    public string $rutDv = '';
+
+    public string $fechaNacimiento = '';
+
+    public string $email = '';
+
+    public string $telefono = '';
 
     // Roles de Sistema
     public array $roles = [];
@@ -30,7 +33,7 @@ new class extends Component {
     {
         $this->id = $id;
 
-        $funcionario = \App\Models\User::findOrFail($id);
+        $funcionario = User::findOrFail($id);
 
         $this->nombres = $funcionario->nombres ?? '';
         $this->apellidoPat = $funcionario->apellido_pat ?? '';
@@ -42,31 +45,35 @@ new class extends Component {
         $this->roles = $funcionario->active_roles;
     }
 
+    public function updated($propertyName, $value): void
+    {
+        if (in_array($propertyName, ['nombres', 'apellidoPat', 'apellidoMat'])) {
+            $this->{$propertyName} = mb_strtoupper((string) $value, 'UTF-8');
+        }
+    }
+
     public function guardar(): void
     {
         $this->validate([
-            'nombres'     => ['required', 'string', 'max:255'],
+            'nombres' => ['required', 'string', 'max:255'],
             'apellidoPat' => ['required', 'string', 'max:255'],
             'apellidoMat' => ['nullable', 'string', 'max:255'],
-            'email'       => ['required', 'email', Rule::unique('users', 'email')->ignore($this->id)],
-            'rutNumero'   => ['nullable', 'digits_between:7,9'],
-            'rutDv'       => ['nullable', 'string', 'max:1', 'regex:/^[0-9Kk]$/'],
+            'email' => ['required', 'email', Rule::unique('users', 'email')->ignore($this->id)],
+            'rutNumero' => ['nullable', 'digits_between:7,9'],
+            'rutDv' => ['nullable', 'max:1', 'regex:/^[0-9Kk]$/'],
             'fechaNacimiento' => ['nullable', 'date'],
-            'telefono'    => ['nullable', 'string', 'max:20'],
-            'cargo'       => ['nullable', 'string', 'max:100'],
-            'departamento'       => ['nullable', 'string', 'max:100'],
-            'fechaContratacion'  => ['nullable', 'date'],
+            'telefono' => ['nullable', 'string', 'max:20'],
         ]);
 
-        $funcionario = \App\Models\User::findOrFail($this->id);
-        
+        $funcionario = User::findOrFail($this->id);
+
         $funcionario->update([
-            'nombres'      => $this->nombres,
+            'nombres' => $this->nombres,
             'apellido_pat' => $this->apellidoPat,
             'apellido_mat' => $this->apellidoMat ?: null,
-            'email'        => $this->email,
-            'rut_numero'   => $this->rutNumero ?: null,
-            'rut_dv'       => $this->rutDv !== '' ? strtoupper($this->rutDv) : null,
+            'email' => $this->email,
+            'rut_numero' => $this->rutNumero ?: null,
+            'rut_dv' => $this->rutDv !== '' ? strtoupper($this->rutDv) : null,
             'fecha_nacimiento' => $this->fechaNacimiento ?: null,
         ]);
 
@@ -75,17 +82,21 @@ new class extends Component {
             if ($funcionario->current_school_id) {
                 if ($funcionario->schools()->where('school_id', $funcionario->current_school_id)->exists()) {
                     $funcionario->schools()->updateExistingPivot($funcionario->current_school_id, [
-                        'roles' => json_encode($nuevosRoles)
+                        'roles' => json_encode($nuevosRoles),
                     ]);
                 } else {
                     $funcionario->schools()->attach($funcionario->current_school_id, [
-                        'roles' => json_encode($nuevosRoles)
+                        'roles' => json_encode($nuevosRoles),
                     ]);
                 }
             }
         }
 
-        $this->dispatch('saved');
+        Flux::toast(
+            heading: __('Ficha actualizada'),
+            text: __('Los datos del funcionario han sido guardados correctamente.'),
+            variant: 'success',
+        );
     }
 };
 ?>
@@ -124,9 +135,9 @@ new class extends Component {
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <flux:input wire:model="nombres" :label="__('Nombre(s)')" placeholder="Ej: Marcela Paz" />
-            <flux:input wire:model="apellidoPat" :label="__('Apellido Paterno')" placeholder="Ej: Rodríguez" />
-            <flux:input wire:model="apellidoMat" :label="__('Apellido Materno')" placeholder="Ej: López" />
+            <flux:input wire:model="nombres" :label="__('Nombre(s)')" placeholder="EJ: MARCELA PAZ" class="uppercase" />
+            <flux:input wire:model="apellidoPat" :label="__('Apellido Paterno')" placeholder="EJ: RODRÍGUEZ" class="uppercase" />
+            <flux:input wire:model="apellidoMat" :label="__('Apellido Materno')" placeholder="EJ: LÓPEZ" class="uppercase" />
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
@@ -148,32 +159,6 @@ new class extends Component {
             <flux:error name="email" />
             <flux:error name="rutNumero" />
             <flux:error name="rutDv" />
-        </div>
-    </flux:card>
-
-    {{-- Sección 2: Información Profesional --}}
-    <flux:card>
-        <div class="flex items-center gap-3 mb-6">
-            <div class="p-2 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
-                <flux:icon.briefcase class="size-5 text-zinc-600 dark:text-zinc-300" />
-            </div>
-            <flux:heading size="lg">{{ __('Información Profesional') }}</flux:heading>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <flux:select wire:model="cargo" :label="__('Cargo')">
-                <flux:select.option value="" disabled>{{ __('Seleccione cargo') }}</flux:select.option>
-                <flux:select.option value="docente">{{ __('Docente de Aula') }}</flux:select.option>
-                <flux:select.option value="inspector">{{ __('Inspector General') }}</flux:select.option>
-                <flux:select.option value="orientador">{{ __('Orientador') }}</flux:select.option>
-                <flux:select.option value="psicopedagogo">{{ __('Psicopedagogo') }}</flux:select.option>
-                <flux:select.option value="administrativo">{{ __('Administrativo') }}</flux:select.option>
-                <flux:select.option value="directivo">{{ __('Directivo') }}</flux:select.option>
-            </flux:select>
-
-            <flux:input wire:model="departamento" :label="__('Departamento')" placeholder="Ej: Matemáticas" />
-
-            <flux:input wire:model="fechaContratacion" :label="__('Fecha de Contratación')" type="date" />
         </div>
     </flux:card>
 

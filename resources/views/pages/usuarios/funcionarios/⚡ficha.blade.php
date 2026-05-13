@@ -66,7 +66,7 @@ new class extends Component {
             'apellido_mat' => $this->apellidoMat ?: null,
             'email'        => $this->email,
             'rut_numero'   => $this->rutNumero ?: null,
-            'rut_dv'       => $this->rutDv ? strtoupper($this->rutDv) : null,
+            'rut_dv'       => $this->rutDv !== '' ? strtoupper($this->rutDv) : null,
             'fecha_nacimiento' => $this->fechaNacimiento ?: null,
         ]);
 

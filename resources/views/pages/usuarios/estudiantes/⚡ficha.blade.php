@@ -94,7 +94,7 @@ new class extends Component {
         \App\Models\Estudiante::findOrFail($this->id)->update([
             'nombres_csv'            => $this->nombresCsv,
             'rut_numero'             => $this->rutNumero ?: null,
-            'rut_dv'                 => $this->rutDv ? strtoupper($this->rutDv) : null,
+            'rut_dv'                 => $this->rutDv !== '' ? strtoupper($this->rutDv) : null,
             'fecha_nacimiento'       => $this->fechaNacimiento ?: null,
             'genero'                 => $this->genero ?: null,
             'curso_id'               => $this->cursoId,
@@ -103,7 +103,7 @@ new class extends Component {
             'apoderado_apellido_pat' => $this->apoderadoApellidoPat,
             'apoderado_apellido_mat' => $this->apoderadoApellidoMat ?: null,
             'apoderado_rut_numero'   => $this->apoderadoRutNumero ?: null,
-            'apoderado_rut_dv'       => $this->apoderadoRutDv ? strtoupper($this->apoderadoRutDv) : null,
+            'apoderado_rut_dv'       => $this->apoderadoRutDv !== '' ? strtoupper($this->apoderadoRutDv) : null,
             'apoderado_email'        => $this->apoderadoEmail,
             'apoderado_telefono'     => $this->apoderadoTelefono,
             'apoderado_parentesco'   => $this->apoderadoParentesco,

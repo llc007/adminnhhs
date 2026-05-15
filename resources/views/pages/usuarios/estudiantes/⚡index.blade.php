@@ -1,32 +1,50 @@
 <?php
 
+use App\Models\Curso;
+use App\Models\Estudiante;
+use Flux\Flux;
+use Illuminate\Validation\Rule;
+use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Livewire\WithPagination;
-use Illuminate\Validation\Rule;
 
-new class extends Component {
+new class extends Component
+{
     use WithPagination;
 
     // Filtros y orden
     public string $cursoId = ''; // Vacío por defecto para obligar a seleccionar
+
     public string $search = '';
+
     public string $sortBy = 'nombres_csv';
+
     public string $sortDirection = 'asc';
 
     // Modal crear/editar
     public bool $modalAbierto = false;
+
     public ?int $estudianteId = null;
+
     public string $nombres = '';
+
     public string $rutNumero = '';
+
     public string $rutDv = '';
+
     public string $formCursoId = '';
+
     public string $apoderadoNombres = '';
+
     public string $apoderadoTelefono = '';
+
     public string $apoderadoEmail = '';
+
     public string $apoderadoDomicilio = '';
 
     // Modal eliminar
     public bool $modalEliminar = false;
+
     public ?int $eliminarId = null;
 
     public function abrirCrear(): void
@@ -37,7 +55,7 @@ new class extends Component {
 
     public function abrirEditar(int $id): void
     {
-        $estudiante = \App\Models\Estudiante::findOrFail($id);
+        $estudiante = Estudiante::findOrFail($id);
         $this->estudianteId = $estudiante->id;
         $this->nombres = $estudiante->nombres_csv ?? '';
         $this->rutNumero = $estudiante->rut_numero ?? '';
@@ -83,9 +101,9 @@ new class extends Component {
         ];
 
         if ($this->estudianteId) {
-            \App\Models\Estudiante::findOrFail($this->estudianteId)->update($data);
+            Estudiante::findOrFail($this->estudianteId)->update($data);
         } else {
-            \App\Models\Estudiante::create($data);
+            Estudiante::create($data);
         }
 
         $this->modalAbierto = false;
@@ -102,7 +120,6 @@ new class extends Component {
             $this->sortDirection = 'asc';
         }
     }
-
 
     public function updatedCursoId()
     {
@@ -123,31 +140,30 @@ new class extends Component {
     public function eliminar(): void
     {
         if ($this->eliminarId) {
-            \App\Models\Estudiante::findOrFail($this->eliminarId)->delete();
+            Estudiante::findOrFail($this->eliminarId)->delete();
         }
         $this->modalEliminar = false;
         $this->eliminarId = null;
     }
 
-    #[\Livewire\Attributes\Computed]
+    #[Computed]
     public function cursos()
     {
-        return \App\Models\Curso::where('school_id', auth()->user()->current_school_id)
+        return Curso::where('school_id', auth()->user()->current_school_id)
             ->orderBy('modalidad')
             ->orderBy('nivel')
             ->orderBy('letra')
             ->get();
     }
 
-    #[\Livewire\Attributes\Computed]
-    public function estudiantes()
+    #[Computed]
+    public function getEstudiantesQueryProperty()
     {
-        // Retornar conjunto vacío si no se ha seleccionado un curso
         if ($this->cursoId === '') {
-            return collect(); // Colección vacía
+            return Estudiante::query()->whereRaw('1 = 0');
         }
 
-        return \App\Models\Estudiante::query()
+        return Estudiante::query()
             ->with(['curso', 'user'])
             ->where('estudiantes.school_id', auth()->user()->current_school_id)
             ->when($this->cursoId !== 'todos', function ($query) {
@@ -157,12 +173,12 @@ new class extends Component {
                 $search = trim($this->search);
                 $query->where(function ($q) use ($search) {
                     $q->where('estudiantes.nombres_csv', 'like', "%{$search}%")
-                      ->orWhere('estudiantes.rut_numero', 'like', "%{$search}%")
-                      ->orWhereHas('user', function ($uq) use ($search) {
-                          $uq->where('nombres', 'like', "%{$search}%")
-                             ->orWhere('apellido_pat', 'like', "%{$search}%")
-                             ->orWhere('email', 'like', "%{$search}%");
-                      });
+                        ->orWhere('estudiantes.rut_numero', 'like', "%{$search}%")
+                        ->orWhereHas('user', function ($uq) use ($search) {
+                            $uq->where('nombres', 'like', "%{$search}%")
+                                ->orWhere('apellido_pat', 'like', "%{$search}%")
+                                ->orWhere('email', 'like', "%{$search}%");
+                        });
                 });
             })
             ->when($this->sortBy === 'nombres_csv', function ($query) {
@@ -173,12 +189,59 @@ new class extends Component {
             })
             ->when($this->sortBy === 'curso_id', function ($query) {
                 $query->leftJoin('cursos', 'estudiantes.curso_id', '=', 'cursos.id')
-                      ->select('estudiantes.*')
-                      ->orderBy('cursos.modalidad', $this->sortDirection)
-                      ->orderBy('cursos.nivel', $this->sortDirection)
-                      ->orderBy('cursos.letra', $this->sortDirection);
-            })
-            ->paginate(50); // Mostramos 50 alumnos por página pues los cursos rondan los 30-45 alumnos
+                    ->select('estudiantes.*')
+                    ->orderBy('cursos.modalidad', $this->sortDirection)
+                    ->orderBy('cursos.nivel', $this->sortDirection)
+                    ->orderBy('cursos.letra', $this->sortDirection);
+            });
+    }
+
+    #[Computed]
+    public function estudiantes()
+    {
+        if ($this->cursoId === '') {
+            return collect(); // Colección vacía
+        }
+
+        return $this->getEstudiantesQueryProperty->paginate(50);
+    }
+
+    public function exportarExcel()
+    {
+        if ($this->cursoId === '') {
+            Flux::toast('Selecciona un curso primero.', variant: 'danger');
+
+            return;
+        }
+
+        $estudiantes = $this->getEstudiantesQueryProperty->get();
+
+        $csvData = "Nombre del estudiante;RUT;Correo;Curso;Nombre apoderado;Telefono apoderado\n";
+
+        foreach ($estudiantes as $estudiante) {
+            $nombre = $estudiante->nombreCompleto() ?? '';
+            $rut = $estudiante->rutCompleto() ?? '';
+            $correo = $estudiante->email ?? ($estudiante->user_id ? $estudiante->user->email : '');
+            $curso = $estudiante->curso ? $estudiante->curso->nombreCompleto() : '';
+            $apoderado = $estudiante->apoderado_nombres ?? '';
+            $telefono = $estudiante->apoderado_telefono ?? '';
+
+            // Encerramos en comillas por si hay punto y coma en los nombres
+            $csvData .= sprintf('"%s";"%s";"%s";"%s";"%s";"%s"'."\n",
+                $nombre, $rut, $correo, $curso, $apoderado, $telefono
+            );
+        }
+
+        // Fix encoding to UTF-8 with BOM for Excel
+        $csvData = "\xEF\xBB\xBF".$csvData;
+
+        $fileName = 'Estudiantes_Export_'.now()->format('Ymd_His').'.csv';
+
+        return response()->streamDownload(function () use ($csvData) {
+            echo $csvData;
+        }, $fileName, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
     }
 };
 
@@ -202,6 +265,9 @@ new class extends Component {
             </div>
 
             <div class="flex items-center gap-3 shrink-0">
+                <flux:button variant="ghost" icon="document-arrow-down" wire:click="exportarExcel">
+                    {{ __('Exportar') }}
+                </flux:button>
                 <flux:button variant="ghost" icon="document-arrow-up" href="{{ route('estudiantes.carga_masiva') }}">
                     {{ __('Importar CSV') }}
                 </flux:button>
@@ -297,10 +363,12 @@ new class extends Component {
                                             <div class="text-sm font-medium text-zinc-900 dark:text-zinc-100">
                                                 {{ $estudiante->nombreCompleto() }}
                                             </div>
-                                            @if($estudiante->user_id)
+                                            @if($estudiante->email)
+                                                <div class="text-xs text-zinc-500">{{ $estudiante->email }}</div>
+                                            @elseif($estudiante->user_id)
                                                 <div class="text-xs text-zinc-500">{{ $estudiante->user->email }}</div>
                                             @else
-                                                <div class="text-xs text-zinc-400 italic">Pendiente de vinculación</div>
+                                                <div class="text-xs text-zinc-400 italic">Sin correo vinculado</div>
                                             @endif
                                         </div>
                                     </div>
@@ -322,8 +390,8 @@ new class extends Component {
                                     @endif
                                 </flux:table.cell>
                                 <flux:table.cell>
-                                    @if($estudiante->user_id)
-                                        <flux:badge color="green" icon="check-circle">Activo</flux:badge>
+                                    @if($estudiante->email || $estudiante->user_id)
+                                        <flux:badge color="green" icon="check-circle">Vinculado</flux:badge>
                                     @else
                                         <flux:badge color="orange" icon="clock">Inactivo</flux:badge>
                                     @endif

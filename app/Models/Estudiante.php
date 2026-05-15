@@ -6,11 +6,10 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Str;
 
 #[Fillable([
     'user_id', 'school_id', 'curso_id',
-    'nombres_csv', 'rut_numero', 'rut_dv',
+    'nombres_csv', 'rut_numero', 'rut_dv', 'email',
     'fecha_nacimiento', 'genero',
     'apoderado_nombres', 'apoderado_apellido_pat', 'apoderado_apellido_mat',
     'apoderado_rut_numero', 'apoderado_rut_dv',
@@ -27,11 +26,21 @@ class Estudiante extends Model
     protected static function booted(): void
     {
         static::saving(function (Estudiante $estudiante) {
-            if ($estudiante->nombres_csv) $estudiante->nombres_csv = mb_strtoupper($estudiante->nombres_csv, 'UTF-8');
-            if ($estudiante->apoderado_nombres) $estudiante->apoderado_nombres = mb_strtoupper($estudiante->apoderado_nombres, 'UTF-8');
-            if ($estudiante->apoderado_apellido_pat) $estudiante->apoderado_apellido_pat = mb_strtoupper($estudiante->apoderado_apellido_pat, 'UTF-8');
-            if ($estudiante->apoderado_apellido_mat) $estudiante->apoderado_apellido_mat = mb_strtoupper($estudiante->apoderado_apellido_mat, 'UTF-8');
-            if ($estudiante->apoderado_domicilio) $estudiante->apoderado_domicilio = mb_strtoupper($estudiante->apoderado_domicilio, 'UTF-8');
+            if ($estudiante->nombres_csv) {
+                $estudiante->nombres_csv = mb_strtoupper($estudiante->nombres_csv, 'UTF-8');
+            }
+            if ($estudiante->apoderado_nombres) {
+                $estudiante->apoderado_nombres = mb_strtoupper($estudiante->apoderado_nombres, 'UTF-8');
+            }
+            if ($estudiante->apoderado_apellido_pat) {
+                $estudiante->apoderado_apellido_pat = mb_strtoupper($estudiante->apoderado_apellido_pat, 'UTF-8');
+            }
+            if ($estudiante->apoderado_apellido_mat) {
+                $estudiante->apoderado_apellido_mat = mb_strtoupper($estudiante->apoderado_apellido_mat, 'UTF-8');
+            }
+            if ($estudiante->apoderado_domicilio) {
+                $estudiante->apoderado_domicilio = mb_strtoupper($estudiante->apoderado_domicilio, 'UTF-8');
+            }
         });
     }
 

@@ -12,6 +12,7 @@ class StudentMatchService
      */
     public function getCursoIdFromOrgUnitPath(string $orgUnitPath): ?int
     {
+        // Formato con letra de modalidad explícita (ej: /Estudiantes/1°MA o 1°BA)
         if (preg_match('/\/Estudiantes\/(\d+)°?([MBmb])([A-Za-z])/', $orgUnitPath, $matches)) {
             $nivel = (int) $matches[1];
             $modalidadCode = strtoupper($matches[2]);
@@ -21,6 +22,19 @@ class StudentMatchService
 
             $curso = Curso::where('nivel', $nivel)
                 ->where('modalidad', $modalidad)
+                ->where('letra', $letra)
+                ->first();
+
+            return $curso ? $curso->id : null;
+        }
+
+        // Formato sin letra de modalidad (ej: /Estudiantes/1°A), asumimos Básica
+        if (preg_match('/\/Estudiantes\/(\d+)°?([A-Za-z])/', $orgUnitPath, $matches)) {
+            $nivel = (int) $matches[1];
+            $letra = strtoupper($matches[2]);
+            
+            $curso = Curso::where('nivel', $nivel)
+                ->where('modalidad', 'basica')
                 ->where('letra', $letra)
                 ->first();
 

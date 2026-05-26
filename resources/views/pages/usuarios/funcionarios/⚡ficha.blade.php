@@ -78,7 +78,15 @@ new class extends Component
         ]);
 
         if (auth()->user()->hasRole(['administrador', 'superadmin'])) {
-            $nuevosRoles = empty($this->roles) ? ['estudiante'] : $this->roles;
+            $nuevosRoles = $this->roles;
+            // If assigning any real system roles, automatically remove the 'externo' (pending) status
+            $realRoles = array_diff($nuevosRoles, ['externo']);
+            if (! empty($realRoles)) {
+                $nuevosRoles = array_values($realRoles);
+            }
+            if (empty($nuevosRoles)) {
+                $nuevosRoles = ['estudiante'];
+            }
             if ($funcionario->current_school_id) {
                 if ($funcionario->schools()->where('school_id', $funcionario->current_school_id)->exists()) {
                     $funcionario->schools()->updateExistingPivot($funcionario->current_school_id, [

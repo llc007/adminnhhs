@@ -193,6 +193,7 @@ new class extends Component {
                             </flux:label>
                             <flux:select wire:model.live="cargo">
                                 <flux:select.option value="todos">{{ __('Todos') }}</flux:select.option>
+                                <flux:select.option value="externo">{{ __('Pendiente') }}</flux:select.option>
                                 <flux:select.option value="docente">{{ __('Docente') }}</flux:select.option>
                                 <flux:select.option value="inspector">{{ __('Inspector') }}</flux:select.option>
                                 <flux:select.option value="asistente">{{ __('Asistente') }}</flux:select.option>
@@ -266,7 +267,29 @@ new class extends Component {
                             </flux:table.cell>
                             <flux:table.cell>{{ $funcionario->rutCompleto() ?? '-' }}</flux:table.cell>
                             <flux:table.cell>
-                                <flux:badge color="blue">Docente</flux:badge>
+                                <div class="flex flex-wrap gap-1">
+                                    @php
+                                        $roleLabels = [
+                                            'docente'       => ['label' => 'Docente', 'color' => 'blue'],
+                                            'inspector'     => ['label' => 'Inspector', 'color' => 'indigo'],
+                                            'asistente'     => ['label' => 'Asistente', 'color' => 'teal'],
+                                            'psicosocial'   => ['label' => 'Psicosocial', 'color' => 'cyan'],
+                                            'recepcion'     => ['label' => 'Recepción', 'color' => 'emerald'],
+                                            'directivo'     => ['label' => 'Directivo', 'color' => 'violet'],
+                                            'administrador' => ['label' => 'Administrador', 'color' => 'rose'],
+                                            'superadmin'    => ['label' => 'Superadmin', 'color' => 'red'],
+                                            'externo'       => ['label' => 'Pendiente', 'color' => 'orange'],
+                                        ];
+                                    @endphp
+                                    @forelse ($funcionario->active_roles as $role)
+                                        @php
+                                            $roleData = $roleLabels[$role] ?? ['label' => ucfirst($role), 'color' => 'zinc'];
+                                        @endphp
+                                        <flux:badge :color="$roleData['color']">{{ __($roleData['label']) }}</flux:badge>
+                                    @empty
+                                        <flux:badge color="zinc">{{ __('Sin Rol') }}</flux:badge>
+                                    @endforelse
+                                </div>
                             </flux:table.cell>
                             <flux:table.cell class="text-zinc-500">-</flux:table.cell>
                             <flux:table.cell>

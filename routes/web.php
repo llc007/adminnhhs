@@ -3,7 +3,7 @@
 use App\Http\Controllers\GoogleAuthController;
 use Illuminate\Support\Facades\Route;
 
-Route::view('/', 'welcome')->name('home');
+Route::redirect('/', '/login')->name('home');
 
 Route::get('auth/google', [GoogleAuthController::class, 'redirectToGoogle'])->name('auth.google');
 Route::get('auth/google/callback', [GoogleAuthController::class, 'handleGoogleCallback'])->name('auth.google.callback');
@@ -31,6 +31,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('/entrevistas/{entrevista}/bitacora', 'pages::entrevistas.bitacora')
         ->name('entrevistas.bitacora')
         ->middleware('can:update,entrevista');
+
+    Route::livewire('/sin-permiso', 'pages::auth.sin-permiso')->name('sin-permiso');
 });
 
 // Vistas de Estudiantes — Todo el staff

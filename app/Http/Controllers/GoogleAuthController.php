@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\School;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
@@ -31,38 +32,38 @@ class GoogleAuthController extends Controller
             $email = $googleUser->getEmail();
             $domain = substr(strrchr($email, '@'), 1);
 
-            // Restrict domains
-            if (! in_array($domain, ['newheavenhs.cl', 'gmail.com', 'eben-ezer.cl'])) {
-                return redirect()->route('login')->with('error', 'Solo se permite el acceso a correos institucional @newheavenhs.cl o Gmail.');
-            }
+            $school = School::where('domain', $domain)->first();
 
-            $school = \App\Models\School::where('domain', $domain)->first();
+            // Restrict domains dynamically (strictly institutional, registered in schools table)
+            if (! $school) {
+                return redirect()->route('login')->with('error', 'Solo se permite el acceso a correos institucionales.');
+            }
 
             $user = User::updateOrCreate(
                 ['email' => $email],
                 [
                     // Guardamos el nombre completo de Google en `nombres`.
                     // El usuario deberá separar apellidos manualmente desde su ficha.
-                    'nombres'      => $googleUser->getName(),
+                    'nombres' => $googleUser->getName(),
                     'apellido_pat' => null,
                     'apellido_mat' => null,
-                    'google_id'    => $googleUser->getId(),
-                    'avatar'       => $googleUser->getAvatar(),
+                    'google_id' => $googleUser->getId(),
+                    'avatar' => $googleUser->getAvatar(),
                     'current_school_id' => $school?->id,
                 ]
             );
 
             // Relacionar usuario al colegio con un rol por defecto si no están enlazados
-            // Por seguridad, todo usuario nuevo de Google asume rol 'estudiante' (que no verá la app)
-            if ($school && !$user->schools()->where('school_id', $school->id)->exists()) {
-                $user->schools()->attach($school->id, ['roles' => json_encode(['estudiante'])]);
+            // Por seguridad, todo usuario nuevo de Google asume rol 'externo' (que no verá la app)
+            if ($school && ! $user->schools()->where('school_id', $school->id)->exists()) {
+                $user->schools()->attach($school->id, ['roles' => json_encode(['externo'])]);
             }
 
             Auth::login($user);
 
             return redirect()->intended('/dashboard');
         } catch (\Exception $e) {
-            return redirect()->route('login')->with('error', 'Error real de Hostinger: ' . $e->getMessage());
+            return redirect()->route('login')->with('error', 'Error real de Hostinger: '.$e->getMessage());
         }
     }
 }

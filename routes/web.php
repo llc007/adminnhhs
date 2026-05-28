@@ -51,6 +51,10 @@ Route::middleware(['auth', 'verified', 'role:directivo,administrador,superadmin'
     Route::livewire('/estudiantes/agregar-rut', 'pages::usuarios.estudiantes.agregar-rut')->name('estudiantes.agregar_rut');
 });
 
+Route::get('/office', function () {
+    return redirect()->away('https://drive.google.com/file/d/1i8T9g1mlSsUj4xhGGC6-Y99Fwe30fMy7/view?usp=sharing');
+})->name('office');
+
 Route::view('/plantilla', 'pages.plantilla1')->name('plantilla');
 
 require __DIR__.'/settings.php';

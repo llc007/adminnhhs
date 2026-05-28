@@ -38,7 +38,7 @@ new class extends Component
                             
         $this->kpiCanceladas = Entrevista::where('school_id', $schoolId)
                                 ->whereBetween('fecha', [$mesInicio, $mesFin])
-                                ->whereIn('estado', ['cancelada', 'no_realizada'])
+                                ->whereIn('estado', ['cancelada', 'ausente'])
                                 ->count();
 
         // Top 5 Docentes
@@ -78,7 +78,7 @@ new class extends Component
 
         // Asistencia Histórica
         $asistieron = Entrevista::where('school_id', $schoolId)->where('estado', 'realizada')->count();
-        $ausentes = Entrevista::where('school_id', $schoolId)->where('estado', 'no_realizada')->count();
+        $ausentes = Entrevista::where('school_id', $schoolId)->where('estado', 'ausente')->count();
         $this->totalAsistencias = $asistieron;
         $this->totalAusencias = $ausentes;
         $tot = $asistieron + $ausentes;
@@ -86,6 +86,8 @@ new class extends Component
     }
 };
 ?>
+
+
 
 <div class="max-w-7xl mx-auto w-full pb-10">
 
@@ -106,49 +108,61 @@ new class extends Component
     {{-- Fila 1: KPIs Principales --}}
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
         
-        <flux:card class="border-t-4 border-t-blue-500 hover:shadow-md transition-shadow">
-            <div class="flex justify-between items-start mb-4">
-                <div class="w-10 h-10 bg-blue-50 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
-                    <flux:icon.calendar-days class="size-5 text-blue-600 dark:text-blue-400" />
+        <!-- KPI 1: Hoy -->
+        <a href="{{ route('entrevistas.index', ['fecha' => now('America/Santiago')->format('Y-m-d'), 'filtroTemporal' => 'dia']) }}" class="block no-underline">
+            <flux:card class="border-t-4 border-t-blue-500 hover:shadow-md transition-shadow cursor-pointer h-full">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="w-10 h-10 bg-blue-50 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                        <flux:icon.calendar-days class="size-5 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <span class="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{{ __('Hoy') }}</span>
                 </div>
-                <span class="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Hoy</span>
-            </div>
-            <p class="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase">Entrevistas Hoy</p>
-            <p class="text-4xl font-extrabold text-zinc-900 dark:text-white mt-1">{{ str_pad($kpiHoy, 2, '0', STR_PAD_LEFT) }}</p>
-        </flux:card>
+                <p class="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase">{{ __('Entrevistas Hoy') }}</p>
+                <p class="text-4xl font-extrabold text-zinc-900 dark:text-white mt-1">{{ str_pad($kpiHoy, 2, '0', STR_PAD_LEFT) }}</p>
+            </flux:card>
+        </a>
 
-        <flux:card class="border-t-4 border-t-indigo-500 hover:shadow-md transition-shadow">
-            <div class="flex justify-between items-start mb-4">
-                <div class="w-10 h-10 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg flex items-center justify-center">
-                    <flux:icon.calendar class="size-5 text-indigo-600 dark:text-indigo-400" />
+        <!-- KPI 2: Mensual -->
+        <a href="{{ route('entrevistas.index', ['fecha' => now('America/Santiago')->format('Y-m-d'), 'filtroTemporal' => 'mes']) }}" class="block no-underline">
+            <flux:card class="border-t-4 border-t-indigo-500 hover:shadow-md transition-shadow cursor-pointer h-full">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="w-10 h-10 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg flex items-center justify-center">
+                        <flux:icon.calendar class="size-5 text-indigo-600 dark:text-indigo-400" />
+                    </div>
+                    <span class="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{{ __('Este Mes') }}</span>
                 </div>
-                <span class="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Este Mes</span>
-            </div>
-            <p class="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase">Agendadas Mensual</p>
-            <p class="text-4xl font-extrabold text-zinc-900 dark:text-white mt-1">{{ str_pad($kpiMes, 2, '0', STR_PAD_LEFT) }}</p>
-        </flux:card>
+                <p class="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase">{{ __('Agendadas Mensual') }}</p>
+                <p class="text-4xl font-extrabold text-zinc-900 dark:text-white mt-1">{{ str_pad($kpiMes, 2, '0', STR_PAD_LEFT) }}</p>
+            </flux:card>
+        </a>
 
-        <flux:card class="border-t-4 border-t-amber-500 hover:shadow-md transition-shadow">
-            <div class="flex justify-between items-start mb-4">
-                <div class="w-10 h-10 bg-amber-50 dark:bg-amber-900/30 rounded-lg flex items-center justify-center">
-                    <flux:icon.clock class="size-5 text-amber-600 dark:text-amber-400" />
+        <!-- KPI 3: Activo -->
+        <a href="{{ route('entrevistas.index', ['estado' => 'ingresada']) }}" class="block no-underline">
+            <flux:card class="border-t-4 border-t-amber-500 hover:shadow-md transition-shadow cursor-pointer h-full">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="w-10 h-10 bg-amber-50 dark:bg-amber-900/30 rounded-lg flex items-center justify-center">
+                        <flux:icon.clock class="size-5 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <span class="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{{ __('Activo') }}</span>
                 </div>
-                <span class="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Activo</span>
-            </div>
-            <p class="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase">En Proceso / Espera</p>
-            <p class="text-4xl font-extrabold text-zinc-900 dark:text-white mt-1">{{ str_pad($kpiActivos, 2, '0', STR_PAD_LEFT) }}</p>
-        </flux:card>
+                <p class="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase">{{ __('En Proceso / Espera') }}</p>
+                <p class="text-4xl font-extrabold text-zinc-900 dark:text-white mt-1">{{ str_pad($kpiActivos, 2, '0', STR_PAD_LEFT) }}</p>
+            </flux:card>
+        </a>
 
-        <flux:card class="border-t-4 border-t-red-500 hover:shadow-md transition-shadow">
-            <div class="flex justify-between items-start mb-4">
-                <div class="w-10 h-10 bg-red-50 dark:bg-red-900/30 rounded-lg flex items-center justify-center">
-                    <flux:icon.no-symbol class="size-5 text-red-600 dark:text-red-400" />
+        <!-- KPI 4: Canceladas -->
+        <a href="{{ route('entrevistas.index', ['estado' => 'cancelada']) }}" class="block no-underline">
+            <flux:card class="border-t-4 border-t-red-500 hover:shadow-md transition-shadow cursor-pointer h-full">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="w-10 h-10 bg-red-50 dark:bg-red-900/30 rounded-lg flex items-center justify-center">
+                        <flux:icon.no-symbol class="size-5 text-red-600 dark:text-red-400" />
+                    </div>
+                    <span class="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{{ __('Mensual') }}</span>
                 </div>
-                <span class="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Mensual</span>
-            </div>
-            <p class="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase">Canceladas / Fallidas</p>
-            <p class="text-4xl font-extrabold text-zinc-900 dark:text-white mt-1">{{ str_pad($kpiCanceladas, 2, '0', STR_PAD_LEFT) }}</p>
-        </flux:card>
+                <p class="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase">{{ __('Canceladas / Fallidas') }}</p>
+                <p class="text-4xl font-extrabold text-zinc-900 dark:text-white mt-1">{{ str_pad($kpiCanceladas, 2, '0', STR_PAD_LEFT) }}</p>
+            </flux:card>
+        </a>
 
     </div>
 
@@ -235,20 +249,49 @@ new class extends Component
             </flux:card>
 
             <flux:card>
-                <div class="flex justify-between items-center mb-6">
+                <div class="flex justify-between items-center mb-4">
                     <flux:heading size="lg">{{ __('Motivos Principales') }}</flux:heading>
                     <flux:icon.chat-bubble-left-right class="size-5 text-zinc-400" />
                 </div>
                 
-                <div class="flex flex-wrap gap-2">
-                    @forelse($motivos as $motivo => $data)
-                        <flux:badge variant="pill" size="sm" class="mb-2">
-                            {{ ucfirst($motivo) }} ({{ $data['pct'] }}%)
-                        </flux:badge>
-                    @empty
-                        <span class="text-sm text-zinc-500">No hay motivos registrados.</span>
-                    @endforelse
-                </div>
+                @if(empty($motivos))
+                    <div class="text-center py-6 text-zinc-500">
+                        {{ __('No hay motivos registrados en este mes.') }}
+                    </div>
+                @else
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                        <!-- Chart Area -->
+                        <div class="md:col-span-6 flex justify-center items-center">
+                            <div class="relative w-36 h-36" x-init="window.initMotivosChart ? window.initMotivosChart() : document.addEventListener('livewire:navigated', () => window.initMotivosChart())">
+                                <canvas id="motivosChart"></canvas>
+                                <!-- Inner Text of the Donut Chart -->
+                                <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                    <span class="text-2xl font-extrabold text-zinc-900 dark:text-white">{{ array_sum(array_column($motivos, 'count')) }}</span>
+                                    <span class="text-[8px] uppercase tracking-widest font-bold text-zinc-400 mt-0.5">{{ __('Citas') }}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Legend Area -->
+                        <div class="md:col-span-6 space-y-2.5 max-h-36 overflow-y-auto pr-1">
+                            @php
+                                $colors = ['bg-blue-500', 'bg-indigo-500', 'bg-sky-500', 'bg-teal-500', 'bg-emerald-500', 'bg-cyan-500', 'bg-amber-500'];
+                            @endphp
+                            @foreach(array_slice($motivos, 0, 7) as $motivo => $data)
+                                <div class="flex items-center justify-between text-xs">
+                                    <div class="flex items-center gap-2 min-w-0">
+                                        <div class="w-2.5 h-2.5 rounded-full shrink-0 {{ $colors[$loop->index] ?? 'bg-zinc-500' }}"></div>
+                                        <span class="font-semibold text-zinc-700 dark:text-zinc-300 truncate" title="{{ ucfirst($motivo) }}">{{ ucfirst($motivo) }}</span>
+                                    </div>
+                                    <div class="text-right shrink-0">
+                                        <span class="font-bold text-zinc-900 dark:text-white ml-1.5">{{ $data['count'] }}</span>
+                                        <span class="text-[10px] text-zinc-500 ml-0.5">({{ $data['pct'] }}%)</span>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
             </flux:card>
         </div>
 
@@ -283,5 +326,66 @@ new class extends Component
             </div>
         </div>
     </flux:card>
+
+    <script>
+        window.initMotivosChart = function() {
+            if (typeof Chart === 'undefined') {
+                setTimeout(window.initMotivosChart, 50);
+                return;
+            }
+
+            const ctx = document.getElementById("motivosChart")?.getContext("2d");
+            if (!ctx) return;
+            
+            if (window.motivosChartInstance) {
+                window.motivosChartInstance.destroy();
+            }
+            
+            const labels = @js(array_keys($motivos));
+            const data = @js(array_column($motivos, 'count'));
+            const capitalizedLabels = labels.map(l => l.charAt(0).toUpperCase() + l.slice(1));
+            const colors = ['#3b82f6', '#6366f1', '#0ea5e9', '#14b8a6', '#10b981', '#06b6d4', '#f59e0b'];
+            
+            window.motivosChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: capitalizedLabels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: colors.slice(0, data.length),
+                        borderWidth: 1,
+                        borderColor: 'rgba(255, 255, 255, 0.1)',
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#0f172a',
+                            titleColor: '#fff',
+                            bodyColor: '#cbd5e1',
+                            borderColor: 'rgba(255, 255, 255, 0.1)',
+                            borderWidth: 1,
+                            padding: 10,
+                            displayColors: true,
+                            boxPadding: 6,
+                        }
+                    },
+                    cutout: '75%',
+                }
+            });
+        }
+
+        // Initialize on Livewire navigate and load
+        document.addEventListener('livewire:navigated', () => {
+            window.initMotivosChart();
+        });
+
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            setTimeout(() => window.initMotivosChart(), 50);
+        }
+    </script>
 
 </div>

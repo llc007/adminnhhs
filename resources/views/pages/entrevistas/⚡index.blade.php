@@ -6,14 +6,27 @@ use App\Models\Entrevista;
 use App\Models\User;
 use App\Models\Curso;
 
+use Livewire\Attributes\Url;
+
 new class extends Component {
     use WithPagination;
 
+    #[Url]
     public $search = '';
+
+    #[Url]
     public $profesor_id = '';
+
+    #[Url]
     public $curso_id = '';
+
+    #[Url]
     public $fecha = '';
+
+    #[Url]
     public $estado = '';
+
+    #[Url]
     public $filtroTemporal = ''; // dia, semana, mes
 
     public function updating($field)
@@ -86,7 +99,11 @@ new class extends Component {
         }
 
         if (!empty($this->estado)) {
-            $query->where('estado', $this->estado);
+            if ($this->estado === 'cancelada') {
+                $query->whereIn('estado', ['cancelada', 'ausente']);
+            } else {
+                $query->where('estado', $this->estado);
+            }
         }
 
         $entrevistas = $query->paginate(15);

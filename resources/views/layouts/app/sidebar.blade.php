@@ -61,6 +61,26 @@
                 </flux:sidebar.item>
                 @endif
             </flux:sidebar.group>
+
+            <flux:sidebar.group :heading="__('Adquisiciones e Inventario')" class="grid mt-4">
+                <flux:sidebar.item icon="document-text" :href="route('adquisiciones.crear')" :current="request()->routeIs('adquisiciones.crear')" wire:navigate>
+                    {{ __('Solicitar Adquisición') }}
+                </flux:sidebar.item>
+
+                @if(auth()->user()->hasRole(['directivo', 'administrador', 'superadmin']))
+                <flux:sidebar.item icon="shield-check" :href="route('adquisiciones.revision')" :current="request()->routeIs('adquisiciones.revision')" wire:navigate>
+                    {{ __('Bandeja de Revisión') }}
+                </flux:sidebar.item>
+                
+                <flux:sidebar.item icon="shopping-cart" :href="route('adquisiciones.compras')" :current="request()->routeIs('adquisiciones.compras')" wire:navigate>
+                    {{ __('Recepción de Compras') }}
+                </flux:sidebar.item>
+
+                <flux:sidebar.item icon="archive-box" :href="route('inventario.index')" :current="request()->routeIs('inventario.index')" wire:navigate>
+                    {{ __('Inventario General') }}
+                </flux:sidebar.item>
+                @endif
+            </flux:sidebar.group>
         </flux:sidebar.nav>
 
         <flux:spacer />

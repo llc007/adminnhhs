@@ -55,6 +55,17 @@ Route::get('/office', function () {
     return redirect()->away('https://drive.google.com/file/d/1i8T9g1mlSsUj4xhGGC6-Y99Fwe30fMy7/view?usp=sharing');
 })->name('office');
 
+// Módulo de Adquisiciones e Inventario — Fase 1
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::livewire('/adquisiciones/crear', 'pages::adquisiciones.crear')->name('adquisiciones.crear');
+});
+
+Route::middleware(['auth', 'verified', 'role:directivo,administrador,superadmin'])->group(function () {
+    Route::livewire('/adquisiciones/revision', 'pages::adquisiciones.revision')->name('adquisiciones.revision');
+    Route::livewire('/adquisiciones/compras', 'pages::adquisiciones.compras')->name('adquisiciones.compras');
+    Route::livewire('/inventario', 'pages::inventario.index')->name('inventario.index');
+});
+
 Route::view('/plantilla', 'pages.plantilla1')->name('plantilla');
 
 require __DIR__.'/settings.php';

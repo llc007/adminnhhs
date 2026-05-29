@@ -18,7 +18,7 @@ new class extends Component {
     }
 }; ?>
 
-<div class="px-2 mb-2">
+<div @class(['px-2 mb-2' => auth()->user()->schools->count() > 1])>
     @if (auth()->user()->schools->count() > 1)
         <flux:dropdown align="start">
             <flux:button variant="subtle" icon="building-library" icon-trailing="chevron-down">
@@ -36,10 +36,5 @@ new class extends Component {
                 </flux:menu.radio.group>
             </flux:menu>
         </flux:dropdown>
-    @elseif(auth()->user()->currentSchool)
-        <div class="flex items-center px-3 py-2 text-sm font-medium text-zinc-500">
-            <flux:icon.building-library class="w-5 h-5 mr-2" />
-            <span class="truncate">{{ auth()->user()->currentSchool->name }}</span>
-        </div>
     @endif
 </div>

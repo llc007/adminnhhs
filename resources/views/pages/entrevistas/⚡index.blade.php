@@ -52,26 +52,25 @@ new class extends Component {
         $this->resetPage();
     }
 
-    public function render()
+    private function getFilteredQuery()
     {
-        $docentes = User::whereHas('entrevistas')->orderBy('nombres')->get();
-        $cursos = Curso::orderBy('modalidad')->orderBy('nivel')->orderBy('letra')->get();
-
         $query = Entrevista::with(['estudiante.curso', 'user'])
             ->orderBy('fecha', 'desc')
             ->orderBy('hora', 'desc');
 
         if (!empty($this->search)) {
-            $query
-                ->whereHas('estudiante', function ($q) {
-                    $q->where('nombres', 'like', '%' . $this->search . '%')
+            $query->where(function ($q) {
+                $q->whereHas('estudiante', function ($sq) {
+                    $sq->where('nombres', 'like', '%' . $this->search . '%')
                         ->orWhere('apellido_pat', 'like', '%' . $this->search . '%')
                         ->orWhere('apellido_mat', 'like', '%' . $this->search . '%')
                         ->orWhere('rut', 'like', '%' . $this->search . '%');
                 })
-                ->orWhereHas('user', function ($q) {
-                    $q->where('nombres', 'like', '%' . $this->search . '%')->orWhere('apellido_pat', 'like', '%' . $this->search . '%');
+                ->orWhereHas('user', function ($sq) {
+                    $sq->where('nombres', 'like', '%' . $this->search . '%')
+                        ->orWhere('apellido_pat', 'like', '%' . $this->search . '%');
                 });
+            });
         }
 
         if (!empty($this->profesor_id)) {
@@ -106,6 +105,62 @@ new class extends Component {
             }
         }
 
+        return $query;
+    }
+
+    public function export()
+    {
+        $entrevistas = $this->getFilteredQuery()->get();
+
+        $headers = [
+            "Content-type"        => "text/csv; charset=UTF-8",
+            "Content-Disposition" => "attachment; filename=historial_entrevistas_" . now()->format('Y-m-d_H-i-s') . ".csv",
+            "Pragma"              => "no-cache",
+            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
+            "Expires"             => "0"
+        ];
+
+        $columns = [
+            'ID', 'Fecha', 'Hora', 'Docente', 'Estudiante', 'Curso', 'Apoderado', 'RUT Apoderado', 'Teléfono', 'Motivo', 'Estado'
+        ];
+
+        $callback = function() use ($entrevistas, $columns) {
+            $file = fopen('php://output', 'w');
+            
+            // Add UTF-8 BOM to ensure Excel opens it correctly with Spanish accents
+            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
+            
+            fputcsv($file, $columns, ';');
+
+            foreach ($entrevistas as $entrevista) {
+                fputcsv($file, [
+                    $entrevista->id,
+                    $entrevista->fecha,
+                    $entrevista->hora,
+                    $entrevista->user ? $entrevista->user->nombres . ' ' . $entrevista->user->apellido_pat : 'N/A',
+                    $entrevista->estudiante ? $entrevista->estudiante->nombres . ' ' . $entrevista->estudiante->apellido_pat : 'N/A',
+                    $entrevista->estudiante && $entrevista->estudiante->curso ? $entrevista->estudiante->curso->nombreCompleto() : 'N/A',
+                    $entrevista->apoderado_nombre,
+                    $entrevista->apoderado_rut,
+                    $entrevista->apoderado_telefono,
+                    $entrevista->motivo,
+                    ucfirst($entrevista->estado)
+                ], ';');
+            }
+
+            fclose($file);
+        };
+
+        return response()->streamDownload($callback, "historial_entrevistas_" . now()->format('Y-m-d_H-i-s') . ".csv", $headers);
+    }
+
+    public function render()
+    {
+        $docentes = User::whereHas('entrevistas')->orderBy('nombres')->get();
+        $cursos = Curso::orderBy('modalidad')->orderBy('nivel')->orderBy('letra')->get();
+
+        $query = $this->getFilteredQuery();
+
         $entrevistas = $query->paginate(15);
 
         // Métricas dinámicas basadas en los filtros actuales
@@ -138,7 +193,7 @@ new class extends Component {
     >
         <div class="flex gap-3">
             <flux:button variant="ghost" icon="x-mark" wire:click="clearFilters">Limpiar</flux:button>
-            <flux:button variant="primary" icon="document-arrow-down"
+            <flux:button variant="primary" icon="document-arrow-down" wire:click="export"
                 class="bg-gradient-to-br from-[#00376e] to-blue-800">Exportar (Excel)</flux:button>
         </div>
     </x-entrevistas.header>

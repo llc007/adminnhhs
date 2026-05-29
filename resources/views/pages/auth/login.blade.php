@@ -76,14 +76,8 @@
                         
                         <!-- Typography Headings -->
                         <div class="text-center">
-                            <h1 class="bg-gradient-to-r from-white via-neutral-100 to-slate-400 bg-clip-text text-2xl font-bold tracking-tight text-transparent sm:text-3xl">
-                                New Heaven
-                            </h1>
-                            <p class="mt-1 text-xs font-semibold uppercase tracking-widest text-sky-400 sm:text-sm">
-                                High School
-                            </p>
                             <p class="mt-3 text-xs text-slate-400 sm:text-sm font-medium tracking-wide">
-                                {{ __('Alta Administración & Gestión Académica') }}
+                                {{ __('Inicie sesión con su cuenta institucional para ingresar al sistema') }}
                             </p>
                         </div>
                     </div>

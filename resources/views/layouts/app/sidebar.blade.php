@@ -16,10 +16,10 @@
         <livewire:admin.seleccionar-colegio />
 
         <flux:sidebar.nav>
-            <flux:sidebar.group :heading="__('Plataforma')" class="grid">
+            <flux:sidebar.group :heading="__('Entrevistas')" class="grid">
                 @if(auth()->user()->hasRole(['administrador', 'directivo', 'superadmin']))
                 <flux:sidebar.item icon="home" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>
-                    {{ __('Inicio') }}
+                    {{ "Dashboard" }}
                 </flux:sidebar.item>
                 @endif
 
@@ -35,15 +35,15 @@
                 </flux:sidebar.item>
                 @endif
 
+                {{-- @if(auth()->user()->hasRole(['docente', 'inspector', 'administrador', 'directivo', 'superadmin']))
+                <flux:sidebar.item icon="chat-bubble-left-right" :href="route('entrevistas.crear')" :current="request()->routeIs('entrevistas.crear')" wire:navigate>
+                    {{ __('Agendar Entrevista') }}
+                </flux:sidebar.item>
+                @endif --}}
+
                 @if(auth()->user()->hasRole(['docente', 'inspector', 'administrador', 'directivo', 'superadmin']))
                 <flux:sidebar.item icon="table-cells" :href="route('entrevistas.index')" :current="request()->routeIs('entrevistas.index')" wire:navigate>
                     {{ __('Historial General') }}
-                </flux:sidebar.item>
-                @endif
-
-                @if(auth()->user()->hasRole(['docente', 'inspector', 'administrador', 'directivo', 'superadmin']))
-                <flux:sidebar.item icon="chat-bubble-left-right" :href="route('entrevistas.crear')" :current="request()->routeIs('entrevistas.crear')" wire:navigate>
-                    {{ __('Agendar Entrevista') }}
                 </flux:sidebar.item>
                 @endif
             </flux:sidebar.group>
@@ -76,7 +76,7 @@
 
     <!-- Mobile User Menu -->
     <flux:header class="lg:hidden">
-        <flux:sidebar.toggle class="lg:hidden" icon="bars-2" inset="left" />
+        <flux:sidebar.toggle class="lg:hidden shrink-0" icon="bars-2" inset="left" />
 
         <flux:spacer />
 

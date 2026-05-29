@@ -242,21 +242,7 @@ new class extends Component {
         </div>
     </div>
 
-    {{-- Banner de Acciones Rápidas --}}
-    <div class="mb-10 p-6 rounded-2xl bg-gradient-to-br from-blue-700 to-indigo-800 text-white flex flex-col md:flex-row items-center justify-between shadow-lg shadow-blue-900/20">
-        <div class="space-y-1 mb-4 md:mb-0">
-            <p class="text-[11px] font-bold uppercase tracking-[0.2em] opacity-80 text-blue-100">{{ __('Estado de Acceso') }}</p>
-            <h3 class="text-3xl font-extrabold tracking-tight">{{ __('Reporte Diario de Entrevistas') }}</h3>
-            <p class="text-blue-100 text-sm md:text-base font-medium mt-1">
-                Hoy: {{ now('America/Santiago')->translatedFormat('l d \d\e F, Y') }} • {{ $this->metricas['total_hoy'] }} Citas programadas
-            </p>
-        </div>
-        <div class="flex gap-4 w-full md:w-auto">
-            <flux:button variant="primary" class="bg-white text-blue-800 hover:bg-zinc-50" icon="user-plus">
-                {{ __('Visita Externa (Próximamente)') }}
-            </flux:button>
-        </div>
-    </div>
+ 
 
     {{-- Panel de Filtros --}}
     <flux:card class="mb-6">
@@ -546,6 +532,22 @@ new class extends Component {
                 <flux:icon.check-circle class="size-4" /> Apoderados dentro del recinto
             </p>
         </flux:card>
+    </div>
+
+       {{-- Banner de Acciones Rápidas --}}
+    <div class="mb-10 p-6 rounded-2xl bg-gradient-to-br from-blue-700 to-indigo-800 text-white flex flex-col md:flex-row items-center justify-between shadow-lg shadow-blue-900/20">
+        <div class="space-y-1 mb-4 md:mb-0">
+            <p class="text-[11px] font-bold uppercase tracking-[0.2em] opacity-80 text-blue-100">{{ __('Estado de Acceso') }}</p>
+            <h3 class="text-3xl font-extrabold tracking-tight">{{ __('Reporte Diario de Entrevistas') }}</h3>
+            <p class="text-blue-100 text-sm md:text-base font-medium mt-1">
+                Hoy: {{ now('America/Santiago')->translatedFormat('l d \d\e F, Y') }} • {{ $this->metricas['total_hoy'] }} Citas programadas
+            </p>
+        </div>
+        <div class="flex gap-4 w-full md:w-auto">
+            <flux:button variant="primary" class="bg-white text-blue-800 hover:bg-zinc-50" icon="user-plus">
+                {{ __('Visita Externa (Próximamente)') }}
+            </flux:button>
+        </div>
     </div>
 
     {{-- Notas Panel (Muro Institucional) --}}

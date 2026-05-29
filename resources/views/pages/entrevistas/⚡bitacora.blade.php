@@ -183,6 +183,17 @@ new class extends Component {
 
         $this->entrevista->update(['estado' => $this->estadoNoRealizada]);
 
+        // Enviar notificación de cancelación o inasistencia al Docente
+        if ($this->entrevista->user) {
+            $this->entrevista->user->notify(new \App\Notifications\EntrevistaCancelada($this->entrevista, 'docente'));
+        }
+
+        // Enviar notificación de cancelación o inasistencia al Apoderado (si tiene email válido)
+        if ($this->entrevista->estudiante && !empty($this->entrevista->estudiante->apoderado_email)) {
+            \Illuminate\Support\Facades\Notification::route('mail', $this->entrevista->estudiante->apoderado_email)
+                ->notify(new \App\Notifications\EntrevistaCancelada($this->entrevista, 'apoderado'));
+        }
+
         \Flux::toast('Entrevista marcada como no realizada correctamente.', variant: 'warning');
         return redirect()->route('entrevistas.agenda');
     }

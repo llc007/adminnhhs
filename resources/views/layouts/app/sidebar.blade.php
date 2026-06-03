@@ -62,6 +62,7 @@
                 @endif
             </flux:sidebar.group>
 
+            {{--
             <flux:sidebar.group :heading="__('Adquisiciones e Inventario')" class="grid mt-4">
                 <flux:sidebar.item icon="document-text" :href="route('adquisiciones.crear')" :current="request()->routeIs('adquisiciones.crear')" wire:navigate>
                     {{ __('Solicitar Adquisición') }}
@@ -81,6 +82,7 @@
                 </flux:sidebar.item>
                 @endif
             </flux:sidebar.group>
+            --}}
         </flux:sidebar.nav>
 
         <flux:spacer />

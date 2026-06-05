@@ -65,10 +65,8 @@ new class extends Component {
                         ->orWhere('apellido_pat', 'like', '%' . $this->search . '%')
                         ->orWhere('apellido_mat', 'like', '%' . $this->search . '%')
                         ->orWhere('rut', 'like', '%' . $this->search . '%');
-                })
-                ->orWhereHas('user', function ($sq) {
-                    $sq->where('nombres', 'like', '%' . $this->search . '%')
-                        ->orWhere('apellido_pat', 'like', '%' . $this->search . '%');
+                })->orWhereHas('user', function ($sq) {
+                    $sq->where('nombres', 'like', '%' . $this->search . '%')->orWhere('apellido_pat', 'like', '%' . $this->search . '%');
                 });
             });
         }
@@ -113,45 +111,31 @@ new class extends Component {
         $entrevistas = $this->getFilteredQuery()->get();
 
         $headers = [
-            "Content-type"        => "text/csv; charset=UTF-8",
-            "Content-Disposition" => "attachment; filename=historial_entrevistas_" . now()->format('Y-m-d_H-i-s') . ".csv",
-            "Pragma"              => "no-cache",
-            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
-            "Expires"             => "0"
+            'Content-type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename=historial_entrevistas_' . now()->format('Y-m-d_H-i-s') . '.csv',
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires' => '0',
         ];
 
-        $columns = [
-            'ID', 'Fecha', 'Hora', 'Docente', 'Estudiante', 'Curso', 'Apoderado', 'RUT Apoderado', 'Teléfono', 'Motivo', 'Estado'
-        ];
+        $columns = ['ID', 'Fecha', 'Hora', 'Docente', 'Estudiante', 'Curso', 'Apoderado', 'RUT Apoderado', 'Teléfono', 'Motivo', 'Estado'];
 
-        $callback = function() use ($entrevistas, $columns) {
+        $callback = function () use ($entrevistas, $columns) {
             $file = fopen('php://output', 'w');
-            
+
             // Add UTF-8 BOM to ensure Excel opens it correctly with Spanish accents
-            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
-            
+            fprintf($file, chr(0xef) . chr(0xbb) . chr(0xbf));
+
             fputcsv($file, $columns, ';');
 
             foreach ($entrevistas as $entrevista) {
-                fputcsv($file, [
-                    $entrevista->id,
-                    $entrevista->fecha,
-                    $entrevista->hora,
-                    $entrevista->user ? $entrevista->user->nombres . ' ' . $entrevista->user->apellido_pat : 'N/A',
-                    $entrevista->estudiante ? $entrevista->estudiante->nombres . ' ' . $entrevista->estudiante->apellido_pat : 'N/A',
-                    $entrevista->estudiante && $entrevista->estudiante->curso ? $entrevista->estudiante->curso->nombreCompleto() : 'N/A',
-                    $entrevista->apoderado_nombre,
-                    $entrevista->apoderado_rut,
-                    $entrevista->apoderado_telefono,
-                    $entrevista->motivo,
-                    ucfirst($entrevista->estado)
-                ], ';');
+                fputcsv($file, [$entrevista->id, $entrevista->fecha, $entrevista->hora, $entrevista->user ? $entrevista->user->nombres . ' ' . $entrevista->user->apellido_pat : 'N/A', $entrevista->estudiante ? $entrevista->estudiante->nombres . ' ' . $entrevista->estudiante->apellido_pat : 'N/A', $entrevista->estudiante && $entrevista->estudiante->curso ? $entrevista->estudiante->curso->nombreCompleto() : 'N/A', $entrevista->apoderado_nombre, $entrevista->apoderado_rut, $entrevista->apoderado_telefono, $entrevista->motivo, ucfirst($entrevista->estado)], ';');
             }
 
             fclose($file);
         };
 
-        return response()->streamDownload($callback, "historial_entrevistas_" . now()->format('Y-m-d_H-i-s') . ".csv", $headers);
+        return response()->streamDownload($callback, 'historial_entrevistas_' . now()->format('Y-m-d_H-i-s') . '.csv', $headers);
     }
 
     public function render()
@@ -186,15 +170,15 @@ new class extends Component {
 <div class="max-w-7xl mx-auto w-full pb-12 space-y-8">
 
     <!-- Page Header -->
-    <x-entrevistas.header 
-        titulo="Historial General de Entrevistas" 
-        subtitulo="Registro unificado de atención a estudiantes y apoderados." 
-        icono="document-text" 
-    >
+    <x-entrevistas.header titulo="Historial General de Entrevistas"
+        subtitulo="Registro unificado de atención a estudiantes y apoderados." icono="document-text">
         <div class="flex gap-3">
-            <flux:button variant="ghost" icon="x-mark" wire:click="clearFilters">Limpiar</flux:button>
-            <flux:button variant="primary" icon="document-arrow-down" wire:click="export"
-                class="bg-gradient-to-br from-[#00376e] to-blue-800">Exportar (Excel)</flux:button>
+            <flux:button variant="ghost" icon="x-mark" wire:click="clearFilters">Limpiar filtros</flux:button>
+
+            @can('export', App\Models\Entrevista::class)
+                <flux:button variant="primary" icon="document-arrow-down" wire:click="export"
+                    class="bg-gradient-to-br from-[#00376e] to-blue-800">Exportar (Excel)</flux:button>
+            @endcan
         </div>
     </x-entrevistas.header>
 
@@ -218,7 +202,8 @@ new class extends Component {
                 <flux:select wire:model.live="profesor_id">
                     <flux:select.option value="">Todos los docentes</flux:select.option>
                     @foreach ($docentes as $docente)
-                        <flux:select.option value="{{ $docente->id }}">{{ $docente->nombres }} {{ $docente->apellido_pat }}</flux:select.option>
+                        <flux:select.option value="{{ $docente->id }}">{{ $docente->nombres }}
+                            {{ $docente->apellido_pat }}</flux:select.option>
                     @endforeach
                 </flux:select>
             </flux:field>
@@ -229,26 +214,35 @@ new class extends Component {
                 <flux:select wire:model.live="curso_id">
                     <flux:select.option value="">Todos los cursos</flux:select.option>
                     @foreach ($cursos as $curso)
-                        <flux:select.option value="{{ $curso->id }}">{{ $curso->nombreCompleto() }}</flux:select.option>
+                        <flux:select.option value="{{ $curso->id }}">{{ $curso->nombreCompleto() }}
+                        </flux:select.option>
                     @endforeach
                 </flux:select>
             </flux:field>
 
             <!-- Temporal -->
             <flux:field>
-                <flux:label>Temporalidad <span class="text-[10px] text-zinc-400 font-normal ml-1">{{ $fecha ? '(' . \Carbon\Carbon::parse($fecha)->format('d/m') . ')' : '' }}</span></flux:label>
+                <flux:label>Temporalidad <span
+                        class="text-[10px] text-zinc-400 font-normal ml-1">{{ $fecha ? '(' . \Carbon\Carbon::parse($fecha)->format('d/m') . ')' : '' }}</span>
+                </flux:label>
                 <div class="flex gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg">
                     <flux:dropdown position="bottom-start" class="flex-1">
-                        <button type="button" class="w-full h-full text-xs py-1.5 rounded-md font-bold flex items-center justify-center gap-1 {{ (empty($filtroTemporal) && !empty($fecha)) || $filtroTemporal === 'dia' ? 'bg-[#00376e] text-white shadow-sm' : 'text-zinc-600 hover:bg-zinc-200 dark:hover:bg-zinc-700' }} transition-colors" wire:click="setFiltroTemporal('dia')">
+                        <button type="button"
+                            class="w-full h-full text-xs py-1.5 rounded-md font-bold flex items-center justify-center gap-1 {{ (empty($filtroTemporal) && !empty($fecha)) || $filtroTemporal === 'dia' ? 'bg-[#00376e] text-white shadow-sm' : 'text-zinc-600 hover:bg-zinc-200 dark:hover:bg-zinc-700' }} transition-colors"
+                            wire:click="setFiltroTemporal('dia')">
                             <flux:icon.calendar class="size-3" /> Día
                         </button>
                         <flux:menu class="p-2 min-w-[280px]">
                             <flux:calendar wire:model.live="fecha" />
                         </flux:menu>
                     </flux:dropdown>
-                    
-                    <button class="flex-1 text-xs py-1.5 rounded-md font-bold {{ $filtroTemporal === 'semana' ? 'bg-[#00376e] text-white shadow-sm' : 'text-zinc-600 hover:bg-zinc-200 dark:hover:bg-zinc-700' }} transition-colors" wire:click="setFiltroTemporal('semana')">Semana</button>
-                    <button class="flex-1 text-xs py-1.5 rounded-md font-bold {{ $filtroTemporal === 'mes' ? 'bg-[#00376e] text-white shadow-sm' : 'text-zinc-600 hover:bg-zinc-200 dark:hover:bg-zinc-700' }} transition-colors" wire:click="setFiltroTemporal('mes')">Mes</button>
+
+                    <button
+                        class="flex-1 text-xs py-1.5 rounded-md font-bold {{ $filtroTemporal === 'semana' ? 'bg-[#00376e] text-white shadow-sm' : 'text-zinc-600 hover:bg-zinc-200 dark:hover:bg-zinc-700' }} transition-colors"
+                        wire:click="setFiltroTemporal('semana')">Semana</button>
+                    <button
+                        class="flex-1 text-xs py-1.5 rounded-md font-bold {{ $filtroTemporal === 'mes' ? 'bg-[#00376e] text-white shadow-sm' : 'text-zinc-600 hover:bg-zinc-200 dark:hover:bg-zinc-700' }} transition-colors"
+                        wire:click="setFiltroTemporal('mes')">Mes</button>
                 </div>
             </flux:field>
 
@@ -374,7 +368,8 @@ new class extends Component {
                 <flux:icon.clock class="size-8" />
             </div>
             <div>
-                <p class="text-[10px] uppercase tracking-widest font-bold text-zinc-500 dark:text-zinc-400">Pendientes</p>
+                <p class="text-[10px] uppercase tracking-widest font-bold text-zinc-500 dark:text-zinc-400">Pendientes
+                </p>
                 <h3 class="text-2xl font-black text-zinc-900 dark:text-zinc-100">{{ $pendientesMes }}</h3>
             </div>
         </flux:card>
@@ -384,7 +379,8 @@ new class extends Component {
                 <flux:icon.x-circle class="size-8" />
             </div>
             <div>
-                <p class="text-[10px] uppercase tracking-widest font-bold text-zinc-500 dark:text-zinc-400">No Realizadas</p>
+                <p class="text-[10px] uppercase tracking-widest font-bold text-zinc-500 dark:text-zinc-400">No
+                    Realizadas</p>
                 <h3 class="text-2xl font-black text-zinc-900 dark:text-zinc-100">{{ $canceladasMes }}</h3>
             </div>
         </flux:card>

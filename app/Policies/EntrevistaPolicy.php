@@ -67,4 +67,13 @@ class EntrevistaPolicy
         // Solo superadmin o administrador pueden borrar una entrevista (y sus bitácoras)
         return $user->hasRole(['superadmin', 'administrador']);
     }
+
+    /**
+     * Determine whether the user can export interviews.
+     */
+    public function export(User $user): bool
+    {
+        // Solo administradores (o superadmin) pueden exportar
+        return $user->hasRole(['administrador']);
+    }
 }

@@ -193,22 +193,19 @@ new class extends Component {
     <div>
         <flux:breadcrumbs class="mb-4">
             <flux:breadcrumbs.item icon="building-library" href="#" />
-            <flux:breadcrumbs.item href="{{ route('estudiantes.index') }}">{{ __('Estudiantes') }}
-            </flux:breadcrumbs.item>
+            <flux:breadcrumbs.item href="{{ route('estudiantes.index') }}">{{ __('Estudiantes') }}</flux:breadcrumbs.item>
             <flux:breadcrumbs.item>{{ __('Carga Masiva') }}</flux:breadcrumbs.item>
         </flux:breadcrumbs>
 
-        <div class="flex items-start justify-between">
-            <div>
-                <flux:heading size="xl" level="1">{{ __('Importación Masiva de Estudiantes') }}</flux:heading>
-                <flux:subheading size="lg">
-                    {{ __('Sube el CSV exportado desde FullCollege para registrar estudiantes en lote.') }}
-                </flux:subheading>
-            </div>
+        <x-header 
+            :titulo="__('Importación Masiva de Estudiantes')" 
+            :subtitulo="__('Sube el CSV exportado desde FullCollege para registrar estudiantes en lote.')" 
+            icono="document-arrow-up"
+        >
             <flux:button href="{{ route('estudiantes.index') }}" variant="ghost" icon="arrow-left">
                 {{ __('Volver') }}
             </flux:button>
-        </div>
+        </x-header>
     </div>
 
     @if ($importado)

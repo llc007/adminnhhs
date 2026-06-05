@@ -250,21 +250,18 @@ new class extends Component
 <div>
     <div class="flex flex-col gap-8 w-full max-w-7xl mx-auto">
         <!-- Quick Action Header -->
-        <div class="flex flex-col md:flex-row md:items-start justify-between gap-6">
-            <div>
-                <flux:breadcrumbs class="mb-4">
-                    <flux:breadcrumbs.item icon="building-library" href="#" />
-                    <flux:breadcrumbs.item>{{ __('Institución') }}</flux:breadcrumbs.item>
-                    <flux:breadcrumbs.item>{{ __('Gestión de Estudiantes') }}</flux:breadcrumbs.item>
-                </flux:breadcrumbs>
+        <div>
+            <flux:breadcrumbs class="mb-4">
+                <flux:breadcrumbs.item icon="building-library" href="#" />
+                <flux:breadcrumbs.item>{{ __('Institución') }}</flux:breadcrumbs.item>
+                <flux:breadcrumbs.item>{{ __('Gestión de Estudiantes') }}</flux:breadcrumbs.item>
+            </flux:breadcrumbs>
 
-                <flux:heading size="xl" level="1">{{ __('Listado de Estudiantes') }}</flux:heading>
-                <flux:subheading size="lg" class="max-w-xl">
-                    {{ __('Administración centralizada de alumnos del establecimiento.') }}
-                </flux:subheading>
-            </div>
-
-            <div class="flex items-center gap-3 shrink-0">
+            <x-header 
+                :titulo="__('Listado de Estudiantes')" 
+                :subtitulo="__('Administración centralizada de alumnos del establecimiento.')" 
+                icono="users"
+            >
                 <flux:button variant="ghost" icon="document-arrow-down" wire:click="exportarExcel">
                     {{ __('Exportar') }}
                 </flux:button>
@@ -274,7 +271,7 @@ new class extends Component
                 <flux:button variant="primary" icon="plus" class="shrink-0" wire:click="abrirCrear">
                     {{ __('Nuevo Estudiante') }}
                 </flux:button>
-            </div>
+            </x-header>
         </div>
 
         <!-- Filters Bento Grid -->

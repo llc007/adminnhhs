@@ -178,17 +178,15 @@ new class extends Component {
             <flux:breadcrumbs.item>{{ __('Carga Masiva') }}</flux:breadcrumbs.item>
         </flux:breadcrumbs>
 
-        <div class="flex items-start justify-between">
-            <div>
-                <flux:heading size="xl" level="1">{{ __('Importación Masiva de Funcionarios') }}</flux:heading>
-                <flux:subheading size="lg">
-                    {{ __('Sube un archivo CSV para registrar o actualizar el personal docente y administrativo en lote.') }}
-                </flux:subheading>
-            </div>
+        <x-header 
+            :titulo="__('Importación Masiva de Funcionarios')" 
+            :subtitulo="__('Sube un archivo CSV para registrar o actualizar el personal docente y administrativo en lote.')" 
+            icono="document-arrow-up"
+        >
             <flux:button href="{{ route('funcionarios.index') }}" variant="ghost" icon="arrow-left">
                 {{ __('Volver') }}
             </flux:button>
-        </div>
+        </x-header>
     </div>
 
     @if ($importado)

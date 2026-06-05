@@ -302,19 +302,15 @@ new class extends Component
 ?>
 
 <div class="flex flex-col gap-8 max-w-7xl mx-auto w-full pb-10">
-    {{-- Header --}}
-    <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-        <div>
-            <h1 class="text-3xl font-extrabold text-[#00376e] dark:text-blue-100 tracking-tight">Inventario General</h1>
-            <p class="text-zinc-500 dark:text-zinc-400 font-medium">Consulte, filtre y edite las custodias, ubicaciones y estados de conservación de todos los artículos.</p>
-        </div>
-
-        <div class="flex gap-2">
-            <flux:button wire:click="$set('modalAltaDirecta', true)" variant="primary" icon="plus" class="bg-[#00376e] dark:bg-blue-600 text-white">
-                {{ __('Alta Directa') }}
-            </flux:button>
-        </div>
-    </div>
+    <x-header 
+        titulo="Inventario General" 
+        subtitulo="Consulte, filtre y edite las custodias, ubicaciones y estados de conservación de todos los artículos." 
+        icono="archive-box"
+    >
+        <flux:button wire:click="$set('modalAltaDirecta', true)" variant="primary" icon="plus" class="bg-[#00376e] dark:bg-blue-600 text-white">
+            {{ __('Alta Directa') }}
+        </flux:button>
+    </x-header>
 
     {{-- Filtros y Buscador --}}
     <flux:card class="bg-zinc-50/50 dark:bg-zinc-900/50 backdrop-blur-md">

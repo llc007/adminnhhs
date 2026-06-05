@@ -121,19 +121,17 @@ new class extends Component
 ?>
 
 <div class="flex flex-col gap-8 max-w-7xl mx-auto w-full pb-10">
-    <div class="flex flex-col gap-2 md:flex-row md:justify-between md:items-center">
-        <div>
-            <h1 class="text-3xl font-extrabold text-[#00376e] dark:text-blue-100 tracking-tight">Crear Requerimiento de Adquisición</h1>
-            <p class="text-zinc-500 dark:text-zinc-400 font-medium">Ingrese la justificación y los artículos que desea solicitar para su aprobación.</p>
-        </div>
-        <div class="flex gap-2">
-            @if(auth()->user()->hasRole(['directivo', 'administrador', 'superadmin']))
-                <flux:button href="{{ route('adquisiciones.revision') }}" variant="ghost" icon="shield-check" wire:navigate>
-                    {{ __('Bandeja de Revisión') }}
-                </flux:button>
-            @endif
-        </div>
-    </div>
+    <x-header 
+        titulo="Crear Requerimiento de Adquisición" 
+        subtitulo="Ingrese la justificación y los artículos que desea solicitar para su aprobación." 
+        icono="document-text"
+    >
+        @if(auth()->user()->hasRole(['directivo', 'administrador', 'superadmin']))
+            <flux:button href="{{ route('adquisiciones.revision') }}" variant="ghost" icon="shield-check" wire:navigate>
+                {{ __('Bandeja de Revisión') }}
+            </flux:button>
+        @endif
+    </x-header>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {{-- Panel Izquierdo: Datos de la Solicitud & Agregar Artículo --}}

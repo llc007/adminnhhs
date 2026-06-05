@@ -345,12 +345,11 @@ new class extends Component
 ?>
 
 <div class="flex flex-col gap-8 max-w-7xl mx-auto w-full pb-10">
-    <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-        <div>
-            <h1 class="text-3xl font-extrabold text-[#00376e] dark:text-blue-100 tracking-tight">Recepción e Ingreso de Compras</h1>
-            <p class="text-zinc-500 dark:text-zinc-400 font-medium">Registre los números de serie e ingrese físicamente los artículos adquiridos a la Bodega.</p>
-        </div>
-    </div>
+    <x-header 
+        titulo="Recepción e Ingreso de Compras" 
+        subtitulo="Registre los números de serie e ingrese físicamente los artículos adquiridos a la Bodega." 
+        icono="shopping-cart"
+    />
 
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {{-- Listado de Requerimientos en Adquisición (4 cols) --}}

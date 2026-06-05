@@ -310,12 +310,15 @@ new class extends Component
 ?>
 
 <div class="max-w-7xl mx-auto w-full pb-12 space-y-8">
-    <x-entrevistas.header titulo="Enlazar RUTs a Google Workspace"
-        subtitulo="Cruce de datos entre el CSV de Google Workspace y el de Fullcollege para asignar el RUT (Employee ID)."
-        icono="arrows-right-left">
-        <flux:button href="{{ route('estudiantes.index') }}" variant="ghost" icon="arrow-left">Volver a Estudiantes
+    <x-header 
+        :titulo="__('Enlazar RUTs a Google Workspace')"
+        :subtitulo="__('Cruce de datos entre el CSV de Google Workspace y el de Fullcollege para asignar el RUT (Employee ID).')"
+        icono="arrows-right-left"
+    >
+        <flux:button href="{{ route('estudiantes.index') }}" variant="ghost" icon="arrow-left">
+            {{ __('Volver a Estudiantes') }}
         </flux:button>
-    </x-entrevistas.header>
+    </x-header>
 
     <div class="flex flex-col gap-6">
         <flux:card class="shadow-sm border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/40">

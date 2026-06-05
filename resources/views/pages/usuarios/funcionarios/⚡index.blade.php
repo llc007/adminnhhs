@@ -149,28 +149,25 @@ new class extends Component {
 <div>
     <div class="flex flex-col gap-8 w-full max-w-7xl mx-auto">
         <!-- Quick Action Header -->
-        <div class="flex flex-col md:flex-row md:items-start justify-between gap-6">
-            <div>
-                <flux:breadcrumbs class="mb-4">
-                    <flux:breadcrumbs.item icon="building-library" href="#" />
-                    <flux:breadcrumbs.item>{{ __('Institución') }}</flux:breadcrumbs.item>
-                    <flux:breadcrumbs.item>{{ __('Gestión de Funcionarios') }}</flux:breadcrumbs.item>
-                </flux:breadcrumbs>
+        <div>
+            <flux:breadcrumbs class="mb-4">
+                <flux:breadcrumbs.item icon="building-library" href="#" />
+                <flux:breadcrumbs.item>{{ __('Institución') }}</flux:breadcrumbs.item>
+                <flux:breadcrumbs.item>{{ __('Gestión de Funcionarios') }}</flux:breadcrumbs.item>
+            </flux:breadcrumbs>
 
-                <flux:heading size="xl" level="1">{{ __('Listado de Funcionarios') }}</flux:heading>
-                <flux:subheading size="lg" class="max-w-xl">
-                    {{ __('Administración centralizada de personal docente, administrativo y auxiliar del establecimiento.') }}
-                </flux:subheading>
-            </div>
-
-            <div class="flex flex-col gap-2 shrink-0">
+            <x-header 
+                :titulo="__('Listado de Funcionarios')" 
+                :subtitulo="__('Administración centralizada de personal docente, administrativo y auxiliar del establecimiento.')" 
+                icono="identification"
+            >
                 <flux:button variant="primary" icon="plus" wire:click="abrirCrear">
                     {{ __('Nuevo Funcionario') }}
                 </flux:button>
                 <flux:button variant="ghost" icon="document-arrow-up" href="{{ route('funcionarios.carga_masiva') }}">
                     {{ __('Carga Masiva') }}
                 </flux:button>
-            </div>
+            </x-header>
         </div>
 
         <!-- Filters Bento Grid -->

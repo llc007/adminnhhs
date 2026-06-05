@@ -195,13 +195,11 @@ new class extends Component
 ?>
 
 <div class="flex flex-col gap-8 max-w-7xl mx-auto w-full pb-10">
-    {{-- Encabezado --}}
-    <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-        <div>
-            <h1 class="text-3xl font-extrabold text-[#00376e] dark:text-blue-100 tracking-tight">Revisión y Aprobación</h1>
-            <p class="text-zinc-500 dark:text-zinc-400 font-medium">Bandeja de revisión institucional para la adquisición de requerimientos.</p>
-        </div>
-
+    <x-header 
+        titulo="Revisión y Aprobación" 
+        subtitulo="Bandeja de revisión institucional para la adquisición de requerimientos." 
+        icono="shield-check"
+    >
         {{-- Selector de Rol de Revisión --}}
         <div class="bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl flex gap-1 self-start">
             <button 
@@ -219,7 +217,7 @@ new class extends Component
                 {{ __('Gerencia') }}
             </button>
         </div>
-    </div>
+    </x-header>
 
     {{-- Grid Principal --}}
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">

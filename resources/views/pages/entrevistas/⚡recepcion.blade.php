@@ -224,23 +224,19 @@ new class extends Component {
 ?>
 <div class="max-w-7xl mx-auto w-full pb-10">
 
-    {{-- Encabezado Principal --}}
-    <div class="flex items-start justify-between mb-8">
-        <div>
-            <flux:heading size="xl" level="1" class="text-[#00376e] dark:text-blue-400">{{ __('Panel de Recepción') }}</flux:heading>
-            <flux:subheading size="lg" class="max-w-xl">
-                {{ __('Administra los ingresos y accesos programados para el recinto durante el día de hoy.') }}
-            </flux:subheading>
-        </div>
-        
-        <div class="text-right flex items-center justify-end gap-3 text-sm text-zinc-500 font-medium">
+    <x-header 
+        titulo="Panel de Recepción" 
+        subtitulo="Administra los ingresos y accesos programados para el recinto durante el día de hoy." 
+        icono="building-office-2"
+    >
+        <div class="text-right flex items-center justify-end gap-3 text-sm text-zinc-500 font-medium mr-4">
             <span class="relative flex h-3 w-3">
               <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
             </span>
             Actualización en vivo
         </div>
-    </div>
+    </x-header>
 
  
 

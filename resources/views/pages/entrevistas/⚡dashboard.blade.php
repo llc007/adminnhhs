@@ -91,19 +91,15 @@ new class extends Component
 
 <div class="max-w-7xl mx-auto w-full pb-10">
 
-    {{-- Encabezado Principal --}}
-    <div class="flex items-start justify-between mb-10">
-        <div>
-            <flux:heading size="xl" level="1" class="text-[#00376e] dark:text-blue-400">{{ __('Dashboard Analítico') }}</flux:heading>
-            <flux:subheading size="lg" class="max-w-xl">
-                {{ __('Monitoreo de gestión de entrevistas y rendimiento a nivel institucional.') }}
-            </flux:subheading>
-        </div>
-        
+    <x-header 
+        titulo="Dashboard Analítico" 
+        subtitulo="Monitoreo de gestión de entrevistas y rendimiento a nivel institucional." 
+        icono="chart-bar"
+    >
         <div class="hidden md:flex items-center gap-3">
             <flux:button variant="primary" icon="arrow-path" wire:click="$refresh">{{ __('Actualizar') }}</flux:button>
         </div>
-    </div>
+    </x-header>
 
     {{-- Fila 1: KPIs Principales --}}
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">

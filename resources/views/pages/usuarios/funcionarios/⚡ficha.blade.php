@@ -115,22 +115,19 @@ new class extends Component
     <div>
         <flux:breadcrumbs class="mb-4">
             <flux:breadcrumbs.item icon="building-library" href="#" />
-            <flux:breadcrumbs.item href="{{ route('funcionarios.index') }}">{{ __('Funcionarios') }}
-            </flux:breadcrumbs.item>
+            <flux:breadcrumbs.item href="{{ route('funcionarios.index') }}">{{ __('Funcionarios') }}</flux:breadcrumbs.item>
             <flux:breadcrumbs.item>{{ __('Ficha Digital') }}</flux:breadcrumbs.item>
         </flux:breadcrumbs>
 
-        <div class="flex items-start justify-between">
-            <div>
-                <flux:heading size="xl" level="1">{{ __('Ficha Digital del Funcionario') }}</flux:heading>
-                <flux:subheading size="lg" class="max-w-2xl">
-                    {{ __('Información institucional del miembro del equipo docente o administrativo.') }}
-                </flux:subheading>
-            </div>
+        <x-header 
+            :titulo="__('Ficha Digital del Funcionario')" 
+            :subtitulo="__('Información institucional del miembro del equipo docente o administrativo.')" 
+            icono="user"
+        >
             <flux:button href="{{ route('funcionarios.index') }}" variant="ghost" icon="arrow-left">
                 {{ __('Volver al listado') }}
             </flux:button>
-        </div>
+        </x-header>
     </div>
 
     {{-- Sección 1: Información Personal --}}

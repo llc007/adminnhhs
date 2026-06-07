@@ -100,41 +100,92 @@ new class extends Component {
             ->get()
             ->mapWithKeys(fn($c) => [$this->normalizarTexto($c->nombre_fc) => $c]);
 
+        // 1. Pre-extraer todos los RUTs válidos del CSV para consultarlos de una sola vez
+        $rutsEnArchivo = [];
+        foreach ($lineas as $linea) {
+            $cols = str_getcsv($linea, $separador, '"', '\\');
+            if (count($cols) < 4) {
+                continue;
+            }
+            $rutRaw = $cols[1] ?? '';
+            $dvRaw = trim($cols[2] ?? '');
+
+            if ($dvRaw !== '') {
+                if (str_contains($rutRaw, '-')) {
+                    [$numero, ] = explode('-', $rutRaw, 2);
+                    $rutNumero = preg_replace('/\D/', '', $numero);
+                } else {
+                    $rutNumero = preg_replace('/\D/', '', $rutRaw);
+                }
+            } else {
+                $rut = $this->parsearRut($rutRaw);
+                $rutNumero = $rut['rut_numero'];
+            }
+
+            if ($rutNumero !== '') {
+                $rutsEnArchivo[] = $rutNumero;
+            }
+        }
+
+        // 2. Consultar todos los RUTs existentes en la base de datos a la vez (evita N+1 consultas)
+        $existingRuts = Estudiante::where('school_id', $schoolId)
+            ->whereIn('rut_numero', array_unique($rutsEnArchivo))
+            ->pluck('rut_numero')
+            ->flip()
+            ->toArray();
+
         $rutsVistos = [];
 
         foreach ($lineas as $linea) {
-            $cols = str_getcsv($linea, $separador);
-            if (count($cols) < 3) {
+            $cols = str_getcsv($linea, $separador, '"', '\\');
+            if (count($cols) < 4) {
                 continue;
             }
 
             $rutRaw = $cols[1] ?? '';
-            $rut = $this->parsearRut($rutRaw);
-            $cursoRaw = $this->normalizarTexto($cols[2] ?? '');
+            $dvRaw = strtoupper(trim($cols[2] ?? ''));
+
+            if ($dvRaw !== '') {
+                if (str_contains($rutRaw, '-')) {
+                    [$numero, ] = explode('-', $rutRaw, 2);
+                    $rutNumero = preg_replace('/\D/', '', $numero);
+                } else {
+                    $rutNumero = preg_replace('/\D/', '', $rutRaw);
+                }
+                $rutDv = $dvRaw;
+            } else {
+                $rut = $this->parsearRut($rutRaw);
+                $rutNumero = $rut['rut_numero'];
+                $rutDv = $rut['rut_dv'];
+            }
+
+            $cursoRaw = $this->normalizarTexto($cols[3] ?? '');
 
             // Buscar en el mapa pre-normalizado (ambos lados usan la misma función)
             $curso = $cursos->get($cursoRaw);
 
             $nombreCompleto = $this->normalizarTexto($cols[0] ?? '');
+            $emailEstudiante = strtolower(trim($cols[4] ?? ''));
 
-            // Verificar si ya existe en BD o en el mismo archivo
-            $existeBd = Estudiante::where('school_id', $schoolId)->where('rut_numero', $rut['rut_numero'])->exists();
-            $existeArchivo = isset($rutsVistos[$rut['rut_numero']]);
+            // Verificar si ya existe en BD (consulta en memoria) o en el mismo archivo
+            $existeBd = isset($existingRuts[$rutNumero]);
+            $existeArchivo = isset($rutsVistos[$rutNumero]);
             $existe = $existeBd || $existeArchivo;
             
-            $rutsVistos[$rut['rut_numero']] = true;
+            $rutsVistos[$rutNumero] = true;
 
             $this->filas[] = [
                 'nombre_completo' => $nombreCompleto,
-                'rut_numero' => $rut['rut_numero'],
-                'rut_dv' => $rut['rut_dv'],
+                'rut_numero' => $rutNumero,
+                'rut_dv' => $rutDv,
+                'email' => $emailEstudiante,
                 'curso_raw' => $cursoRaw,
                 'curso_id' => $curso?->id,
                 'curso_nombre' => $curso?->nombreCompleto(),
-                'apoderado' => $this->normalizarTexto($cols[3] ?? ''),
-                'apoderado_telefono' => $this->normalizarTexto($cols[4] ?? ''),
-                'apoderado_email' => strtoupper(trim($cols[5] ?? '')),
-                'apoderado_domicilio' => $this->normalizarTexto($cols[6] ?? ''),
+                'apoderado' => $this->normalizarTexto($cols[5] ?? ''),
+                'apoderado_telefono' => $this->normalizarTexto($cols[6] ?? ''),
+                'apoderado_email' => strtoupper(trim($cols[7] ?? '')),
+                'apoderado_domicilio' => $this->normalizarTexto($cols[8] ?? ''),
                 'estado' => $existe ? 'duplicado' : ($curso ? 'ok' : 'sin_curso'),
             ];
         }
@@ -164,6 +215,7 @@ new class extends Component {
                         'curso_id' => $fila['curso_id'],
                         'nombres_csv' => $fila['nombre_completo'],
                         'rut_dv' => $fila['rut_dv'],
+                        'email' => $fila['email'],
                         'apoderado_nombres' => $fila['apoderado'],
                         'apoderado_telefono' => $fila['apoderado_telefono'],
                         'apoderado_email' => $fila['apoderado_email'],
@@ -247,7 +299,7 @@ new class extends Component {
             <flux:card class="flex flex-col gap-4 bg-zinc-50 dark:bg-zinc-800/50">
                 <flux:heading>{{ __('Columnas esperadas') }}</flux:heading>
                 <div class="flex flex-col gap-2 text-sm text-zinc-600 dark:text-zinc-400">
-                    @foreach ([['Nombres y Apellidos', '→ nombre estudiante'], ['R.U.T', '→ ej: 21258654-5'], ['Curso', '→ nombre en FullCollege'], ['Apoderado', '→ nombre apoderado'], ['Telefono Apoderado', '→ número'], ['Email Apoderado', '→ correo'], ['Domicilio Apoderado', '→ dirección']] as [$col, $desc])
+                    @foreach ([['Nombres y Apellidos', '→ nombre estudiante'], ['R.U.T', '→ sin dígito verificador'], ['D.V', '→ dígito verificador'], ['Curso', '→ nombre en FullCollege'], ['Email Estudiante', '→ correo estudiante'], ['Apoderado', '→ nombre apoderado'], ['Telefono Apoderado', '→ número'], ['Email Apoderado', '→ correo apoderado'], ['Domicilio Apoderado', '→ dirección']] as [$col, $desc])
                         <div class="flex justify-between gap-2">
                             <span
                                 class="font-mono font-medium text-zinc-800 dark:text-zinc-200">{{ $col }}</span>
@@ -294,50 +346,76 @@ new class extends Component {
                 </div>
             </div>
 
-            <div class="overflow-x-auto">
-                <flux:table>
-                    <flux:table.columns>
-                        <flux:table.column>{{ __('Estado') }}</flux:table.column>
-                        <flux:table.column>{{ __('Nombre Completo') }}</flux:table.column>
-                        <flux:table.column>{{ __('RUT') }}</flux:table.column>
-                        <flux:table.column>{{ __('Curso CSV') }}</flux:table.column>
-                        <flux:table.column>{{ __('Curso Mapeado') }}</flux:table.column>
-                        <flux:table.column>{{ __('Apoderado') }}</flux:table.column>
-                    </flux:table.columns>
-                    <flux:table.rows>
-                        @foreach ($filas as $fila)
-                            <flux:table.row>
-                                <flux:table.cell>
-                                    @if ($fila['estado'] === 'ok')
-                                        <flux:badge color="green" icon="check-circle">{{ __('OK') }}</flux:badge>
-                                    @elseif ($fila['estado'] === 'duplicado')
-                                        <flux:badge color="yellow" icon="exclamation-triangle">{{ __('Ya existe') }}
-                                        </flux:badge>
-                                    @else
-                                        <flux:badge color="red" icon="x-circle">{{ __('Sin curso') }}</flux:badge>
-                                    @endif
-                                </flux:table.cell>
-                                <flux:table.cell class="font-medium">{{ $fila['nombre_completo'] }}</flux:table.cell>
-                                <flux:table.cell class="font-mono text-sm">
-                                    {{ $fila['rut_numero'] }}-{{ $fila['rut_dv'] }}
-                                </flux:table.cell>
-                                <flux:table.cell class="text-xs text-zinc-500">{{ $fila['curso_raw'] }}
-                                </flux:table.cell>
-                                <flux:table.cell>
-                                    @if ($fila['curso_nombre'])
-                                        <flux:badge color="blue">{{ $fila['curso_nombre'] }}</flux:badge>
-                                    @else
-                                        <span class="text-red-400 text-xs">{{ __('Sin mapeo') }}</span>
-                                    @endif
-                                </flux:table.cell>
-                                <flux:table.cell class="text-sm text-zinc-600 dark:text-zinc-400">
-                                    {{ $fila['apoderado'] }}
-                                </flux:table.cell>
-                            </flux:table.row>
-                        @endforeach
-                    </flux:table.rows>
-                </flux:table>
-            </div>
+            @php
+                $filasConObservacion = array_filter($filas, fn($f) => $f['estado'] !== 'ok');
+            @endphp
+
+            @if (count($filasConObservacion) === 0)
+                <div class="py-12 text-center">
+                    <flux:icon.check-circle class="size-16 text-green-500 mx-auto mb-4" />
+                    <flux:heading size="xl">{{ __('¡Todo listo para importar!') }}</flux:heading>
+                    <flux:subheading class="mt-2 max-w-md mx-auto">
+                        {{ __('No se encontraron observaciones en los registros. Todos los estudiantes del archivo se importarán correctamente.') }}
+                    </flux:subheading>
+                </div>
+            @else
+                <div class="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
+                    {{ __('Mostrando solo los registros con observaciones (duplicados o sin curso). Los registros que están "OK" se importarán en segundo plano.') }}
+                </div>
+
+                <div class="overflow-x-auto">
+                    <flux:table>
+                        <flux:table.columns>
+                            <flux:table.column>{{ __('Estado') }}</flux:table.column>
+                            <flux:table.column>{{ __('Nombre Completo') }}</flux:table.column>
+                            <flux:table.column>{{ __('RUT') }}</flux:table.column>
+                            <flux:table.column>{{ __('Email Estudiante') }}</flux:table.column>
+                            <flux:table.column>{{ __('Curso CSV') }}</flux:table.column>
+                            <flux:table.column>{{ __('Curso Mapeado') }}</flux:table.column>
+                            <flux:table.column>{{ __('Apoderado') }}</flux:table.column>
+                        </flux:table.columns>
+                        <flux:table.rows>
+                            @foreach (array_slice($filasConObservacion, 0, 100) as $fila)
+                                <flux:table.row>
+                                    <flux:table.cell>
+                                        @if ($fila['estado'] === 'duplicado')
+                                            <flux:badge color="yellow" icon="exclamation-triangle">{{ __('Ya existe') }}
+                                            </flux:badge>
+                                        @else
+                                            <flux:badge color="red" icon="x-circle">{{ __('Sin curso') }}</flux:badge>
+                                        @endif
+                                    </flux:table.cell>
+                                    <flux:table.cell class="font-medium">{{ $fila['nombre_completo'] }}</flux:table.cell>
+                                    <flux:table.cell class="font-mono text-sm">
+                                        {{ $fila['rut_numero'] }}-{{ $fila['rut_dv'] }}
+                                    </flux:table.cell>
+                                    <flux:table.cell class="text-sm text-zinc-600 dark:text-zinc-400">
+                                        {{ $fila['email'] ?: '-' }}
+                                    </flux:table.cell>
+                                    <flux:table.cell class="text-xs text-zinc-500">{{ $fila['curso_raw'] }}
+                                    </flux:table.cell>
+                                    <flux:table.cell>
+                                        @if ($fila['curso_nombre'])
+                                            <flux:badge color="blue">{{ $fila['curso_nombre'] }}</flux:badge>
+                                        @else
+                                            <span class="text-red-400 text-xs">{{ __('Sin mapeo') }}</span>
+                                        @endif
+                                    </flux:table.cell>
+                                    <flux:table.cell class="text-sm text-zinc-600 dark:text-zinc-400">
+                                        {{ $fila['apoderado'] }}
+                                    </flux:table.cell>
+                                </flux:table.row>
+                            @endforeach
+                        </flux:table.rows>
+                    </flux:table>
+                </div>
+
+                @if (count($filasConObservacion) > 100)
+                    <div class="mt-4 p-3 bg-zinc-50 dark:bg-zinc-800 rounded-lg text-xs text-zinc-500 text-center">
+                        {{ __('Mostrando las primeras 100 observaciones de un total de ' . count($filasConObservacion) . '.') }}
+                    </div>
+                @endif
+            @endif
         </flux:card>
     @endif
 </div>

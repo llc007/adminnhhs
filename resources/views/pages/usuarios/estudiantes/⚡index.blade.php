@@ -311,10 +311,12 @@ new class extends Component {
                     class="h-full flex items-center justify-between bg-zinc-900 border-none !text-white dark:bg-zinc-800">
                     <div>
                         <div class="text-[10px] uppercase tracking-widest font-bold opacity-70">
-                            {{ __('Total Estudiantes') }}
+                            {{ $cursoId === '' ? __('Total Estudiantes') : __('Estudiantes Filtrados') }}
                         </div>
                         <div class="text-4xl font-bold mt-1">
-                            {{ \App\Models\Estudiante::where('school_id', auth()->user()->current_school_id)->count() }}
+                            {{ $cursoId === '' 
+                                ? \App\Models\Estudiante::where('school_id', auth()->user()->current_school_id)->count() 
+                                : $this->getEstudiantesQueryProperty->count() }}
                         </div>
                     </div>
                     <div class="p-3 bg-white/10 rounded-full">
@@ -325,7 +327,15 @@ new class extends Component {
         </div>
 
         <!-- Table UI -->
-        <flux:card>
+        <flux:card class="relative">
+            {{-- Loader overlay --}}
+            <div wire:loading.flex wire:target="cursoId, search, sort, gotoPage, nextPage, previousPage" class="absolute inset-0 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-[1px] z-10 flex items-center justify-center rounded-xl">
+                <div class="flex flex-col items-center gap-3">
+                    <flux:icon.arrow-path class="size-8 animate-spin text-[#00376e] dark:text-blue-400" />
+                    <span class="text-sm font-medium text-zinc-600 dark:text-zinc-300">{{ __('Cargando nómina de estudiantes...') }}</span>
+                </div>
+            </div>
+
             @if ($this->cursoId === '')
                 <div class="py-12 flex flex-col items-center justify-center text-center">
                     <div class="p-4 bg-zinc-100 dark:bg-zinc-800 rounded-full mb-4">
@@ -360,44 +370,43 @@ new class extends Component {
                         @forelse ($this->estudiantes as $estudiante)
                             <flux:table.row :key="$estudiante->id">
                                 <flux:table.cell>
-                                    <div class="flex items-center gap-3">
-                                        <flux:avatar />
+                                    <div class="flex items-center gap-2">
+                                        <flux:avatar class="size-7" />
                                         <div>
-                                            <div class="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                            <div class="text-xs font-medium text-zinc-900 dark:text-zinc-100">
                                                 {{ $estudiante->nombreCompleto() }}
                                             </div>
                                             @if ($estudiante->email)
-                                                <div class="text-xs text-zinc-500">{{ $estudiante->email }}</div>
+                                                <div class="text-[10px] text-zinc-500">{{ $estudiante->email }}</div>
                                             @elseif($estudiante->user_id)
-                                                <div class="text-xs text-zinc-500">{{ $estudiante->user->email }}</div>
+                                                <div class="text-[10px] text-zinc-500">{{ $estudiante->user->email }}</div>
                                             @else
-                                                <div class="text-xs text-zinc-400 italic">Sin correo vinculado</div>
+                                                <div class="text-[10px] text-zinc-400 italic">Sin correo vinculado</div>
                                             @endif
                                         </div>
                                     </div>
                                 </flux:table.cell>
-                                <flux:table.cell>{{ $estudiante->rutCompleto() ?? '-' }}</flux:table.cell>
+                                <flux:table.cell class="text-xs font-mono">{{ $estudiante->rutCompleto() ?? '-' }}</flux:table.cell>
                                 <flux:table.cell>
                                     @if ($estudiante->curso)
-                                        <flux:badge color="blue">{{ $estudiante->curso->nombreCompleto() }}
-                                        </flux:badge>
+                                        <flux:badge size="sm" color="blue">{{ $estudiante->curso->nombreCompleto() }}</flux:badge>
                                     @else
-                                        <span class="text-zinc-500">-</span>
+                                        <span class="text-xs text-zinc-500">-</span>
                                     @endif
                                 </flux:table.cell>
-                                <flux:table.cell>
-                                    <div class="text-sm">{{ $estudiante->apoderado_nombres }}</div>
+                                <flux:table.cell class="text-xs">
+                                    <div class="font-medium">{{ $estudiante->apoderado_nombres ?: '-' }}</div>
                                     @if ($estudiante->apoderado_telefono)
-                                        <div class="text-xs text-zinc-500 flex items-center gap-1 mt-0.5">
+                                        <div class="text-[10px] text-zinc-500 flex items-center gap-1 mt-0.5">
                                             <flux:icon.phone class="size-3" /> {{ $estudiante->apoderado_telefono }}
                                         </div>
                                     @endif
                                 </flux:table.cell>
                                 <flux:table.cell>
                                     @if ($estudiante->email || $estudiante->user_id)
-                                        <flux:badge color="green" icon="check-circle">Vinculado</flux:badge>
+                                        <flux:badge size="sm" color="green" icon="check-circle">Vinculado</flux:badge>
                                     @else
-                                        <flux:badge color="orange" icon="clock">Inactivo</flux:badge>
+                                        <flux:badge size="sm" color="orange" icon="clock">Inactivo</flux:badge>
                                     @endif
                                 </flux:table.cell>
                                 <flux:table.cell class="text-right">

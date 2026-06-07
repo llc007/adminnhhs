@@ -24,8 +24,8 @@ class SchoolSeeder extends Seeder
             ['school_id' => $school->id, 'name' => 'Año Académico 2026'],
             [
                 'start_date' => '2026-03-01',
-                'end_date'   => '2026-12-15',
-                'is_active'  => true,
+                'end_date' => '2026-12-15',
+                'is_active' => true,
             ]
         );
         $this->command->info("📅 Año académico: {$year->name}");
@@ -35,7 +35,7 @@ class SchoolSeeder extends Seeder
             ['academic_year_id' => $year->id, 'name' => '1° Semestre 2026'],
             [
                 'start_date' => '2026-03-01',
-                'end_date'   => '2026-07-04',
+                'end_date' => '2026-07-04',
             ]
         );
         $this->command->info('📆 Término: 1° Semestre 2026');
@@ -45,19 +45,21 @@ class SchoolSeeder extends Seeder
             ['academic_year_id' => $year->id, 'name' => '2° Semestre 2026'],
             [
                 'start_date' => '2026-07-27',
-                'end_date'   => '2026-12-15',
+                'end_date' => '2026-12-15',
             ]
         );
         $this->command->info('📆 Término: 2° Semestre 2026');
 
-        // 5. Asociar user id=1 al colegio con roles administrador y docente
-        $user = User::find(1);
-
-        if (! $user) {
-            $this->command->warn('⚠️  No se encontró el usuario con id=1. Omitiendo asociación.');
-
-            return;
-        }
+        // 5. Crear o asociar el usuario administrador inicial
+        $adminEmail = env('ADMIN_EMAIL', 'luislopez@newheavenhs.cl');
+        $user = User::firstOrCreate(
+            ['email' => $adminEmail],
+            [
+                'nombres' => 'Administrador',
+                'apellido_pat' => 'Principal',
+                'apellido_mat' => '',
+            ]
+        );
 
         // Actualizar current_school_id del usuario
         $user->update(['current_school_id' => $school->id]);
@@ -73,6 +75,6 @@ class SchoolSeeder extends Seeder
             ]);
         }
 
-        $this->command->info("👤 Usuario id=1 ({$user->nombres}) asociado con roles: administrador, docente");
+        $this->command->info("👤 Usuario administrador ({$user->email}) asociado con roles: administrador, docente");
     }
 }

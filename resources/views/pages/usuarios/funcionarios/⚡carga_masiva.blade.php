@@ -46,7 +46,7 @@ new class extends Component {
         $schoolId = auth()->user()->current_school_id;
 
         foreach ($lineas as $linea) {
-            $cols = str_getcsv($linea, $separador);
+            $cols = str_getcsv($linea, $separador, '"', '\\');
             if (count($cols) < 5) {
                 continue;
             }

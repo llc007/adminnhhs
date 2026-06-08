@@ -44,6 +44,7 @@ Route::middleware(['auth', 'verified', 'role:directivo,administrador,superadmin,
 // Alta Administración — Gestión de Funcionarios y Cargas Masivas
 Route::middleware(['auth', 'verified', 'role:directivo,administrador,superadmin'])->group(function () {
     Route::livewire('/funcionarios', 'pages::usuarios.funcionarios.index')->name('funcionarios.index');
+    Route::livewire('/funcionarios/calculadora-horas', 'pages::usuarios.funcionarios.calculadora_horas')->name('funcionarios.calculadora_horas');
     Route::livewire('/funcionarios/carga-masiva', 'pages::usuarios.funcionarios.carga_masiva')->name('funcionarios.carga_masiva');
     Route::livewire('/funcionarios/ficha/{id}', 'pages::usuarios.funcionarios.ficha')->name('funcionarios.ficha');
     Route::livewire('/estudiantes/carga-masiva', 'pages::usuarios.estudiantes.carga_masiva')->name('estudiantes.carga_masiva');

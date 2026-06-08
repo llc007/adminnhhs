@@ -56,8 +56,11 @@
                 @endif
 
                 @if(auth()->user()->hasRole(['directivo', 'administrador', 'superadmin']))
-                <flux:sidebar.item icon="briefcase" :href="route('funcionarios.index')" :current="request()->routeIs('funcionarios.*')" wire:navigate>
+                <flux:sidebar.item icon="briefcase" :href="route('funcionarios.index')" :current="request()->routeIs('funcionarios.index') || request()->routeIs('funcionarios.ficha') || request()->routeIs('funcionarios.carga_masiva')" wire:navigate>
                     {{ __('Funcionarios') }}
+                </flux:sidebar.item>
+                <flux:sidebar.item icon="clock" :href="route('funcionarios.calculadora_horas')" :current="request()->routeIs('funcionarios.calculadora_horas')" wire:navigate>
+                    {{ __('Calculadora 42 Hrs') }}
                 </flux:sidebar.item>
                 @endif
             </flux:sidebar.group>

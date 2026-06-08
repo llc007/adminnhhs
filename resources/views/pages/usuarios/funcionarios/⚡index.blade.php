@@ -24,6 +24,7 @@ new class extends Component {
     public string $email = '';
     public string $rutNumero = '';
     public string $rutDv = '';
+    public array $roles = ['docente'];
 
     // Modal eliminar
     public bool $modalEliminar = false;
@@ -42,6 +43,7 @@ new class extends Component {
     public function abrirCrear(): void
     {
         $this->reset(['funcionarioId', 'nombres', 'apellidoPat', 'apellidoMat', 'email', 'rutNumero', 'rutDv']);
+        $this->roles = ['docente'];
         $this->modalAbierto = true;
     }
 
@@ -55,6 +57,7 @@ new class extends Component {
         $this->email = $funcionario->email;
         $this->rutNumero = $funcionario->rut_numero ?? '';
         $this->rutDv = $funcionario->rut_dv ?? '';
+        $this->roles = $funcionario->active_roles;
         $this->modalAbierto = true;
     }
 
@@ -74,6 +77,7 @@ new class extends Component {
             'email' => ['required', 'email', Rule::unique('users', 'email')->ignore($this->funcionarioId)],
             'rutNumero' => ['nullable', 'digits_between:7,9'],
             'rutDv' => ['nullable', 'max:1', 'regex:/^[0-9Kk]$/'],
+            'roles' => ['required', 'array', 'min:1'],
         ]);
 
         if ($this->funcionarioId) {
@@ -86,6 +90,17 @@ new class extends Component {
                 'rut_numero' => $this->rutNumero ?: null,
                 'rut_dv' => $this->rutDv !== '' ? strtoupper($this->rutDv) : null,
             ]);
+
+            $schoolId = auth()->user()->current_school_id;
+            if ($funcionario->schools()->where('school_id', $schoolId)->exists()) {
+                $funcionario->schools()->updateExistingPivot($schoolId, [
+                    'roles' => json_encode($this->roles),
+                ]);
+            } else {
+                $funcionario->schools()->attach($schoolId, [
+                    'roles' => json_encode($this->roles),
+                ]);
+            }
         } else {
             $funcionario = \App\Models\User::create([
                 'nombres' => $this->nombres,
@@ -97,11 +112,12 @@ new class extends Component {
                 'password' => \Illuminate\Support\Facades\Hash::make(\Illuminate\Support\Str::random(16)),
                 'current_school_id' => auth()->user()->current_school_id,
             ]);
-            $funcionario->schools()->attach(auth()->user()->current_school_id, ['roles' => json_encode(['docente'])]);
+            $funcionario->schools()->attach(auth()->user()->current_school_id, ['roles' => json_encode($this->roles)]);
         }
 
         $this->modalAbierto = false;
         $this->reset(['funcionarioId', 'nombres', 'apellidoPat', 'apellidoMat', 'email', 'rutNumero', 'rutDv']);
+        $this->roles = ['docente'];
     }
 
     public function confirmarEliminar(int $id): void
@@ -357,6 +373,25 @@ new class extends Component {
             </div>
             <flux:error name="rutNumero" />
             <flux:error name="rutDv" />
+
+            <flux:field>
+                <flux:label class="mb-2 uppercase tracking-widest text-[10px] font-bold text-zinc-500 dark:text-zinc-400">
+                    {{ __('Roles de Acceso') }}
+                </flux:label>
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-y-3 gap-x-4 mt-2">
+                    <flux:checkbox wire:model="roles" value="docente" :label="__('Docente')" />
+                    <flux:checkbox wire:model="roles" value="inspector" :label="__('Inspectoría')" />
+                    <flux:checkbox wire:model="roles" value="asistente" :label="__('Asistente')" />
+                    <flux:checkbox wire:model="roles" value="psicosocial" :label="__('Psicosocial')" />
+                    <flux:checkbox wire:model="roles" value="recepcion" :label="__('Recepción')" />
+                    <flux:checkbox wire:model="roles" value="directivo" :label="__('Directivo')" />
+                    <flux:checkbox wire:model="roles" value="administrador" :label="__('Administrador')" />
+                    @if(auth()->user()->hasRole('superadmin'))
+                        <flux:checkbox wire:model="roles" value="superadmin" :label="__('Superadmin')" />
+                    @endif
+                </div>
+                <flux:error name="roles" class="mt-2" />
+            </flux:field>
 
             <div class="flex">
                 <flux:spacer />

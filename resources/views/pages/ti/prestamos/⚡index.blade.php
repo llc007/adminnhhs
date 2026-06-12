@@ -102,25 +102,21 @@ new #[Title('Gestión de Préstamos')] class extends Component
 ?>
 
 <div class="max-w-7xl mx-auto w-full pb-12 space-y-8">
-    <flux:breadcrumbs class="mb-4">
-        <flux:breadcrumbs.item icon="building-library" href="#" />
-        <flux:breadcrumbs.item href="{{ route('ti.prestamos.index') }}">{{ __('Informática') }}</flux:breadcrumbs.item>
-        <flux:breadcrumbs.item>{{ __('Gestión de Préstamos') }}</flux:breadcrumbs.item>
-    </flux:breadcrumbs>
-
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <x-header
-            :titulo="__('Gestión de Préstamos TI')"
-            :subtitulo="__('Administra y monitorea los insumos tecnológicos prestados temporalmente a los docentes y funcionarios.')"
-            icono="briefcase"
-        />
-        
+    <x-header
+        :titulo="__('Gestión de Préstamos TI')"
+        :subtitulo="__('Administra y monitorea los insumos tecnológicos prestados temporalmente a los docentes y funcionarios.')"
+        icono="briefcase"
+    />
+    
+    <!-- Botón para móvil (arriba del card, abajo del título) -->
+    <div class="block md:hidden">
         <flux:button 
             :href="route('ti.prestamos.crear')" 
             icon="plus" 
             variant="filled" 
             color="blue"
             wire:navigate
+            class="w-full"
         >
             {{ __('Nuevo Préstamo') }}
         </flux:button>
@@ -145,11 +141,27 @@ new #[Title('Gestión de Préstamos')] class extends Component
                     <flux:select.option value="vencido">{{ __('Vencido (Atrasado)') }}</flux:select.option>
                 </flux:select>
             </flux:field>
+
+            <!-- Botón para desktop (dentro del card, al lado del filtro) -->
+            <div class="hidden md:block">
+                <flux:button 
+                    :href="route('ti.prestamos.crear')" 
+                    icon="plus" 
+                    variant="filled" 
+                    color="blue"
+                    wire:navigate
+                >
+                    {{ __('Nuevo Préstamo') }}
+                </flux:button>
+            </div>
         </div>
     </flux:card>
 
     {{-- Listado de Préstamos --}}
     <flux:card>
+        <div class="mb-4">
+            <h3 class="font-headline text-lg font-bold text-primary dark:text-zinc-100">{{ __('Préstamos') }}</h3>
+        </div>
         <flux:table :paginate="$this->prestamos">
             <flux:table.columns>
                 <flux:table.column>{{ __('Estado') }}</flux:table.column>

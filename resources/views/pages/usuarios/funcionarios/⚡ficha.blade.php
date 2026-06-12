@@ -113,12 +113,6 @@ new class extends Component
 
     {{-- Breadcrumbs + Título --}}
     <div>
-        <flux:breadcrumbs class="mb-4">
-            <flux:breadcrumbs.item icon="building-library" href="#" />
-            <flux:breadcrumbs.item href="{{ route('funcionarios.index') }}">{{ __('Funcionarios') }}</flux:breadcrumbs.item>
-            <flux:breadcrumbs.item>{{ __('Ficha Digital') }}</flux:breadcrumbs.item>
-        </flux:breadcrumbs>
-
         <x-header 
             :titulo="__('Ficha Digital del Funcionario')" 
             :subtitulo="__('Información institucional del miembro del equipo docente o administrativo.')" 

@@ -182,12 +182,6 @@ new class extends Component
 ?>
 
 <div class="max-w-7xl mx-auto w-full pb-12 space-y-8">
-    <flux:breadcrumbs class="mb-4">
-        <flux:breadcrumbs.item icon="building-library" href="#" />
-        <flux:breadcrumbs.item href="{{ route('funcionarios.index') }}">{{ __('Funcionarios') }}</flux:breadcrumbs.item>
-        <flux:breadcrumbs.item>{{ __('Calculadora 42 Horas') }}</flux:breadcrumbs.item>
-    </flux:breadcrumbs>
-
     <x-header
         :titulo="__('Calculadora de Jornada Laboral (Ley 42 Horas)')"
         :subtitulo="__('Planifica, ajusta y cuadra los horarios del equipo de trabajo según los límites legales.')"

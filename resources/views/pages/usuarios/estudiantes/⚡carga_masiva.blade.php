@@ -243,12 +243,6 @@ new class extends Component {
 
     {{-- Encabezado --}}
     <div>
-        <flux:breadcrumbs class="mb-4">
-            <flux:breadcrumbs.item icon="building-library" href="#" />
-            <flux:breadcrumbs.item href="{{ route('estudiantes.index') }}">{{ __('Estudiantes') }}</flux:breadcrumbs.item>
-            <flux:breadcrumbs.item>{{ __('Carga Masiva') }}</flux:breadcrumbs.item>
-        </flux:breadcrumbs>
-
         <x-header 
             :titulo="__('Importación Masiva de Estudiantes')" 
             :subtitulo="__('Sube el CSV exportado desde FullCollege para registrar estudiantes en lote.')" 

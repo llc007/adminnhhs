@@ -28,10 +28,18 @@ class User extends Authenticatable
     protected static function booted(): void
     {
         static::saving(function (User $user) {
-            if ($user->nombres) $user->nombres = mb_strtoupper($user->nombres, 'UTF-8');
-            if ($user->apellido_pat) $user->apellido_pat = mb_strtoupper($user->apellido_pat, 'UTF-8');
-            if ($user->apellido_mat) $user->apellido_mat = mb_strtoupper($user->apellido_mat, 'UTF-8');
-            if ($user->direccion) $user->direccion = mb_strtoupper($user->direccion, 'UTF-8');
+            if ($user->nombres) {
+                $user->nombres = mb_strtoupper($user->nombres, 'UTF-8');
+            }
+            if ($user->apellido_pat) {
+                $user->apellido_pat = mb_strtoupper($user->apellido_pat, 'UTF-8');
+            }
+            if ($user->apellido_mat) {
+                $user->apellido_mat = mb_strtoupper($user->apellido_mat, 'UTF-8');
+            }
+            if ($user->direccion) {
+                $user->direccion = mb_strtoupper($user->direccion, 'UTF-8');
+            }
         });
     }
 
@@ -45,6 +53,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'ultimo_ingreso_at' => 'datetime',
         ];
     }
 

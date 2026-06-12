@@ -69,12 +69,6 @@ new #[Title('Módulos Publicados')] class extends Component {
 }; ?>
 
 <div class="max-w-7xl mx-auto w-full pb-12 space-y-8">
-    <flux:breadcrumbs class="mb-4">
-        <flux:breadcrumbs.item icon="building-library" href="#" />
-        <flux:breadcrumbs.item href="{{ route('funcionarios.index') }}">{{ __('Administración') }}</flux:breadcrumbs.item>
-        <flux:breadcrumbs.item>{{ __('Módulos Publicados') }}</flux:breadcrumbs.item>
-    </flux:breadcrumbs>
-
     <x-header
         :titulo="__('Módulos Publicados')"
         :subtitulo="__('Administra las vistas y accesos de los módulos para docentes y funcionarios.')"

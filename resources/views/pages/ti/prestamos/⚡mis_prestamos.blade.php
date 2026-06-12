@@ -22,11 +22,6 @@ new #[Title('Mis Préstamos')] class extends Component
 ?>
 
 <div class="max-w-6xl mx-auto w-full pb-12 space-y-8">
-    <flux:breadcrumbs class="mb-4">
-        <flux:breadcrumbs.item icon="building-library" href="#" />
-        <flux:breadcrumbs.item>{{ __('Mis Préstamos') }}</flux:breadcrumbs.item>
-    </flux:breadcrumbs>
-
     <x-header
         :titulo="__('Mis Préstamos de Informática')"
         :subtitulo="__('Consulta el listado histórico y activo de los insumos y equipos tecnológicos que te han sido entregados en préstamo.')"
@@ -35,6 +30,9 @@ new #[Title('Mis Préstamos')] class extends Component
 
     {{-- Listado de Préstamos Propios --}}
     <flux:card>
+        <div class="mb-4">
+            <h3 class="font-headline text-lg font-bold text-primary dark:text-zinc-100">{{ __('Préstamos') }}</h3>
+        </div>
         <flux:table :paginate="$this->misPrestamos">
             <flux:table.columns>
                 <flux:table.column>{{ __('Estado') }}</flux:table.column>

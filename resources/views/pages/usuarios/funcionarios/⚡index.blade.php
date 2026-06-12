@@ -256,6 +256,8 @@ new class extends Component {
                     <flux:table.column>{{ __('Cargo') }}</flux:table.column>
                     <flux:table.column>{{ __('Departamento') }}</flux:table.column>
                     <flux:table.column>{{ __('Estado') }}</flux:table.column>
+                    <flux:table.column sortable :sorted="$sortBy === 'ultimo_ingreso_at'" :direction="$sortDirection"
+                        wire:click="sort('ultimo_ingreso_at')">{{ __('Último Ingreso') }}</flux:table.column>
                     <flux:table.column class="text-right">{{ __('Acciones') }}</flux:table.column>
                 </flux:table.columns>
 
@@ -306,6 +308,9 @@ new class extends Component {
                             <flux:table.cell class="text-zinc-500">-</flux:table.cell>
                             <flux:table.cell>
                                 <flux:badge color="green" icon="check-circle">Activo</flux:badge>
+                            </flux:table.cell>
+                            <flux:table.cell class="text-zinc-500 text-xs">
+                                {{ $funcionario->ultimo_ingreso_at ? $funcionario->ultimo_ingreso_at->diffForHumans() : __('Nunca') }}
                             </flux:table.cell>
                             <flux:table.cell class="text-right">
                                 <div class="flex items-center justify-end gap-1">

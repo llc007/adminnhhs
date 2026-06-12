@@ -172,12 +172,6 @@ new class extends Component {
 
     {{-- Encabezado --}}
     <div>
-        <flux:breadcrumbs class="mb-4">
-            <flux:breadcrumbs.item icon="building-library" href="#" />
-            <flux:breadcrumbs.item href="{{ route('funcionarios.index') }}">{{ __('Funcionarios') }}</flux:breadcrumbs.item>
-            <flux:breadcrumbs.item>{{ __('Carga Masiva') }}</flux:breadcrumbs.item>
-        </flux:breadcrumbs>
-
         <x-header 
             :titulo="__('Importación Masiva de Funcionarios')" 
             :subtitulo="__('Sube un archivo CSV para registrar o actualizar el personal docente y administrativo en lote.')" 

@@ -138,12 +138,6 @@ new class extends Component {
 
     {{-- Breadcrumbs + Título --}}
     <div>
-        <flux:breadcrumbs class="mb-4">
-            <flux:breadcrumbs.item icon="building-library" href="#" />
-            <flux:breadcrumbs.item href="{{ route('estudiantes.index') }}">{{ __('Estudiantes') }}</flux:breadcrumbs.item>
-            <flux:breadcrumbs.item>{{ __('Ficha del Estudiante') }}</flux:breadcrumbs.item>
-        </flux:breadcrumbs>
-
         <x-header 
             :titulo="__('Ficha Escolar')" 
             :subtitulo="__('Registro institucional del estudiante y su grupo familiar.')" 

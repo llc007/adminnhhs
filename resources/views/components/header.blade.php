@@ -5,12 +5,12 @@
         <flux:heading size="xl" class="text-[#00376e] dark:text-blue-400 font-extrabold">
             {{ $titulo }}
         </flux:heading>
-        <p class="text-zinc-500 text-sm mt-1 flex items-center gap-2">
+        <p class="hidden md:flex text-zinc-500 text-sm mt-1 items-center gap-2">
             <flux:icon name="{{ $icono }}" class="size-4" />
             {{ $subtitulo }}
         </p>
     </div>
-    <div class="flex items-center gap-4">
+    <div class="hidden lg:flex items-center gap-4">
         {{ $slot }}
         
         <livewire:layout.notifications-bell />

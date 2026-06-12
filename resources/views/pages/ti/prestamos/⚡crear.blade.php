@@ -151,13 +151,6 @@ new #[Title('Registrar Préstamo')] class extends Component
 ?>
 
 <div class="max-w-7xl mx-auto w-full pb-12 space-y-8">
-    <flux:breadcrumbs class="mb-4">
-        <flux:breadcrumbs.item icon="building-library" href="#" />
-        <flux:breadcrumbs.item href="{{ route('ti.prestamos.index') }}">{{ __('Informática') }}</flux:breadcrumbs.item>
-        <flux:breadcrumbs.item href="{{ route('ti.prestamos.index') }}">{{ __('Gestión de Préstamos') }}</flux:breadcrumbs.item>
-        <flux:breadcrumbs.item>{{ __('Registrar Préstamo') }}</flux:breadcrumbs.item>
-    </flux:breadcrumbs>
-
     <x-header
         :titulo="__('Registrar Préstamo de Insumo')"
         :subtitulo="__('Registra la asignación temporal de un recurso tecnológico u otro insumo a un funcionario o docente.')"

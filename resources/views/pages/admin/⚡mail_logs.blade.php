@@ -60,12 +60,6 @@ new #[Title('Auditoría de Correos')] class extends Component
 ?>
 
 <div class="max-w-7xl mx-auto w-full pb-12 space-y-8">
-    <flux:breadcrumbs class="mb-4">
-        <flux:breadcrumbs.item icon="building-library" href="#" />
-        <flux:breadcrumbs.item href="{{ route('funcionarios.index') }}">{{ __('Administración') }}</flux:breadcrumbs.item>
-        <flux:breadcrumbs.item>{{ __('Historial de Correos') }}</flux:breadcrumbs.item>
-    </flux:breadcrumbs>
-
     <x-header
         :titulo="__('Auditoría de Correos Enviados')"
         :subtitulo="__('Monitorea y diagnostica los correos electrónicos emitidos por la plataforma, incluyendo rebotes y fallos.')"

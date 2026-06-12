@@ -46,7 +46,7 @@ class EntrevistaAgendadaApoderado extends Notification implements ShouldQueue
         return (new MailMessage)
             ->subject('Citación a Entrevista - Liceo New Heaven High School')
             ->greeting('Estimado/a apoderado/a,')
-            ->line('Le informamos que ha sido citado a una entrevista respecto a su pupilo/a **'.$estudiante->nombreCompleto().'**, por el/la docente **'.$docente->nombres.' '.$docente->apellido_pat.'**.')
+            ->line('Le informamos que ha sido citado a una entrevista respecto al estudiante **'.$estudiante->nombreCompleto().'**, por el/la docente **'.$docente->nombreCompleto().'**.')
             ->line('**Fecha de la entrevista:** '.$fecha)
             ->line('**Hora:** '.$hora)
             ->line('**Modalidad:** '.$this->entrevista->lugar)

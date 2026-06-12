@@ -1,3 +1,13 @@
+@php
+    $school = auth()->user()->currentSchool;
+    $modulos = $school ? $school->modulos_publicados : [
+        'entrevistas' => true,
+        'estudiantes' => true,
+        'adquisiciones' => true,
+        'prestamos' => true,
+    ];
+    $isAdmin = auth()->user()->hasRole(['administrador', 'directivo', 'superadmin']);
+@endphp
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 
@@ -31,7 +41,7 @@
                     </flux:sidebar.item>
                 @endif
 
-                @if (auth()->user()->hasRole(['docente', 'inspector', 'administrador', 'directivo', 'superadmin']))
+                @if (auth()->user()->hasRole(['docente', 'inspector', 'administrador', 'directivo', 'superadmin']) && ($isAdmin || ($modulos['entrevistas'] ?? false)))
                     <flux:sidebar.item icon="calendar-days" :href="route('entrevistas.agenda')"
                         :current="request()->routeIs('entrevistas.agenda')" wire:navigate>
                         {{ __('Mi Agenda') }}
@@ -44,7 +54,7 @@
                 </flux:sidebar.item>
                 @endif --}}
 
-                @if (auth()->user()->hasRole(['docente', 'inspector', 'administrador', 'directivo', 'superadmin']))
+                @if (auth()->user()->hasRole(['docente', 'inspector', 'administrador', 'directivo', 'superadmin']) && ($isAdmin || ($modulos['entrevistas'] ?? false)))
                     <flux:sidebar.item icon="table-cells" :href="route('entrevistas.index')"
                         :current="request()->routeIs('entrevistas.index')" wire:navigate>
                         {{ __('Historial General') }}
@@ -52,28 +62,39 @@
                 @endif
             </flux:sidebar.group>
 
-            <flux:sidebar.group :heading="__('Gestión Académica')" class="grid mt-4">
-                @if (auth()->user()->hasRole([
-                            'directivo',
-                            'administrador',
-                            'superadmin',
-                            'inspector',
-                            'docente',
-                            'asistente',
-                            'psicosocial',
-                            'recepcion',
-                        ]))
-                    <flux:sidebar.item icon="users" :href="route('estudiantes.index')"
-                        :current="request()->routeIs('estudiantes.*')" wire:navigate>
-                        {{ __('Estudiantes') }}
-                    </flux:sidebar.item>
-                @endif
+            @if ($isAdmin || ($modulos['estudiantes'] ?? false))
+                <flux:sidebar.group :heading="__('Gestión Académica')" class="grid mt-4">
+                    @if (auth()->user()->hasRole([
+                                'directivo',
+                                'administrador',
+                                'superadmin',
+                                'inspector',
+                                'docente',
+                                'asistente',
+                                'psicosocial',
+                                'recepcion',
+                            ]) && ($isAdmin || ($modulos['estudiantes'] ?? false)))
+                        <flux:sidebar.item icon="users" :href="route('estudiantes.index')"
+                            :current="request()->routeIs('estudiantes.*')" wire:navigate>
+                            {{ __('Estudiantes') }}
+                        </flux:sidebar.item>
+                    @endif
 
-                @if (auth()->user()->hasRole(['directivo', 'administrador', 'superadmin']))
-                    <flux:sidebar.item icon="briefcase" :href="route('funcionarios.index')"
-                        :current="request()->routeIs('funcionarios.index') || request()->routeIs('funcionarios.ficha') || request()->routeIs('funcionarios.carga_masiva')"
-                        wire:navigate>
-                        {{ __('Funcionarios') }}
+                    @if (auth()->user()->hasRole(['directivo', 'administrador', 'superadmin']))
+                        <flux:sidebar.item icon="briefcase" :href="route('funcionarios.index')"
+                            :current="request()->routeIs('funcionarios.index') || request()->routeIs('funcionarios.ficha') || request()->routeIs('funcionarios.carga_masiva')"
+                            wire:navigate>
+                            {{ __('Funcionarios') }}
+                        </flux:sidebar.item>
+                    @endif
+                </flux:sidebar.group>
+            @endif
+
+            @if (auth()->user()->hasRole(['directivo', 'administrador', 'superadmin']))
+                <flux:sidebar.group :heading="__('Administración')" class="grid mt-4">
+                    <flux:sidebar.item icon="adjustments-horizontal" :href="route('admin.modules')"
+                        :current="request()->routeIs('admin.modules')" wire:navigate>
+                        {{ __('Módulos') }}
                     </flux:sidebar.item>
                     <flux:sidebar.item icon="clock" :href="route('funcionarios.calculadora_horas')"
                         :current="request()->routeIs('funcionarios.calculadora_horas')" wire:navigate>
@@ -83,33 +104,57 @@
                         :current="request()->routeIs('admin.mail_logs')" wire:navigate>
                         {{ __('Historial de Correos') }}
                     </flux:sidebar.item>
-                @endif
-            </flux:sidebar.group>
+                </flux:sidebar.group>
+            @endif
 
 
-            <flux:sidebar.group :heading="__('Adquisiciones e Inventario')" class="grid mt-4">
-                <flux:sidebar.item icon="document-text" :href="route('adquisiciones.crear')"
-                    :current="request()->routeIs('adquisiciones.crear')" wire:navigate>
-                    {{ __('Solicitar Adquisición') }}
-                </flux:sidebar.item>
+            @if ($isAdmin || ($modulos['adquisiciones'] ?? false))
+                <flux:sidebar.group :heading="__('Adquisiciones e Inventario')" class="grid mt-4">
+                    @if ($isAdmin || ($modulos['adquisiciones'] ?? false))
+                        <flux:sidebar.item icon="document-text" :href="route('adquisiciones.crear')"
+                            :current="request()->routeIs('adquisiciones.crear')" wire:navigate>
+                            {{ __('Solicitar Adquisición') }}
+                        </flux:sidebar.item>
+                    @endif
 
-                @if (auth()->user()->hasRole(['directivo', 'administrador', 'superadmin']))
-                    <flux:sidebar.item icon="shield-check" :href="route('adquisiciones.revision')"
-                        :current="request()->routeIs('adquisiciones.revision')" wire:navigate>
-                        {{ __('Bandeja de Revisión') }}
-                    </flux:sidebar.item>
+                    @if (auth()->user()->hasRole(['directivo', 'administrador', 'superadmin']))
+                        <flux:sidebar.item icon="shield-check" :href="route('adquisiciones.revision')"
+                            :current="request()->routeIs('adquisiciones.revision')" wire:navigate>
+                            {{ __('Bandeja de Revisión') }}
+                        </flux:sidebar.item>
 
-                    <flux:sidebar.item icon="shopping-cart" :href="route('adquisiciones.compras')"
-                        :current="request()->routeIs('adquisiciones.compras')" wire:navigate>
-                        {{ __('Recepción de Compras') }}
-                    </flux:sidebar.item>
+                        <flux:sidebar.item icon="shopping-cart" :href="route('adquisiciones.compras')"
+                            :current="request()->routeIs('adquisiciones.compras')" wire:navigate>
+                            {{ __('Recepción de Compras') }}
+                        </flux:sidebar.item>
 
-                    <flux:sidebar.item icon="archive-box" :href="route('inventario.index')"
-                        :current="request()->routeIs('inventario.index')" wire:navigate>
-                        {{ __('Inventario General') }}
-                    </flux:sidebar.item>
-                @endif
-            </flux:sidebar.group>
+                        <flux:sidebar.item icon="archive-box" :href="route('inventario.index')"
+                            :current="request()->routeIs('inventario.index')" wire:navigate>
+                            {{ __('Inventario General') }}
+                        </flux:sidebar.item>
+                    @endif
+                </flux:sidebar.group>
+            @endif
+
+            @php
+                $isTI = auth()->user()->hasRole(['ti', 'administrador', 'superadmin']);
+            @endphp
+            @if ($isTI || ($modulos['prestamos'] ?? false))
+                <flux:sidebar.group :heading="__('Informática')" class="grid mt-4">
+                    @if ($isTI)
+                        <flux:sidebar.item icon="briefcase" :href="route('ti.prestamos.index')"
+                            :current="request()->routeIs('ti.prestamos.*')" wire:navigate>
+                            {{ __('Préstamos') }}
+                        </flux:sidebar.item>
+                    @elseif ($modulos['prestamos'] ?? false)
+                        <flux:sidebar.item icon="briefcase" :href="route('ti.prestamos.mis_prestamos')"
+                            :current="request()->routeIs('ti.prestamos.mis_prestamos')" wire:navigate>
+                            {{ __('Mis Préstamos') }}
+                        </flux:sidebar.item>
+                    @endif
+                </flux:sidebar.group>
+            @endif
+
 
         </flux:sidebar.nav>
 

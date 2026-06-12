@@ -54,6 +54,7 @@ Route::middleware(['auth', 'verified', 'role:directivo,administrador,superadmin'
     Route::livewire('/estudiantes/match', 'pages::usuarios.estudiantes.match')->name('estudiantes.match');
     Route::livewire('/estudiantes/agregar-rut', 'pages::usuarios.estudiantes.agregar-rut')->name('estudiantes.agregar_rut');
     Route::livewire('/admin/historial-correos', 'pages::admin.mail_logs')->name('admin.mail_logs');
+    Route::livewire('/admin/modulos', 'pages::admin.modules')->name('admin.modules');
 });
 
 Route::get('/office', function () {
@@ -69,6 +70,16 @@ Route::middleware(['auth', 'verified', 'role:directivo,administrador,superadmin'
     Route::livewire('/adquisiciones/revision', 'pages::adquisiciones.revision')->name('adquisiciones.revision');
     Route::livewire('/adquisiciones/compras', 'pages::adquisiciones.compras')->name('adquisiciones.compras');
     Route::livewire('/inventario', 'pages::inventario.index')->name('inventario.index');
+});
+
+// Módulo de Informática (TI) — Préstamos
+Route::middleware(['auth', 'verified', 'role:ti,administrador,superadmin'])->group(function () {
+    Route::livewire('/ti/prestamos', 'pages::ti.prestamos.index')->name('ti.prestamos.index');
+    Route::livewire('/ti/prestamos/crear', 'pages::ti.prestamos.crear')->name('ti.prestamos.crear');
+});
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::livewire('/ti/mis-prestamos', 'pages::ti.prestamos.mis_prestamos')->name('ti.prestamos.mis_prestamos');
 });
 
 Route::view('/plantilla', 'pages.plantilla1')->name('plantilla');

@@ -8,9 +8,34 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
-#[Fillable(['name', 'domain'])]
+#[Fillable(['name', 'domain', 'modulos_publicados'])]
 class School extends Model
 {
+    protected $casts = [
+        'modulos_publicados' => 'array',
+    ];
+
+    /**
+     * Get the active published modules, merging defaults.
+     */
+    public function getModulosPublicadosAttribute($value): array
+    {
+        $defaults = [
+            'entrevistas' => true,
+            'estudiantes' => true,
+            'adquisiciones' => true,
+            'prestamos' => true,
+        ];
+
+        if (is_null($value)) {
+            return $defaults;
+        }
+
+        $decoded = is_string($value) ? json_decode($value, true) : $value;
+
+        return array_merge($defaults, is_array($decoded) ? $decoded : []);
+    }
+
     /**
      * Get the users that belong to this school (many-to-many via school_user).
      */

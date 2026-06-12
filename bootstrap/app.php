@@ -20,6 +20,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => CheckRole::class,
         ]);
+
+        $middleware->validateCsrfTokens(except: [
+            'webhooks/mail',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

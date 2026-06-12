@@ -7,6 +7,7 @@ use App\Models\LugarAtencion;
 use App\Notifications\IngresoApoderado;
 use App\Notifications\SalidaApoderado;
 use Carbon\Carbon;
+use Flux\Flux;
 
 new class extends Component {
     use WithPagination;
@@ -16,6 +17,10 @@ new class extends Component {
     public ?int $entrevistaSeleccionadaId = null;
     public string $lugarIngreso = '';
     public string $mensajeRecepcion = '';
+
+    // Configuración para el modal de nuevo lugar
+    public bool $modalNuevoLugar = false;
+    public string $nuevoLugarNombre = '';
 
     // Filtros de tabla
     public string $searchTexto = '';
@@ -219,6 +224,39 @@ new class extends Component {
 
             \Flux::toast('Salida registrada exitosamente.', variant: 'success');
         }
+    }
+
+    public function abrirNuevoLugar()
+    {
+        $this->nuevoLugarNombre = '';
+        $this->modalNuevoLugar = true;
+    }
+
+    public function guardarNuevoLugar()
+    {
+        $this->validate([
+            'nuevoLugarNombre' => [
+                'required',
+                'string',
+                'max:255',
+                \Illuminate\Validation\Rule::unique('lugares_atencion', 'nombre')
+                    ->where('school_id', auth()->user()->current_school_id)
+            ]
+        ], [
+            'nuevoLugarNombre.required' => 'El nombre del lugar es obligatorio.',
+            'nuevoLugarNombre.unique' => 'Este lugar ya está registrado.',
+        ]);
+
+        LugarAtencion::create([
+            'school_id' => auth()->user()->current_school_id,
+            'nombre' => mb_strtoupper(trim($this->nuevoLugarNombre), 'UTF-8'),
+            'activo' => true,
+        ]);
+
+        $this->modalNuevoLugar = false;
+        $this->nuevoLugarNombre = '';
+        
+        Flux::toast('Lugar de atención agregado con éxito.', variant: 'success');
     }
 };
 ?>
@@ -438,6 +476,9 @@ new class extends Component {
                 <flux:icon.building-office-2 class="size-6" />
                 Estado de Lugares y Boxes
             </h4>
+            <flux:button wire:click="abrirNuevoLugar" variant="primary" size="sm" icon="plus">
+                Agregar Lugar
+            </flux:button>
         </div>
 
         <div class="overflow-x-auto">
@@ -583,6 +624,30 @@ new class extends Component {
                     <flux:button type="submit" variant="primary">Confirmar Acceso</flux:button>
                 </div>
             </form>
+        </div>
+    </flux:modal>
+
+    {{-- Modal Agregar Lugar de Atención --}}
+    <flux:modal wire:model="modalNuevoLugar" class="md:w-md">
+        <div class="space-y-6">
+            <div>
+                <flux:heading size="lg">{{ __('Nuevo Lugar de Atención') }}</flux:heading>
+                <flux:text class="mt-2">{{ __('Ingresa el nombre del nuevo box, oficina o lugar donde se realizarán las entrevistas.') }}</flux:text>
+            </div>
+
+            <flux:input 
+                wire:model="nuevoLugarNombre" 
+                :label="__('Nombre del Lugar / Box')" 
+                placeholder="EJ: BOX 5, OFICINA UTP, etc." 
+                x-on:input="$event.target.value = $event.target.value.toLocaleUpperCase(); $wire.set('nuevoLugarNombre', $event.target.value)" 
+            />
+            <flux:error name="nuevoLugarNombre" />
+
+            <div class="flex">
+                <flux:spacer />
+                <flux:button wire:click="$set('modalNuevoLugar', false)" variant="ghost">{{ __('Cancelar') }}</flux:button>
+                <flux:button wire:click="guardarNuevoLugar" variant="primary" class="ml-2">{{ __('Guardar') }}</flux:button>
+            </div>
         </div>
     </flux:modal>
 </div>

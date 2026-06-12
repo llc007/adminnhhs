@@ -1,12 +1,15 @@
 <?php
 
 use App\Http\Controllers\GoogleAuthController;
+use App\Http\Controllers\MailWebhookController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/login')->name('home');
 
 Route::get('auth/google', [GoogleAuthController::class, 'redirectToGoogle'])->name('auth.google');
 Route::get('auth/google/callback', [GoogleAuthController::class, 'handleGoogleCallback'])->name('auth.google.callback');
+
+Route::post('webhooks/mail', [MailWebhookController::class, 'handle'])->name('webhooks.mail');
 
 // Dashboard Analítico — Solo Administradores y Directivos
 Route::middleware(['auth', 'verified', 'role:administrador,directivo,superadmin'])->group(function () {
@@ -50,6 +53,7 @@ Route::middleware(['auth', 'verified', 'role:directivo,administrador,superadmin'
     Route::livewire('/estudiantes/carga-masiva', 'pages::usuarios.estudiantes.carga_masiva')->name('estudiantes.carga_masiva');
     Route::livewire('/estudiantes/match', 'pages::usuarios.estudiantes.match')->name('estudiantes.match');
     Route::livewire('/estudiantes/agregar-rut', 'pages::usuarios.estudiantes.agregar-rut')->name('estudiantes.agregar_rut');
+    Route::livewire('/admin/historial-correos', 'pages::admin.mail_logs')->name('admin.mail_logs');
 });
 
 Route::get('/office', function () {

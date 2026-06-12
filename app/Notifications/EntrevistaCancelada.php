@@ -71,7 +71,7 @@ class EntrevistaCancelada extends Notification implements ShouldQueue
             if ($this->entrevista->estado === 'cancelada') {
                 $mail->subject('Entrevista Cancelada - Colegio New Heaven High School')
                     ->greeting('Estimado/a apoderado/a,')
-                    ->line('Le informamos que la entrevista que tenía programada respecto a su pupilo/a **'.$estudiante->nombreCompleto().'** con el/la docente **'.$docente->nombres.' '.$docente->apellido_pat.'** ha sido **cancelada**.')
+                    ->line('Le informamos que la entrevista que tenía programada respecto a su pupilo/a **'.$estudiante->nombreCompleto().'** con el/la docente **'.$docente->nombreCompleto().'** ha sido **cancelada**.')
                     ->line('**Fecha original de la cita:** '.$fecha)
                     ->line('**Hora:** '.$hora.' hrs')
                     ->line('**Justificación o motivo registrado:**')
@@ -82,7 +82,7 @@ class EntrevistaCancelada extends Notification implements ShouldQueue
                 // estado 'ausente'
                 $mail->subject('Registro de Inasistencia a Entrevista - Colegio New Heaven High School')
                     ->greeting('Estimado/a apoderado/a,')
-                    ->line('Le informamos que se ha registrado una **inasistencia (ausencia)** a la entrevista que tenía programada respecto a su pupilo/a **'.$estudiante->nombreCompleto().'** con el/la docente **'.$docente->nombres.' '.$docente->apellido_pat.'**.')
+                    ->line('Le informamos que se ha registrado una **inasistencia (ausencia)** a la entrevista que tenía programada respecto a su pupilo/a **'.$estudiante->nombreCompleto().'** con el/la docente **'.$docente->nombreCompleto().'**.')
                     ->line('**Fecha de la cita programada:** '.$fecha)
                     ->line('**Hora:** '.$hora.' hrs')
                     ->line('**Detalle o motivo registrado:**')

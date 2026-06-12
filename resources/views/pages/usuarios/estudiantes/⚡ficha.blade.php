@@ -4,6 +4,7 @@ use Livewire\Component;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Illuminate\Validation\Rule;
+use Flux\Flux;
 
 new class extends Component {
     public ?int $id = null;
@@ -41,7 +42,7 @@ new class extends Component {
         }
 
         $this->userId = $estudiante->user_id;
-        $this->emailInstitucional = $estudiante->user ? $estudiante->user->email : 'No vinculado';
+        $this->emailInstitucional = $estudiante->email ?? '';
 
         $this->nombresCsv = $estudiante->nombres_csv ?? '';
         $this->rutNumero = $estudiante->rut_numero ?? '';
@@ -82,6 +83,7 @@ new class extends Component {
             'nombresCsv'          => ['nullable', 'string', 'max:255'],
             'rutNumero'           => ['nullable', 'digits_between:7,9'],
             'rutDv'               => ['nullable', 'max:1', 'regex:/^[0-9Kk]$/'],
+            'emailInstitucional'  => ['nullable', 'email', 'max:255', Rule::unique('estudiantes', 'email')->ignore($this->id)],
             'fechaNacimiento'     => ['nullable', 'date'],
             'genero'              => ['nullable', 'string', 'max:20'],
             'cursoId'             => ['nullable', 'exists:cursos,id'],
@@ -97,10 +99,20 @@ new class extends Component {
             'apoderadoDomicilio'  => ['nullable', 'string', 'max:255'],
         ]);
 
+        $user = \App\Models\User::where('email', $this->emailInstitucional)->first();
+        if ($user) {
+            $this->userId = $user->id;
+        } else {
+            $this->userId = null;
+        }
+
         \App\Models\Estudiante::findOrFail($this->id)->update([
             'nombres_csv'            => $this->nombresCsv,
             'rut_numero'             => $this->rutNumero ?: null,
             'rut_dv'                 => $this->rutDv !== '' ? strtoupper($this->rutDv) : null,
+            'email'                  => $this->emailInstitucional ?: null,
+            'user_id'                => $this->userId,
+            'vinculado_en'           => $user ? now() : null,
             'fecha_nacimiento'       => $this->fechaNacimiento ?: null,
             'genero'                 => $this->genero ?: null,
             'curso_id'               => $this->cursoId,
@@ -117,6 +129,7 @@ new class extends Component {
         ]);
 
         $this->dispatch('saved');
+        Flux::toast('Ficha del estudiante guardada con éxito.', variant: 'success');
     }
 };
 ?>
@@ -178,7 +191,15 @@ new class extends Component {
                 <flux:input wire:model="rutDv" :label="__('DV')" placeholder="K" class="w-20" maxlength="1" />
             </div>
 
-            <flux:input wire:model="emailInstitucional" :label="__('Correo Institucional (@newheavenhs.cl)')" disabled />
+            <div>
+                <flux:input wire:model="emailInstitucional" :label="__('Correo Institucional (@newheavenhs.cl)')" type="email" placeholder="estudiante@newheavenhs.cl" />
+                <flux:error name="emailInstitucional" />
+                @if ($this->userId)
+                    <p class="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1">✓ {{ __('Cuenta Google vinculada activamente.') }}</p>
+                @else
+                    <p class="text-[10px] text-zinc-500 mt-1">{{ __('Sin vinculación a cuenta Google activa. Se vinculará cuando el estudiante inicie sesión con este correo.') }}</p>
+                @endif
+            </div>
 
             <flux:input wire:model="fechaNacimiento" :label="__('Fecha de Nacimiento')" type="date" />
 
@@ -255,7 +276,4 @@ new class extends Component {
             {{ __('Guardar Ficha') }}
         </flux:button>
     </div>
-
-    {{-- Toast de confirmación --}}
-    <flux:toast />
 </div>

@@ -162,3 +162,29 @@ test('it triggers EntrevistaCancelada notifications when marked as ausente', fun
         }
     );
 });
+
+test('receptionist can add a new attention place successfully', function () {
+    $user = User::factory()->create();
+
+    $schoolId = DB::table('schools')->insertGetId([
+        'name' => 'Test School',
+        'domain' => 'test.com',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $user->update(['current_school_id' => $schoolId]);
+    $user->schools()->attach($schoolId, ['roles' => json_encode(['recepcion'])]);
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::entrevistas.recepcion')
+        ->set('nuevoLugarNombre', 'BOX 99')
+        ->call('guardarNuevoLugar');
+
+    $this->assertDatabaseHas('lugares_atencion', [
+        'school_id' => $schoolId,
+        'nombre' => 'BOX 99',
+        'activo' => true,
+    ]);
+});

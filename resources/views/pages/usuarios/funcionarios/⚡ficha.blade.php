@@ -236,7 +236,4 @@ new class extends Component
             {{ __('Guardar Ficha') }}
         </flux:button>
     </div>
-
-    {{-- Toast de confirmación --}}
-    <flux:toast />
 </div>

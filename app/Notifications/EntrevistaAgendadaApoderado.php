@@ -44,7 +44,7 @@ class EntrevistaAgendadaApoderado extends Notification implements ShouldQueue
         $hora = Carbon::parse($this->entrevista->hora)->format('H:i');
 
         return (new MailMessage)
-            ->subject('Citación a Entrevista - Colegio New Heaven High School')
+            ->subject('Citación a Entrevista - Liceo New Heaven High School')
             ->greeting('Estimado/a apoderado/a,')
             ->line('Le informamos que ha sido citado a una entrevista respecto a su pupilo/a **'.$estudiante->nombreCompleto().'**, por el/la docente **'.$docente->nombres.' '.$docente->apellido_pat.'**.')
             ->line('**Fecha de la entrevista:** '.$fecha)
@@ -52,7 +52,7 @@ class EntrevistaAgendadaApoderado extends Notification implements ShouldQueue
             ->line('**Modalidad:** '.$this->entrevista->lugar)
             ->line('Le solicitamos puntualidad. Si la entrevista es presencial, por favor anuncie su llegada en recepción.')
             ->line('Si no puede asistir, le rogamos comunicarse con el establecimiento a la brevedad para reagendar.')
-            ->salutation("Atentamente,\nDirección Académica\nColegio New Heaven High School");
+            ->salutation("Atentamente,\nDirección Académica\nLiceo New Heaven High School");
     }
 
     /**

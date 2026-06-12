@@ -33,6 +33,8 @@ new class extends Component {
 
     public string $formCursoId = '';
 
+    public string $email = '';
+
     public string $apoderadoNombres = '';
 
     public string $apoderadoTelefono = '';
@@ -48,7 +50,7 @@ new class extends Component {
 
     public function abrirCrear(): void
     {
-        $this->reset(['estudianteId', 'nombres', 'rutNumero', 'rutDv', 'formCursoId', 'apoderadoNombres', 'apoderadoTelefono', 'apoderadoEmail', 'apoderadoDomicilio']);
+        $this->reset(['estudianteId', 'nombres', 'rutNumero', 'rutDv', 'email', 'formCursoId', 'apoderadoNombres', 'apoderadoTelefono', 'apoderadoEmail', 'apoderadoDomicilio']);
         $this->modalAbierto = true;
     }
 
@@ -59,6 +61,7 @@ new class extends Component {
         $this->nombres = $estudiante->nombres_csv ?? '';
         $this->rutNumero = $estudiante->rut_numero ?? '';
         $this->rutDv = $estudiante->rut_dv ?? '';
+        $this->email = $estudiante->email ?? '';
         $this->formCursoId = $estudiante->curso_id ?? '';
         $this->apoderadoNombres = $estudiante->apoderado_nombres ?? '';
         $this->apoderadoTelefono = $estudiante->apoderado_telefono ?? '';
@@ -86,6 +89,13 @@ new class extends Component {
                     ->ignore($this->estudianteId),
             ],
             'rutDv' => ['nullable', 'max:1', 'regex:/^[0-9Kk]$/'],
+            'email' => [
+                'nullable',
+                'email',
+                'max:255',
+                Rule::unique('estudiantes', 'email')
+                    ->ignore($this->estudianteId),
+            ],
             'formCursoId' => ['required', 'exists:cursos,id'],
             'apoderadoNombres' => ['nullable', 'string', 'max:255'],
             'apoderadoTelefono' => ['nullable', 'string', 'max:40'],
@@ -93,16 +103,21 @@ new class extends Component {
             'apoderadoDomicilio' => ['nullable', 'string', 'max:255'],
         ]);
 
+        $user = \App\Models\User::where('email', $this->email)->first();
+
         $data = [
             'school_id' => auth()->user()->current_school_id,
             'nombres_csv' => $this->nombres,
             'rut_numero' => $this->rutNumero ?: null,
             'rut_dv' => $this->rutDv !== '' ? strtoupper($this->rutDv) : null,
+            'email' => $this->email ?: null,
             'curso_id' => $this->formCursoId ?: null,
             'apoderado_nombres' => $this->apoderadoNombres ?: null,
             'apoderado_telefono' => $this->apoderadoTelefono ?: null,
             'apoderado_email' => $this->apoderadoEmail ?: null,
             'apoderado_domicilio' => $this->apoderadoDomicilio ?: null,
+            'user_id' => $user ? $user->id : null,
+            'vinculado_en' => $user ? now() : null,
         ];
 
         if ($this->estudianteId) {
@@ -112,7 +127,7 @@ new class extends Component {
         }
 
         $this->modalAbierto = false;
-        $this->reset(['estudianteId', 'nombres', 'rutNumero', 'rutDv', 'formCursoId', 'apoderadoNombres', 'apoderadoTelefono', 'apoderadoEmail', 'apoderadoDomicilio']);
+        $this->reset(['estudianteId', 'nombres', 'rutNumero', 'rutDv', 'email', 'formCursoId', 'apoderadoNombres', 'apoderadoTelefono', 'apoderadoEmail', 'apoderadoDomicilio']);
         $this->resetPage();
     }
 
@@ -501,6 +516,9 @@ new class extends Component {
             <flux:error name="rutNumero" />
             <flux:error name="rutDv" />
             <flux:error name="formCursoId" />
+
+            <flux:input wire:model="email" type="email" :label="__('Correo Institucional (@newheavenhs.cl)')" placeholder="ejemplo@newheavenhs.cl" />
+            <flux:error name="email" />
 
             <flux:separator text="Datos del Apoderado (Opcional)" />
 

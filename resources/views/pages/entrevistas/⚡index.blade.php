@@ -58,13 +58,20 @@ new class extends Component {
             ->orderBy('fecha', 'desc')
             ->orderBy('hora', 'desc');
 
+        if (auth()->user()->hasRole('estudiante')) {
+            $estudiante = \App\Models\Estudiante::where('user_id', auth()->id())->first();
+            if ($estudiante) {
+                $query->where('estudiante_id', $estudiante->id);
+            } else {
+                $query->whereRaw('1 = 0');
+            }
+        }
+
         if (!empty($this->search)) {
             $query->where(function ($q) {
                 $q->whereHas('estudiante', function ($sq) {
-                    $sq->where('nombres', 'like', '%' . $this->search . '%')
-                        ->orWhere('apellido_pat', 'like', '%' . $this->search . '%')
-                        ->orWhere('apellido_mat', 'like', '%' . $this->search . '%')
-                        ->orWhere('rut', 'like', '%' . $this->search . '%');
+                    $sq->where('nombres_csv', 'like', '%' . $this->search . '%')
+                        ->orWhere('rut_numero', 'like', '%' . $this->search . '%');
                 })->orWhereHas('user', function ($sq) {
                     $sq->where('nombres', 'like', '%' . $this->search . '%')->orWhere('apellido_pat', 'like', '%' . $this->search . '%');
                 });
@@ -170,17 +177,26 @@ new class extends Component {
 <div class="max-w-7xl mx-auto w-full pb-12 space-y-8">
 
     <!-- Page Header -->
-    <x-entrevistas.header titulo="Historial General de Entrevistas"
-        subtitulo="Registro unificado de atención a estudiantes y apoderados." icono="document-text">
-        <div class="flex gap-3">
-            <flux:button variant="ghost" icon="x-mark" wire:click="clearFilters">Limpiar filtros</flux:button>
+    @if(auth()->user()->hasRole('estudiante'))
+        <x-entrevistas.header titulo="Mi Historial de Entrevistas"
+            subtitulo="Registro de tus atenciones y citaciones programadas." icono="document-text">
+            <div class="flex gap-3">
+                <flux:button variant="ghost" icon="x-mark" wire:click="clearFilters">Limpiar filtros</flux:button>
+            </div>
+        </x-entrevistas.header>
+    @else
+        <x-entrevistas.header titulo="Historial General de Entrevistas"
+            subtitulo="Registro unificado de atención a estudiantes y apoderados." icono="document-text">
+            <div class="flex gap-3">
+                <flux:button variant="ghost" icon="x-mark" wire:click="clearFilters">Limpiar filtros</flux:button>
 
-            @can('export', App\Models\Entrevista::class)
-                <flux:button variant="primary" icon="document-arrow-down" wire:click="export"
-                    class="bg-gradient-to-br from-[#00376e] to-blue-800">Exportar (Excel)</flux:button>
-            @endcan
-        </div>
-    </x-entrevistas.header>
+                @can('export', App\Models\Entrevista::class)
+                    <flux:button variant="primary" icon="document-arrow-down" wire:click="export"
+                        class="bg-gradient-to-br from-[#00376e] to-blue-800">Exportar (Excel)</flux:button>
+                @endcan
+            </div>
+        </x-entrevistas.header>
+    @endif
 
     <!-- Bento Filter Section -->
     <flux:card class="p-6 md:p-8 bg-zinc-50 dark:bg-zinc-800/40 shadow-sm border border-zinc-200 dark:border-zinc-700">
@@ -190,14 +206,16 @@ new class extends Component {
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-6">
-            <!-- Search Text -->
-            <flux:field class="lg:col-span-2">
-                <flux:label>Buscar Texto</flux:label>
-                <flux:input wire:model.live.debounce.300ms="search" placeholder="Buscar Estudiante o Apoderado..." />
-            </flux:field>
+            @if(!auth()->user()->hasRole('estudiante'))
+                <!-- Search Text -->
+                <flux:field class="lg:col-span-2">
+                    <flux:label>Buscar Texto</flux:label>
+                    <flux:input wire:model.live.debounce.300ms="search" placeholder="Buscar Estudiante o Apoderado..." />
+                </flux:field>
+            @endif
 
             <!-- Dropdown: Profesor -->
-            <flux:field>
+            <flux:field class="{{ auth()->user()->hasRole('estudiante') ? 'lg:col-span-2' : '' }}">
                 <flux:label>Filtrar por Profesor</flux:label>
                 <flux:select wire:model.live="profesor_id">
                     <flux:select.option value="">Todos los docentes</flux:select.option>
@@ -208,20 +226,22 @@ new class extends Component {
                 </flux:select>
             </flux:field>
 
-            <!-- Dropdown: Curso -->
-            <flux:field>
-                <flux:label>Filtrar por Curso</flux:label>
-                <flux:select wire:model.live="curso_id">
-                    <flux:select.option value="">Todos los cursos</flux:select.option>
-                    @foreach ($cursos as $curso)
-                        <flux:select.option value="{{ $curso->id }}">{{ $curso->nombreCompleto() }}
-                        </flux:select.option>
-                    @endforeach
-                </flux:select>
-            </flux:field>
+            @if(!auth()->user()->hasRole('estudiante'))
+                <!-- Dropdown: Curso -->
+                <flux:field>
+                    <flux:label>Filtrar por Curso</flux:label>
+                    <flux:select wire:model.live="curso_id">
+                        <flux:select.option value="">Todos los cursos</flux:select.option>
+                        @foreach ($cursos as $curso)
+                            <flux:select.option value="{{ $curso->id }}">{{ $curso->nombreCompleto() }}
+                            </flux:select.option>
+                        @endforeach
+                    </flux:select>
+                </flux:field>
+            @endif
 
             <!-- Temporal -->
-            <flux:field>
+            <flux:field class="{{ auth()->user()->hasRole('estudiante') ? 'lg:col-span-2' : '' }}">
                 <flux:label>Temporalidad <span
                         class="text-[10px] text-zinc-400 font-normal ml-1">{{ $fecha ? '(' . \Carbon\Carbon::parse($fecha)->format('d/m') . ')' : '' }}</span>
                 </flux:label>
@@ -247,7 +267,7 @@ new class extends Component {
             </flux:field>
 
             <!-- Dropdown: Estado -->
-            <flux:field>
+            <flux:field class="{{ auth()->user()->hasRole('estudiante') ? 'lg:col-span-2' : '' }}">
                 <flux:label>Estado</flux:label>
                 <flux:select wire:model.live="estado">
                     <flux:select.option value="">Todos los estados</flux:select.option>
@@ -288,15 +308,18 @@ new class extends Component {
 
                         <flux:table.cell>
                             <div class="flex items-center gap-3">
-                                <div
-                                    class="size-8 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-xs font-bold text-blue-700 dark:text-blue-300">
-                                    {{ substr($entrevista->estudiante->nombres ?? '?', 0, 1) }}{{ substr($entrevista->estudiante->apellido_pat ?? '?', 0, 1) }}
-                                </div>
+                                {{--
+                                @if ($entrevista->estudiante)
+                                    <flux:avatar class="size-8" initials="{{ $entrevista->estudiante->initials() }}" :src="$entrevista->estudiante->avatar" />
+                                @else
+                                    <flux:avatar class="size-8" initials="??" />
+                                @endif
+                                --}}
                                 <div>
                                     <span
-                                        class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $entrevista->estudiante->nombreCompleto() ?? '-' }}</span>
+                                        class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $entrevista->estudiante ? $entrevista->estudiante->nombreCompleto() : '-' }}</span>
                                     <p class="text-[10px] text-zinc-500">
-                                        {{ $entrevista->estudiante->curso?->nombreCompleto() ?? 'Sin Curso' }}</p>
+                                        {{ $entrevista->estudiante && $entrevista->estudiante->curso ? $entrevista->estudiante->curso->nombreCompleto() : 'Sin Curso' }}</p>
                                 </div>
                             </div>
                         </flux:table.cell>

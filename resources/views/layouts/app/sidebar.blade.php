@@ -60,11 +60,11 @@
                     </flux:sidebar.item>
                     @endif --}}
 
-                    @if (auth()->user()->hasRole(['docente', 'inspector', 'administrador', 'directivo', 'superadmin']) &&
+                    @if (auth()->user()->hasRole(['docente', 'inspector', 'administrador', 'directivo', 'superadmin', 'estudiante']) &&
                             ($isAdmin || ($modulos['entrevistas'] ?? false)))
                         <flux:sidebar.item icon="table-cells" :href="route('entrevistas.index')"
                             :current="request()->routeIs('entrevistas.index')" wire:navigate>
-                            {{ __('Historial General') }}
+                            {{ auth()->user()->hasRole('estudiante') ? __('Mi Historial') : __('Historial General') }}
                         </flux:sidebar.item>
                     @endif
                 </flux:sidebar.group>
@@ -99,7 +99,7 @@
                 </flux:sidebar.group>
             @endif
 
-            @if (auth()->user()->hasRole(['directivo', 'administrador', 'superadmin']))
+            @if (auth()->user()->hasRole(['administrador', 'superadmin']))
                 <flux:sidebar.group :heading="__('Administración')" class="grid mt-4">
                     <flux:sidebar.item icon="adjustments-horizontal" :href="route('admin.modules')"
                         :current="request()->routeIs('admin.modules')" wire:navigate>
@@ -117,16 +117,19 @@
             @endif
 
 
-            @if ($isAdmin || ($modulos['adquisiciones'] ?? false))
+            @php
+                $canSeeAdquisicionesGroup = auth()->user()->hasRole(['solicitante_adquisiciones', 'administrador', 'superadmin']);
+            @endphp
+            @if ($canSeeAdquisicionesGroup && ($isAdmin || ($modulos['adquisiciones'] ?? false)))
                 <flux:sidebar.group :heading="__('Adquisiciones e Inventario')" class="grid mt-4">
-                    @if ($isAdmin || ($modulos['adquisiciones'] ?? false))
+                    @if (auth()->user()->hasRole(['solicitante_adquisiciones', 'administrador', 'superadmin']))
                         <flux:sidebar.item icon="document-text" :href="route('adquisiciones.crear')"
                             :current="request()->routeIs('adquisiciones.crear')" wire:navigate>
                             {{ __('Solicitar Adquisición') }}
                         </flux:sidebar.item>
                     @endif
 
-                    @if (auth()->user()->hasRole(['directivo', 'administrador', 'superadmin']))
+                    @if (auth()->user()->hasRole(['administrador', 'superadmin']))
                         <flux:sidebar.item icon="shield-check" :href="route('adquisiciones.revision')"
                             :current="request()->routeIs('adquisiciones.revision')" wire:navigate>
                             {{ __('Bandeja de Revisión') }}

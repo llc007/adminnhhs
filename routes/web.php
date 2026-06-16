@@ -22,9 +22,13 @@ Route::middleware(['auth', 'verified', 'role:recepcion,inspector,administrador,d
     Route::livewire('/entrevistas/recepcion', 'pages::entrevistas.recepcion')->name('entrevistas.recepcion');
 });
 
-// Agenda, Historial General y Agendar Entrevista — Docentes, Inspectores, Administradores, Directivos
-Route::middleware(['auth', 'verified', 'role:docente,inspector,administrador,directivo,superadmin'])->group(function () {
+// Historial General — Docentes, Inspectores, Administradores, Directivos, Estudiantes
+Route::middleware(['auth', 'verified', 'role:docente,inspector,administrador,directivo,superadmin,estudiante'])->group(function () {
     Route::livewire('/entrevistas', 'pages::entrevistas.index')->name('entrevistas.index');
+});
+
+// Agenda y Agendar Entrevista — Docentes, Inspectores, Administradores, Directivos
+Route::middleware(['auth', 'verified', 'role:docente,inspector,administrador,directivo,superadmin'])->group(function () {
     Route::livewire('/entrevistas/agenda', 'pages::entrevistas.agenda')->name('entrevistas.agenda');
     Route::livewire('/entrevistas/crear', 'pages::entrevistas.crear')->name('entrevistas.crear');
 });
@@ -44,12 +48,16 @@ Route::middleware(['auth', 'verified', 'role:directivo,administrador,superadmin,
     Route::livewire('/estudiantes/ficha/{id}', 'pages::usuarios.estudiantes.ficha')->name('estudiantes.ficha');
 });
 
-// Alta Administración — Gestión de Funcionarios y Cargas Masivas
+// Gestión de Funcionarios (Accesible por Directivos)
 Route::middleware(['auth', 'verified', 'role:directivo,administrador,superadmin'])->group(function () {
     Route::livewire('/funcionarios', 'pages::usuarios.funcionarios.index')->name('funcionarios.index');
+    Route::livewire('/funcionarios/ficha/{id}', 'pages::usuarios.funcionarios.ficha')->name('funcionarios.ficha');
+});
+
+// Configuración y Cargas Administrativas — Solo Administradores y Superadmins
+Route::middleware(['auth', 'verified', 'role:administrador,superadmin'])->group(function () {
     Route::livewire('/funcionarios/calculadora-horas', 'pages::usuarios.funcionarios.calculadora_horas')->name('funcionarios.calculadora_horas');
     Route::livewire('/funcionarios/carga-masiva', 'pages::usuarios.funcionarios.carga_masiva')->name('funcionarios.carga_masiva');
-    Route::livewire('/funcionarios/ficha/{id}', 'pages::usuarios.funcionarios.ficha')->name('funcionarios.ficha');
     Route::livewire('/estudiantes/carga-masiva', 'pages::usuarios.estudiantes.carga_masiva')->name('estudiantes.carga_masiva');
     Route::livewire('/estudiantes/match', 'pages::usuarios.estudiantes.match')->name('estudiantes.match');
     Route::livewire('/estudiantes/agregar-rut', 'pages::usuarios.estudiantes.agregar-rut')->name('estudiantes.agregar_rut');
@@ -61,15 +69,21 @@ Route::get('/office', function () {
     return redirect()->away('https://drive.google.com/file/d/1i8T9g1mlSsUj4xhGGC6-Y99Fwe30fMy7/view?usp=sharing');
 })->name('office');
 
-// Módulo de Adquisiciones e Inventario — Fase 1
-Route::middleware(['auth', 'verified'])->group(function () {
+// Módulo de Adquisiciones e Inventario — Fase 1 (Crear)
+Route::middleware(['auth', 'verified', 'role:solicitante_adquisiciones,administrador,superadmin'])->group(function () {
     Route::livewire('/adquisiciones/crear', 'pages::adquisiciones.crear')->name('adquisiciones.crear');
 });
 
-Route::middleware(['auth', 'verified', 'role:directivo,administrador,superadmin'])->group(function () {
+// Aprobación y Recepción — Solo Administrador y Superadmin (NO directivos)
+Route::middleware(['auth', 'verified', 'role:administrador,superadmin'])->group(function () {
     Route::livewire('/adquisiciones/revision', 'pages::adquisiciones.revision')->name('adquisiciones.revision');
     Route::livewire('/adquisiciones/compras', 'pages::adquisiciones.compras')->name('adquisiciones.compras');
+});
+
+// Inventario General — Solo Administrador y Superadmin (NO directivos)
+Route::middleware(['auth', 'verified', 'role:administrador,superadmin'])->group(function () {
     Route::livewire('/inventario', 'pages::inventario.index')->name('inventario.index');
+    Route::livewire('/inventario/detalles/{id}', 'pages::inventario.detalles')->name('inventario.detalles');
 });
 
 // Módulo de Informática (TI) — Préstamos

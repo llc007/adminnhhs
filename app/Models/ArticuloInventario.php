@@ -29,10 +29,13 @@ class ArticuloInventario extends Model
         'responsable_user_id',
         'fecha_ingreso',
         'observaciones',
+        'fecha_baja',
+        'motivo_baja',
     ];
 
     protected $casts = [
         'fecha_ingreso' => 'date',
+        'fecha_baja' => 'date',
     ];
 
     public function school()
@@ -53,5 +56,15 @@ class ArticuloInventario extends Model
     public function actaEntregaDetalles()
     {
         return $this->hasMany(ActaEntregaDetalle::class);
+    }
+
+    public function revisiones()
+    {
+        return $this->hasMany(RevisionInventario::class, 'articulo_inventario_id');
+    }
+
+    public function ultimaRevision()
+    {
+        return $this->hasOne(RevisionInventario::class, 'articulo_inventario_id')->latestOfMany('fecha');
     }
 }

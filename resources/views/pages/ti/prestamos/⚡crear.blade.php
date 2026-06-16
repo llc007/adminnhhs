@@ -37,6 +37,7 @@ new #[Title('Registrar Préstamo')] class extends Component
         if (strlen($this->search_articulo) >= 2) {
             $this->sugerencias = ArticuloInventario::query()
                 ->where('school_id', auth()->user()->current_school_id)
+                ->whereNull('fecha_baja')
                 ->where(function ($q) {
                     $q->where('nombre', 'like', '%' . $this->search_articulo . '%')
                       ->orWhere('codigo_patrimonial', 'like', '%' . $this->search_articulo . '%');

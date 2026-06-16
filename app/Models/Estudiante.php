@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Str;
 
 #[Fillable([
     'user_id', 'school_id', 'curso_id',
@@ -19,6 +20,36 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Estudiante extends Model
 {
     use HasFactory;
+
+    /**
+     * Get the student's initials.
+     */
+    public function initials(): string
+    {
+        if ($this->user) {
+            return $this->user->initials();
+        }
+
+        if (! $this->nombres_csv) {
+            return '??';
+        }
+
+        $parts = array_filter(explode(' ', trim($this->nombres_csv)));
+
+        return Str::of(implode(' ', $parts))
+            ->explode(' ')
+            ->take(2)
+            ->map(fn ($word) => Str::substr($word, 0, 1))
+            ->implode('');
+    }
+
+    /**
+     * Get the student's avatar URL from user account if linked.
+     */
+    public function getAvatarAttribute(): ?string
+    {
+        return $this->user?->avatar;
+    }
 
     /**
      * The "booted" method of the model.

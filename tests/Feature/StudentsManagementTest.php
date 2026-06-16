@@ -86,3 +86,34 @@ test('can edit student email in profile page and it updates user linkage', funct
     expect($student->email)->toBe('new@test.com');
     expect($student->user_id)->toBe($newStudentUser->id);
 });
+
+test('estudiante initials and avatar helpers work correctly', function () {
+    [$user, $schoolId, $cursoId] = setupTestAdmin();
+
+    // 1. Without linked user
+    $studentWithoutUser = Estudiante::create([
+        'school_id' => $schoolId,
+        'curso_id' => $cursoId,
+        'nombres_csv' => 'LÓPEZ PÉREZ LUIS FELIPE',
+    ]);
+
+    expect($studentWithoutUser->initials())->toBe('LP');
+    expect($studentWithoutUser->avatar)->toBeNull();
+
+    // 2. With linked user
+    $linkedUser = User::factory()->create([
+        'nombres' => 'Luis Felipe',
+        'apellido_pat' => 'López',
+        'avatar' => 'https://lh3.googleusercontent.com/a/avatar-url',
+    ]);
+
+    $studentWithUser = Estudiante::create([
+        'school_id' => $schoolId,
+        'curso_id' => $cursoId,
+        'nombres_csv' => 'LÓPEZ LUIS',
+        'user_id' => $linkedUser->id,
+    ]);
+
+    expect($studentWithUser->initials())->toBe('LF');
+    expect($studentWithUser->avatar)->toBe('https://lh3.googleusercontent.com/a/avatar-url');
+});

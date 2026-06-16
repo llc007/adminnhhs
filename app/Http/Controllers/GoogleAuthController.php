@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Estudiante;
 use App\Models\School;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -54,9 +55,35 @@ class GoogleAuthController extends Controller
             );
 
             // Relacionar usuario al colegio con un rol por defecto si no están enlazados
-            // Por seguridad, todo usuario nuevo de Google asume rol 'externo' (que no verá la app)
-            if ($school && ! $user->schools()->where('school_id', $school->id)->exists()) {
-                $user->schools()->attach($school->id, ['roles' => json_encode(['externo'])]);
+            // Los correos de estudiantes tienen un punto en la parte local.
+            $localPart = strstr($email, '@', true);
+            $isStudent = $localPart && str_contains($localPart, '.');
+            $roleToAssign = $isStudent ? 'estudiante' : 'externo';
+
+            $schoolUser = $user->schools()->where('school_id', $school->id)->first();
+            if (! $schoolUser) {
+                $user->schools()->attach($school->id, ['roles' => json_encode([$roleToAssign])]);
+            } elseif ($isStudent) {
+                // Si ya existe pero tiene solo 'externo', actualizamos a 'estudiante'
+                $currentRoles = json_decode($schoolUser->pivot->roles, true) ?: [];
+                if (empty($currentRoles) || (count($currentRoles) === 1 && $currentRoles[0] === 'externo')) {
+                    $user->schools()->updateExistingPivot($school->id, ['roles' => json_encode(['estudiante'])]);
+                }
+            }
+
+            // Si es estudiante, lo vinculamos con su ficha de estudiante si existe una con el mismo correo
+            if ($isStudent) {
+                $estudiante = Estudiante::where('email', $email)
+                    ->where('school_id', $school->id)
+                    ->first();
+                if ($estudiante) {
+                    if (! $estudiante->user_id) {
+                        $estudiante->update([
+                            'user_id' => $user->id,
+                            'vinculado_en' => now(),
+                        ]);
+                    }
+                }
             }
 
             Auth::login($user);

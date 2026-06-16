@@ -80,6 +80,12 @@ new class extends Component {
             'roles' => ['required', 'array', 'min:1'],
         ]);
 
+        $nuevosRoles = $this->roles;
+        $realRoles = array_diff($nuevosRoles, ['externo']);
+        if (! empty($realRoles)) {
+            $nuevosRoles = array_values($realRoles);
+        }
+
         if ($this->funcionarioId) {
             $funcionario = \App\Models\User::findOrFail($this->funcionarioId);
             $funcionario->update([
@@ -94,11 +100,11 @@ new class extends Component {
             $schoolId = auth()->user()->current_school_id;
             if ($funcionario->schools()->where('school_id', $schoolId)->exists()) {
                 $funcionario->schools()->updateExistingPivot($schoolId, [
-                    'roles' => json_encode($this->roles),
+                    'roles' => json_encode($nuevosRoles),
                 ]);
             } else {
                 $funcionario->schools()->attach($schoolId, [
-                    'roles' => json_encode($this->roles),
+                    'roles' => json_encode($nuevosRoles),
                 ]);
             }
         } else {
@@ -112,7 +118,7 @@ new class extends Component {
                 'password' => \Illuminate\Support\Facades\Hash::make(\Illuminate\Support\Str::random(16)),
                 'current_school_id' => auth()->user()->current_school_id,
             ]);
-            $funcionario->schools()->attach(auth()->user()->current_school_id, ['roles' => json_encode($this->roles)]);
+            $funcionario->schools()->attach(auth()->user()->current_school_id, ['roles' => json_encode($nuevosRoles)]);
         }
 
         $this->modalAbierto = false;
@@ -266,8 +272,18 @@ new class extends Component {
                         <flux:table.row :key="$funcionario->id">
                             <flux:table.cell>
                                 <div class="flex items-center gap-3">
-                                    <flux:avatar initials="{{ $funcionario->initials() }}"
-                                        :src="$funcionario->avatar" />
+                                    <flux:avatar>
+                                        @if ($funcionario->avatar)
+                                            <img src="{{ $funcionario->avatar }}" 
+                                                 alt="{{ $funcionario->nombres }}" 
+                                                 class="rounded-lg size-full object-cover" 
+                                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='';"
+                                                 referrerpolicy="no-referrer">
+                                            <span style="display: none;">{{ $funcionario->initials() }}</span>
+                                        @else
+                                            <span>{{ $funcionario->initials() }}</span>
+                                        @endif
+                                    </flux:avatar>
                                     <div>
                                         <div class="text-sm font-medium text-zinc-900 dark:text-zinc-100">
                                             {{ $funcionario->nombreCompleto() }}</div>
@@ -391,6 +407,7 @@ new class extends Component {
                     <flux:checkbox wire:model="roles" value="recepcion" :label="__('Recepción')" />
                     <flux:checkbox wire:model="roles" value="directivo" :label="__('Directivo')" />
                     <flux:checkbox wire:model="roles" value="administrador" :label="__('Administrador')" />
+                    <flux:checkbox wire:model="roles" value="solicitante_adquisiciones" :label="__('Solicitante Adq.')" />
                     @if(auth()->user()->hasRole('superadmin'))
                         <flux:checkbox wire:model="roles" value="superadmin" :label="__('Superadmin')" />
                     @endif

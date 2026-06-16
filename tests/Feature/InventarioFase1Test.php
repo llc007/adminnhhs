@@ -229,13 +229,15 @@ test('ti admin can add items directly and update custodian and state in general 
 
     $articulo = ArticuloInventario::where('codigo_patrimonial', 'MOB-SIL-001')->first();
 
-    // Quick edit custodian and state
-    Livewire::test('pages::inventario.index')
-        ->call('abrirEditar', $articulo->id)
-        ->set('editResponsableId', $user->id)
+    // Quick edit custodian and state using the new details page (auto-saved)
+    Livewire::test('pages::inventario.detalles', ['id' => $articulo->id])
+        ->set('editingItems.item_'.$articulo->id.'.responsable_user_id', $user->id)
+        ->set('editingItems.item_'.$articulo->id.'.estado_conservacion', 'bueno')
+        ->assertHasNoErrors()
+        // Edit physical details
+        ->call('abrirFisicos', $articulo->id)
         ->set('editUbicacion', 'Rectoría')
-        ->set('editEstado', 'bueno')
-        ->call('guardarEdicion')
+        ->call('guardarFisicos')
         ->assertHasNoErrors();
 
     $articulo->refresh();
@@ -273,5 +275,93 @@ test('ti admin can add multiple assets directly with auto consecutive correlativ
         'codigo_patrimonial' => 'TEC-COM-003',
         'nombre' => 'Computador iMac',
         'tipo' => 'activo',
+    ]);
+});
+
+test('ti admin can log maintenance and decommission an asset', function () {
+    [$user, $schoolId] = setupInventarioTestUser(['administrador']);
+    $this->actingAs($user);
+
+    $articulo = ArticuloInventario::create([
+        'school_id' => $schoolId,
+        'tipo' => 'activo',
+        'codigo_patrimonial' => 'MOB-SIL-999',
+        'nombre' => 'Silla Ejecutiva',
+        'categoria' => 'Mobiliario',
+        'cantidad' => 1,
+        'estado_conservacion' => 'excelente',
+        'ubicacion' => 'Bodega',
+        'fecha_ingreso' => now(),
+    ]);
+
+    // Log a maintenance/revision
+    Livewire::test('pages::inventario.detalles', ['id' => $articulo->id])
+        ->call('abrirRevisiones', $articulo->id)
+        ->set('nuevaRevFecha', now()->toDateString())
+        ->set('nuevaRevDetalle', 'Ajuste de pistón de altura')
+        ->set('nuevaRevRealizadoPor', 'Servicio Técnico Interno')
+        ->set('nuevaRevProximaFecha', now()->addMonths(6)->toDateString())
+        ->call('guardarRevision')
+        ->assertHasNoErrors();
+
+    $this->assertDatabaseHas('revisiones_inventario', [
+        'articulo_inventario_id' => $articulo->id,
+        'detalle' => 'Ajuste de pistón de altura',
+        'realizado_por' => 'Servicio Técnico Interno',
+    ]);
+
+    // Decommission the item
+    Livewire::test('pages::inventario.detalles', ['id' => $articulo->id])
+        ->call('abrirBaja', $articulo->id)
+        ->set('bajaFecha', now()->toDateString())
+        ->set('bajaMotivo', 'Pistón roto irreparable')
+        ->call('confirmarBaja')
+        ->assertHasNoErrors();
+
+    $articulo->refresh();
+    expect($articulo->fecha_baja)->not->toBeNull();
+    expect($articulo->motivo_baja)->toBe('Pistón roto irreparable');
+    expect($articulo->responsable_user_id)->toBeNull();
+
+    // Verify it is excluded from search suggestions in loans
+    Livewire::test('pages::ti.prestamos.crear')
+        ->set('search_articulo', 'Silla Ejecutiva')
+        ->assertSet('sugerencias', []);
+});
+
+test('ti admin can view and discount stock of a consumable with audit logs', function () {
+    [$user, $schoolId] = setupInventarioTestUser(['administrador']);
+    $this->actingAs($user);
+
+    $consumible = ArticuloInventario::create([
+        'school_id' => $schoolId,
+        'tipo' => 'consumible',
+        'codigo_patrimonial' => 'BAR-CAB-001',
+        'nombre' => 'Cable Eléctrico 10m',
+        'categoria' => 'Eléctrico',
+        'cantidad' => 50,
+        'estado_conservacion' => 'excelente',
+        'ubicacion' => 'Bodega Central',
+        'fecha_ingreso' => now(),
+    ]);
+
+    Livewire::test('pages::inventario.detalles', ['id' => $consumible->id])
+        ->assertSee('Cable Eléctrico 10m')
+        // Open descontar modal
+        ->call('abrirDescontar', $consumible->id)
+        ->set('descontarCantidad', 5)
+        ->set('descontarMotivo', 'Instalación sala 4')
+        ->call('confirmarDescontar')
+        ->assertHasNoErrors()
+        ->assertSet('modalDescontar', false);
+
+    $consumible->refresh();
+    expect($consumible->cantidad)->toBe(45);
+
+    // Verify it is logged in revisiones_inventario
+    $this->assertDatabaseHas('revisiones_inventario', [
+        'articulo_inventario_id' => $consumible->id,
+        'detalle' => 'Consumo de stock: -5 unidades. Motivo: Instalación sala 4. Stock restante: 45.',
+        'realizado_por' => $user->nombreCompleto(),
     ]);
 });

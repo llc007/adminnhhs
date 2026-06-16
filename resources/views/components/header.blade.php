@@ -26,7 +26,14 @@
                 
                 @if(auth()->user()->avatar)
                     <div class="relative w-10 h-10 shrink-0">
-                        <img src="{{ auth()->user()->avatar }}" alt="{{ auth()->user()->nombres }}" class="w-10 h-10 rounded-full object-cover border border-zinc-200 dark:border-zinc-700 group-hover:border-blue-500 dark:group-hover:border-blue-400 transition-colors" referrerpolicy="no-referrer">
+                        <img src="{{ auth()->user()->avatar }}" 
+                             alt="{{ auth()->user()->nombres }}" 
+                             class="w-10 h-10 rounded-full object-cover border border-zinc-200 dark:border-zinc-700 group-hover:border-blue-500 dark:group-hover:border-blue-400 transition-colors" 
+                             referrerpolicy="no-referrer"
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                        <div class="w-10 h-10 rounded-full bg-[#00376e] text-white flex items-center justify-center font-bold relative shrink-0 group-hover:bg-blue-600 transition-colors" style="display: none;">
+                            {{ substr(auth()->user()->nombres ?? 'U', 0, 1) }}
+                        </div>
                         <span class="absolute top-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white dark:border-zinc-900 rounded-full"></span>
                     </div>
                 @else

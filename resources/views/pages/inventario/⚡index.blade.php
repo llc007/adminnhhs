@@ -14,12 +14,10 @@ new class extends Component
     public string $filtroUbicacion = '';
     public string $filtroTipo = '';
     public ?int $filtroResponsableId = null;
+    public string $filtroEstado = 'activos';
 
     // Modales
     public bool $modalAltaDirecta = false;
-    public bool $modalEditarItem = false;
-
-    // Campos Alta Directa
     public string $nuevoTipo = 'activo';
     public string $nuevoCodigo = '';
     public string $nuevoNombre = '';
@@ -33,12 +31,6 @@ new class extends Component
     public ?int $nuevoResponsableId = null;
     public string $nuevasObservaciones = '';
 
-    // Campos Editar
-    public ?int $editItemId = null;
-    public ?int $editResponsableId = null;
-    public string $editUbicacion = '';
-    public string $editEstado = 'excelente';
-    public string $editObservaciones = '';
 
     public function mount()
     {
@@ -204,47 +196,28 @@ new class extends Component
         \Flux::toast('Artículos registrados directamente en el inventario.', variant: 'success');
     }
 
-    public function abrirEditar(int $id)
-    {
-        $item = ArticuloInventario::find($id);
-        if ($item) {
-            $this->editItemId = $id;
-            $this->editResponsableId = $item->responsable_user_id;
-            $this->editUbicacion = $item->ubicacion;
-            $this->editEstado = $item->estado_conservacion;
-            $this->editObservaciones = $item->observaciones ?? '';
-            $this->modalEditarItem = true;
-        }
-    }
-
-    public function guardarEdicion()
-    {
-        $this->validate([
-            'editUbicacion' => 'required|string',
-            'editEstado' => 'required|in:excelente,bueno,usado,regular,malo',
-            'editObservaciones' => 'nullable|string',
-        ]);
-
-        $item = ArticuloInventario::find($this->editItemId);
-        if ($item) {
-            $item->update([
-                'responsable_user_id' => $this->editResponsableId ?: null,
-                'ubicacion' => $this->editUbicacion,
-                'estado_conservacion' => $this->editEstado,
-                'observaciones' => $this->editObservaciones ?: null,
-            ]);
-
-            $this->modalEditarItem = false;
-            \Flux::toast('Artículo de inventario actualizado.', variant: 'success');
-        }
-    }
 
     #[\Livewire\Attributes\Computed]
     public function articulos()
     {
         $schoolId = auth()->user()->current_school_id;
-        $query = ArticuloInventario::with('responsable')
+        $query = ArticuloInventario::select([
+                'nombre',
+                'categoria',
+                'marca',
+                'modelo',
+                'tipo',
+                'fecha_ingreso',
+                \Illuminate\Support\Facades\DB::raw('SUM(cantidad) as cantidad'),
+                \Illuminate\Support\Facades\DB::raw('MIN(id) as id'),
+            ])
             ->where('school_id', $schoolId);
+
+        if ($this->filtroEstado === 'activos') {
+            $query->whereNull('fecha_baja');
+        } elseif ($this->filtroEstado === 'de_baja') {
+            $query->whereNotNull('fecha_baja');
+        }
 
         if ($this->search !== '') {
             $query->where(function ($q) {
@@ -272,7 +245,9 @@ new class extends Component
             $query->where('responsable_user_id', $this->filtroResponsableId);
         }
 
-        return $query->orderBy('created_at', 'desc')->paginate(15);
+        return $query->groupBy('nombre', 'categoria', 'marca', 'modelo', 'tipo', 'fecha_ingreso')
+            ->orderBy('fecha_ingreso', 'desc')
+            ->paginate(15);
     }
 
     #[\Livewire\Attributes\Computed]
@@ -314,7 +289,7 @@ new class extends Component
 
     {{-- Filtros y Buscador --}}
     <flux:card class="bg-zinc-50/50 dark:bg-zinc-900/50 backdrop-blur-md">
-        <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+        <div class="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
             <div class="md:col-span-2">
                 <flux:input 
                     wire:model.live.debounce.300ms="search" 
@@ -349,6 +324,13 @@ new class extends Component
                     @endforeach
                 </flux:select>
             </div>
+
+            <div>
+                <flux:select wire:model.live="filtroEstado" label="Estado">
+                    <flux:select.option value="activos">{{ __('Activo') }}</flux:select.option>
+                    <flux:select.option value="de_baja">{{ __('Dado de Baja') }}</flux:select.option>
+                </flux:select>
+            </div>
         </div>
     </flux:card>
 
@@ -358,23 +340,17 @@ new class extends Component
             <table class="w-full text-left border-collapse text-sm">
                 <thead>
                     <tr class="bg-zinc-100 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-300 font-semibold border-b border-zinc-200 dark:border-zinc-700">
-                        <th class="px-4 py-3">{{ __('Código Patrimonial') }}</th>
                         <th class="px-4 py-3">{{ __('Artículo / Nombre') }}</th>
                         <th class="px-4 py-3">{{ __('Categoría') }}</th>
                         <th class="px-4 py-3">{{ __('Detalles') }}</th>
+                        <th class="px-4 py-3">{{ __('Fecha de Adquisición') }}</th>
                         <th class="px-4 py-3 text-center">{{ __('Cant.') }}</th>
-                        <th class="px-4 py-3 text-center">{{ __('Conservación') }}</th>
-                        <th class="px-4 py-3">{{ __('Ubicación') }}</th>
-                        <th class="px-4 py-3">{{ __('Responsable') }}</th>
                         <th class="px-4 py-3 text-center w-12"></th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700/50">
                     @forelse($this->articulos as $art)
                         <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition">
-                            <td class="px-4 py-3 font-mono font-bold text-zinc-950 dark:text-white">
-                                {{ $art->codigo_patrimonial }}
-                            </td>
                             <td class="px-4 py-3">
                                 <div class="font-semibold text-zinc-900 dark:text-white">{{ $art->nombre }}</div>
                                 <div class="text-[10px] text-zinc-400 capitalize">Tipo: {{ $art->tipo === 'activo' ? 'Activo Fijo' : 'Consumible' }}</div>
@@ -385,64 +361,29 @@ new class extends Component
                             <td class="px-4 py-3 text-xs">
                                 @if($art->marca || $art->modelo)
                                     <div><span class="text-zinc-400">M/M:</span> {{ $art->marca ?? '-' }} {{ $art->modelo ?? '' }}</div>
-                                @endif
-                                @if($art->numero_serie)
-                                    <div><span class="text-zinc-400">S/N:</span> {{ $art->numero_serie }}</div>
-                                @endif
-                                @if(!$art->marca && !$art->modelo && !$art->numero_serie)
+                                @else
                                     <span class="text-zinc-400">-</span>
                                 @endif
+                            </td>
+                            <td class="px-4 py-3 text-zinc-500 font-medium">
+                                {{ $art->fecha_ingreso ? $art->fecha_ingreso->format('d/m/Y') : '-' }}
                             </td>
                             <td class="px-4 py-3 text-center font-mono font-bold text-zinc-800 dark:text-zinc-200">
                                 {{ $art->cantidad }}
                             </td>
                             <td class="px-4 py-3 text-center">
-                                @php
-                                    $color = match($art->estado_conservacion) {
-                                        'excelente' => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400',
-                                        'bueno' => 'bg-teal-100 text-teal-700 dark:bg-teal-950/30 dark:text-teal-400',
-                                        'usado' => 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-400',
-                                        'regular' => 'bg-amber-100 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400',
-                                        default => 'bg-rose-100 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400',
-                                    };
-                                @endphp
-                                <span class="px-2 py-0.5 text-[10px] font-bold rounded-full uppercase {{ $color }}">
-                                    {{ $art->estado_conservacion }}
-                                </span>
-                            </td>
-                            <td class="px-4 py-3 font-semibold text-zinc-700 dark:text-zinc-300">
-                                {{ $art->ubicacion }}
-                            </td>
-                            <td class="px-4 py-3">
-                                @if($art->responsable)
-                                    <div class="flex items-center gap-2">
-                                        <div class="h-6 w-6 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center text-[10px] font-extrabold uppercase">
-                                            {{ Str::substr($art->responsable->nombres, 0, 1) }}{{ Str::substr($art->responsable->apellido_pat, 0, 1) }}
-                                        </div>
-                                        <span class="font-medium text-zinc-800 dark:text-zinc-200 truncate max-w-[150px]">
-                                            {{ $art->responsable->nombreCompleto() }}
-                                        </span>
-                                    </div>
-                                @else
-                                    <span class="px-2 py-0.5 text-[10px] font-bold rounded bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 uppercase">
-                                        {{ __('En Bodega') }}
-                                    </span>
-                                @endif
-                            </td>
-                            <td class="px-4 py-3 text-center">
-                                <button 
-                                    type="button" 
-                                    wire:click="abrirEditar({{ $art->id }})" 
-                                    class="text-blue-500 hover:text-blue-700 p-1 hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded"
-                                    title="Editar custodias y estados"
-                                >
-                                    <flux:icon.pencil-square class="size-4" />
-                                </button>
+                                <flux:button 
+                                    href="{{ route('inventario.detalles', ['id' => $art->id]) }}" 
+                                    variant="ghost" 
+                                    icon="eye" 
+                                    size="sm"
+                                    title="Ver detalles e individualizar"
+                                />
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="9" class="px-6 py-12 text-center text-zinc-500">
+                            <td colspan="6" class="px-6 py-12 text-center text-zinc-500">
                                 <div class="flex flex-col items-center gap-2">
                                     <flux:icon.archive-box class="size-10 text-zinc-400" />
                                     <p class="font-medium text-sm">{{ __('No se encontraron artículos.') }}</p>
@@ -533,40 +474,6 @@ new class extends Component
             <div class="flex justify-end gap-2 pt-4">
                 <flux:button wire:click="$set('modalAltaDirecta', false)" variant="ghost">{{ __('Cancelar') }}</flux:button>
                 <flux:button type="submit" variant="primary" class="bg-[#00376e] dark:bg-blue-600 text-white">{{ __('Registrar') }}</flux:button>
-            </div>
-        </form>
-    </flux:modal>
-
-    {{-- Modal Editar --}}
-    <flux:modal wire:model="modalEditarItem" class="md:w-[30rem] space-y-6">
-        <div>
-            <flux:heading size="lg">{{ __('Actualizar Custodia e Inventario') }}</flux:heading>
-            <flux:text>{{ __('Modifique la ubicación, asigne el funcionario responsable o actualice su estado de conservación.') }}</flux:text>
-        </div>
-
-        <form wire:submit.prevent="guardarEdicion" class="space-y-4">
-            <flux:select wire:model="editResponsableId" :label="__('Responsable de Custodia')">
-                <flux:select.option value="">{{ __('En Bodega (Sin Responsable)') }}</flux:select.option>
-                @foreach($this->usuarios as $u)
-                    <flux:select.option value="{{ $u->id }}">{{ $u->nombreCompleto() }}</flux:select.option>
-                @endforeach
-            </flux:select>
-
-            <flux:input wire:model="editUbicacion" :label="__('Ubicación')" />
-
-            <flux:select wire:model="editEstado" :label="__('Estado de Conservación')">
-                <flux:select.option value="excelente">{{ __('Excelente') }}</flux:select.option>
-                <flux:select.option value="bueno">{{ __('Bueno') }}</flux:select.option>
-                <flux:select.option value="usado">{{ __('Usado') }}</flux:select.option>
-                <flux:select.option value="regular">{{ __('Regular') }}</flux:select.option>
-                <flux:select.option value="malo">{{ __('Malo') }}</flux:select.option>
-            </flux:select>
-
-            <flux:textarea wire:model="editObservaciones" :label="__('Observaciones')" placeholder="Comentarios de la actualización..." />
-
-            <div class="flex justify-end gap-2 pt-4">
-                <flux:button wire:click="$set('modalEditarItem', false)" variant="ghost">{{ __('Cancelar') }}</flux:button>
-                <flux:button type="submit" variant="primary" class="bg-[#00376e] dark:bg-blue-600 text-white">{{ __('Guardar Cambios') }}</flux:button>
             </div>
         </form>
     </flux:modal>

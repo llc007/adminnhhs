@@ -26,3 +26,22 @@ test('authenticated users can visit the dashboard', function () {
     $response = $this->get(route('dashboard'));
     $response->assertOk();
 });
+
+test('authenticated assistants are redirected to mis prestamos', function () {
+    $user = User::factory()->create();
+
+    $schoolId = DB::table('schools')->insertGetId([
+        'name' => 'Test School',
+        'domain' => 'test.com',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $user->update(['current_school_id' => $schoolId]);
+    $user->schools()->attach($schoolId, ['roles' => json_encode(['asistente'])]);
+
+    $this->actingAs($user);
+
+    $response = $this->get(route('dashboard'));
+    $response->assertRedirect(route('ti.prestamos.mis_prestamos'));
+});

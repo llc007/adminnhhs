@@ -279,7 +279,7 @@ new class extends Component {
  
 
     {{-- Cronograma Interactivo --}}
-    <flux:card class="p-0 overflow-hidden mb-6 w-full border border-zinc-200 dark:border-zinc-800/80 shadow-lg dark:shadow-none bg-white dark:bg-zinc-900/80 dark:backdrop-blur-md" wire:poll.5m>
+    <flux:card class="p-0 overflow-hidden mb-6 w-full border border-zinc-200 dark:border-zinc-800/80 shadow-lg dark:shadow-none bg-white dark:bg-zinc-900/80 dark:backdrop-blur-md" wire:poll.5m.visible>
         <div class="px-6 py-5 border-b border-zinc-200 dark:border-zinc-800/80 bg-gradient-to-r from-zinc-50 to-zinc-100 dark:from-zinc-900 dark:to-zinc-900/40">
             <h4 class="text-xl font-bold text-[#00376e] dark:text-white flex items-center gap-2">
                 <flux:icon.list-bullet class="size-6 text-[#00376e] dark:text-zinc-200" />
@@ -501,7 +501,7 @@ new class extends Component {
     </flux:card>
 
     {{-- Estado de Boxes --}}
-    <flux:card class="p-0 overflow-hidden mb-10 w-full border border-zinc-200 dark:border-zinc-800/80 shadow-lg dark:shadow-none bg-white dark:bg-zinc-900/80 dark:backdrop-blur-md" wire:poll.10s>
+    <flux:card class="p-0 overflow-hidden mb-10 w-full border border-zinc-200 dark:border-zinc-800/80 shadow-lg dark:shadow-none bg-white dark:bg-zinc-900/80 dark:backdrop-blur-md" wire:poll.15s.visible>
         <div class="px-6 py-5 border-b border-zinc-200 dark:border-zinc-800/80 flex flex-col sm:flex-row justify-between items-center gap-4 bg-gradient-to-r from-zinc-50 to-zinc-100 dark:from-zinc-900 dark:to-zinc-900/40">
             <h4 class="text-xl font-bold text-[#00376e] dark:text-white flex items-center gap-2">
                 <flux:icon.building-office-2 class="size-6 text-[#00376e] dark:text-zinc-200" />

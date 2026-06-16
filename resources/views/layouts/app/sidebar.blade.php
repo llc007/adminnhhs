@@ -236,7 +236,30 @@
     {{-- Toast para notificaciones globales --}}
     <flux:toast position="top right" />
 
+    {{-- Indicador de tamaño de pantalla para depuración --}}
+    <div class="fixed bottom-4 right-4 z-50 flex items-center gap-1.5 rounded-full bg-zinc-900/90 dark:bg-zinc-100/90 px-3 py-1 font-mono text-[10px] font-bold text-zinc-100 dark:text-zinc-900 shadow-lg border border-zinc-700/50 dark:border-zinc-300/50 pointer-events-none">
+        <span>Pantalla:</span>
+        <span class="sm:hidden">XS (&lt; 640px)</span>
+        <span class="hidden sm:inline md:hidden">SM (&gt;= 640px)</span>
+        <span class="hidden md:inline lg:hidden">MD (&gt;= 768px)</span>
+        <span class="hidden lg:inline xl:hidden">LG (&gt;= 1024px)</span>
+        <span class="hidden xl:inline 2xl:hidden">XL (&gt;= 1280px)</span>
+        <span class="hidden 2xl:inline">2XL (&gt;= 1536px)</span>
+    </div>
+
     @fluxScripts
+    <script>
+        document.addEventListener('livewire:init', () => {
+            Livewire.onError((message, statusCode) => {
+                // Manejar silenciosamente problemas de red/servidor (502, 503, 504) y expiración de sesión (419)
+                // durante el polling en segundo plano para evitar modales molestos al usuario.
+                if ([419, 502, 503, 504].includes(statusCode)) {
+                    console.warn('Livewire: error de conexión temporal (' + statusCode + '). Reintentando...');
+                    return false; // Evita el modal de error por defecto de Livewire
+                }
+            });
+        });
+    </script>
 </body>
 
 </html>

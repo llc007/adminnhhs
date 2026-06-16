@@ -20,12 +20,15 @@ class ArticuloInventario extends Model
         'codigo_patrimonial',
         'nombre',
         'categoria',
+        'categoria_id',
+        'subcategoria_id',
         'marca',
         'modelo',
         'numero_serie',
         'cantidad',
         'estado_conservacion',
         'ubicacion',
+        'ubicacion_id',
         'responsable_user_id',
         'fecha_ingreso',
         'observaciones',
@@ -66,5 +69,20 @@ class ArticuloInventario extends Model
     public function ultimaRevision()
     {
         return $this->hasOne(RevisionInventario::class, 'articulo_inventario_id')->latestOfMany('fecha');
+    }
+
+    public function categoriaRel()
+    {
+        return $this->belongsTo(InventarioCategoria::class, 'categoria_id');
+    }
+
+    public function subcategoriaRel()
+    {
+        return $this->belongsTo(InventarioSubcategoria::class, 'subcategoria_id');
+    }
+
+    public function ubicacionRel()
+    {
+        return $this->belongsTo(InventarioUbicacion::class, 'ubicacion_id');
     }
 }

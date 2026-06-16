@@ -84,7 +84,7 @@ new class extends Component {
 };
 ?>
 
-<div wire:poll.15s="checkNewNotifications" class="relative">
+<div wire:poll.60s.visible="checkNewNotifications" class="relative">
     <flux:dropdown position="bottom" align="end">
         <flux:button variant="ghost" class="relative hover:bg-zinc-100 dark:hover:bg-zinc-800" icon="bell">
             @if($notifications->count() > 0)

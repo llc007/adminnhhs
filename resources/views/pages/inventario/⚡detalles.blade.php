@@ -12,11 +12,37 @@ new class extends Component
     public ?ArticuloInventario $articuloBase = null;
     public array $editingItems = [];
 
+    // Modales nuevos
+    public bool $modalEditarArticulo = false;
+    public bool $modalAgregarStock = false;
+    public bool $modalAgregarUnidades = false;
+
+    // Propiedades Editar Artículo
+    public string $editNombre = '';
+    public ?int $editCategoriaId = null;
+    public string $searchCategoria = '';
+    public ?int $editSubcategoriaId = null;
+    public string $searchSubcategoria = '';
+    public string $editMarca = '';
+    public string $editModelo = '';
+
+    // Propiedades Agregar Stock (Consumible)
+    public int $agregarStockCantidad = 1;
+    public string $agregarStockMotivo = '';
+
+    // Propiedades Agregar Unidades (Activo Fijo)
+    public int $agregarUnidadesCantidad = 1;
+    public ?int $agregarUnidadesUbicacionId = null;
+    public string $searchUbicacion = '';
+    public string $agregarUnidadesEstado = 'excelente';
+    public ?int $agregarUnidadesResponsableId = null;
+    public string $agregarUnidadesObservaciones = '';
+
     // Modal Detalles Físicos (Serie, Ubicación, Obs)
     public bool $modalFisicos = false;
     public ?int $selectedItemIdForFisicos = null;
     public string $editSerial = '';
-    public string $editUbicacion = '';
+    public ?int $editUbicacionId = null;
     public string $editObservaciones = '';
 
     // Modal Historial de Revisiones/Mantenciones
@@ -147,6 +173,239 @@ new class extends Component
         }
     }
 
+    // Helper inline creations
+    public function updatedEditCategoriaId()
+    {
+        $this->editSubcategoriaId = null;
+    }
+
+    public function crearCategoria()
+    {
+        if (trim($this->searchCategoria) === '') return;
+
+        $cat = \App\Models\InventarioCategoria::create([
+            'school_id' => auth()->user()->current_school_id,
+            'nombre' => trim($this->searchCategoria),
+        ]);
+
+        $this->editCategoriaId = $cat->id;
+        $this->searchCategoria = '';
+    }
+
+    public function crearSubcategoria()
+    {
+        if (!$this->editCategoriaId) {
+            \Flux::toast('Debe seleccionar primero una Categoría para crear la subcategoría.', variant: 'warning');
+            return;
+        }
+        if (trim($this->searchSubcategoria) === '') return;
+
+        $sub = \App\Models\InventarioSubcategoria::create([
+            'school_id' => auth()->user()->current_school_id,
+            'categoria_id' => $this->editCategoriaId,
+            'nombre' => trim($this->searchSubcategoria),
+        ]);
+
+        $this->editSubcategoriaId = $sub->id;
+        $this->searchSubcategoria = '';
+    }
+
+    public function crearUbicacion()
+    {
+        if (trim($this->searchUbicacion) === '') return;
+
+        $ub = \App\Models\InventarioUbicacion::create([
+            'school_id' => auth()->user()->current_school_id,
+            'nombre' => trim($this->searchUbicacion),
+        ]);
+
+        $this->agregarUnidadesUbicacionId = $ub->id;
+        $this->editUbicacionId = $ub->id;
+        $this->searchUbicacion = '';
+    }
+
+    // Modal Editar Artículo
+    public function abrirEditarArticulo()
+    {
+        $this->editNombre = $this->articuloBase->nombre;
+        $this->editCategoriaId = $this->articuloBase->categoria_id;
+        $this->editSubcategoriaId = $this->articuloBase->subcategoria_id;
+        $this->editMarca = $this->articuloBase->marca ?? '';
+        $this->editModelo = $this->articuloBase->modelo ?? '';
+        $this->modalEditarArticulo = true;
+    }
+
+    public function guardarEdicionArticulo()
+    {
+        $this->validate([
+            'editNombre' => 'required|string|min:3|max:255',
+            'editCategoriaId' => 'required|integer|exists:inventario_categorias,id',
+            'editSubcategoriaId' => 'nullable|integer|exists:inventario_subcategorias,id',
+        ]);
+
+        $schoolId = auth()->user()->current_school_id;
+        $catModel = \App\Models\InventarioCategoria::findOrFail($this->editCategoriaId);
+        $categoriaNombre = $catModel->nombre;
+
+        // Query the old group records
+        $query = ArticuloInventario::where('school_id', $schoolId)
+            ->where('nombre', $this->articuloBase->nombre)
+            ->where('categoria', $this->articuloBase->categoria)
+            ->where('tipo', $this->articuloBase->tipo)
+            ->whereDate('fecha_ingreso', $this->articuloBase->fecha_ingreso);
+
+        if ($this->articuloBase->marca === null) {
+            $query->whereNull('marca');
+        } else {
+            $query->where('marca', $this->articuloBase->marca);
+        }
+
+        if ($this->articuloBase->modelo === null) {
+            $query->whereNull('modelo');
+        } else {
+            $query->where('modelo', $this->articuloBase->modelo);
+        }
+
+        $count = $query->count();
+
+        // Update all of them
+        $query->update([
+            'nombre' => $this->editNombre,
+            'categoria' => $categoriaNombre,
+            'categoria_id' => $this->editCategoriaId,
+            'subcategoria_id' => $this->editSubcategoriaId,
+            'marca' => $this->editMarca ?: null,
+            'modelo' => $this->editModelo ?: null,
+        ]);
+
+        $this->articuloBase = ArticuloInventario::findOrFail($this->id);
+        $this->modalEditarArticulo = false;
+        \Flux::toast("Se actualizaron {$count} artículos del lote.", variant: 'success');
+        $this->cargarItems();
+    }
+
+    // Modal Agregar Stock (Consumibles)
+    public function abrirAgregarStock(int $itemId)
+    {
+        $this->selectedItemIdForFisicos = $itemId;
+        $this->agregarStockCantidad = 1;
+        $this->agregarStockMotivo = '';
+        $this->modalAgregarStock = true;
+    }
+
+    public function confirmarAgregarStock()
+    {
+        $this->validate([
+            'agregarStockCantidad' => 'required|integer|min:1|max:1000',
+            'agregarStockMotivo' => 'required|string|min:5|max:1000',
+        ]);
+
+        $item = ArticuloInventario::findOrFail($this->selectedItemIdForFisicos);
+        $item->cantidad = $item->cantidad + $this->agregarStockCantidad;
+        $item->save();
+
+        RevisionInventario::create([
+            'articulo_inventario_id' => $item->id,
+            'fecha' => now(),
+            'detalle' => "Ingreso de stock: +{$this->agregarStockCantidad} unidades. Motivo: {$this->agregarStockMotivo}. Nuevo stock: {$item->cantidad}.",
+            'realizado_por' => auth()->user()->nombreCompleto(),
+            'user_id' => auth()->id(),
+        ]);
+
+        $this->modalAgregarStock = false;
+        \Flux::toast('El stock fue incrementado exitosamente.', variant: 'success');
+        $this->cargarItems();
+    }
+
+    // Modal Agregar Unidades (Activos Fijos)
+    public function abrirAgregarUnidades()
+    {
+        $this->agregarUnidadesCantidad = 1;
+        $this->agregarUnidadesUbicacionId = null;
+        $this->agregarUnidadesEstado = 'excelente';
+        $this->agregarUnidadesResponsableId = null;
+        $this->agregarUnidadesObservaciones = '';
+        $this->modalAgregarUnidades = true;
+    }
+
+    public function confirmarAgregarUnidades()
+    {
+        $this->validate([
+            'agregarUnidadesCantidad' => 'required|integer|min:1|max:100',
+            'agregarUnidadesUbicacionId' => 'required|integer|exists:inventario_ubicaciones,id',
+            'agregarUnidadesEstado' => 'required|in:excelente,bueno,usado,regular,malo',
+        ]);
+
+        $schoolId = auth()->user()->current_school_id;
+        $ubModel = \App\Models\InventarioUbicacion::findOrFail($this->agregarUnidadesUbicacionId);
+        $ubicacionNombre = $ubModel->nombre;
+
+        // Generar prefijo del código patrimonial usando el nombre de categoría del lote
+        $catCode = Str::upper(Str::substr(preg_replace('/[^A-Za-z0-9]/', '', $this->articuloBase->categoria), 0, 3));
+        if (strlen($catCode) < 3) $catCode = Str::padRight($catCode, 3, 'X');
+
+        $itemCode = Str::upper(Str::substr(preg_replace('/[^A-Za-z0-9]/', '', $this->articuloBase->nombre), 0, 3));
+        if (strlen($itemCode) < 3) $itemCode = Str::padRight($itemCode, 3, 'X');
+
+        $prefix = "{$catCode}-{$itemCode}-";
+
+        // Buscar último correlativo en DB
+        $ultimo = ArticuloInventario::where('codigo_patrimonial', 'like', $prefix . '%')
+            ->orderBy('codigo_patrimonial', 'desc')
+            ->first();
+
+        $startCorrelativo = 1;
+        if ($ultimo) {
+            $parts = explode('-', $ultimo->codigo_patrimonial);
+            $num = (int) end($parts);
+            if ($num > 0) {
+                $startCorrelativo = $num + 1;
+            }
+        }
+
+        // Generar códigos patrimoniales correlativos
+        $codigosAInsertar = [];
+        for ($i = 0; $i < $this->agregarUnidadesCantidad; $i++) {
+            $corr = str_pad($startCorrelativo + $i, 3, '0', STR_PAD_LEFT);
+            $codigosAInsertar[] = "{$prefix}{$corr}";
+        }
+
+        // Crear las N unidades individuales
+        for ($i = 0; $i < $this->agregarUnidadesCantidad; $i++) {
+            $item = ArticuloInventario::create([
+                'school_id' => $schoolId,
+                'tipo' => 'activo',
+                'codigo_patrimonial' => $codigosAInsertar[$i],
+                'nombre' => $this->articuloBase->nombre,
+                'categoria' => $this->articuloBase->categoria,
+                'categoria_id' => $this->articuloBase->categoria_id,
+                'subcategoria_id' => $this->articuloBase->subcategoria_id,
+                'marca' => $this->articuloBase->marca,
+                'modelo' => $this->articuloBase->modelo,
+                'numero_serie' => null,
+                'cantidad' => 1,
+                'estado_conservacion' => $this->agregarUnidadesEstado,
+                'ubicacion' => $ubicacionNombre,
+                'ubicacion_id' => $this->agregarUnidadesUbicacionId,
+                'responsable_user_id' => $this->agregarUnidadesResponsableId ?: null,
+                'fecha_ingreso' => $this->articuloBase->fecha_ingreso ?: now(),
+                'observaciones' => $this->agregarUnidadesObservaciones ?: null,
+            ]);
+
+            RevisionInventario::create([
+                'articulo_inventario_id' => $item->id,
+                'fecha' => now(),
+                'detalle' => 'Ingreso inicial de unidad agregada al lote.',
+                'realizado_por' => auth()->user()->nombreCompleto(),
+                'user_id' => auth()->id(),
+            ]);
+        }
+
+        $this->modalAgregarUnidades = false;
+        \Flux::toast("Se agregaron {$this->agregarUnidadesCantidad} unidades al activo.", variant: 'success');
+        $this->cargarItems();
+    }
+
     // Modal Detalles Físicos
     public function abrirFisicos(int $itemId)
     {
@@ -159,7 +418,7 @@ new class extends Component
 
         $this->selectedItemIdForFisicos = $itemId;
         $this->editSerial = $item->numero_serie ?? '';
-        $this->editUbicacion = $item->ubicacion;
+        $this->editUbicacionId = $item->ubicacion_id;
         $this->editObservaciones = $item->observaciones ?? '';
         $this->modalFisicos = true;
     }
@@ -167,23 +426,27 @@ new class extends Component
     public function guardarFisicos()
     {
         $this->validate([
-            'editUbicacion' => 'required|string|max:255',
+            'editUbicacionId' => 'required|integer|exists:inventario_ubicaciones,id',
             'editSerial' => 'nullable|string|max:255',
             'editObservaciones' => 'nullable|string|max:1000',
         ]);
 
         $item = ArticuloInventario::find($this->selectedItemIdForFisicos);
         if ($item) {
+            $ubModel = \App\Models\InventarioUbicacion::findOrFail($this->editUbicacionId);
+            $ubicacionNombre = $ubModel->nombre;
+
             $item->update([
                 'numero_serie' => $this->editSerial ?: null,
-                'ubicacion' => $this->editUbicacion,
+                'ubicacion' => $ubicacionNombre,
+                'ubicacion_id' => $this->editUbicacionId,
                 'observaciones' => $this->editObservaciones ?: null,
             ]);
 
             RevisionInventario::create([
                 'articulo_inventario_id' => $item->id,
                 'fecha' => now(),
-                'detalle' => 'Actualización de datos físicos: Ubicación a "' . $this->editUbicacion . '"' . ($this->editSerial ? ', S/N: ' . $this->editSerial : ''),
+                'detalle' => 'Actualización de datos físicos: Ubicación a "' . $ubicacionNombre . '"' . ($this->editSerial ? ', S/N: ' . $this->editSerial : ''),
                 'realizado_por' => auth()->user()->nombreCompleto(),
                 'user_id' => auth()->id(),
             ]);
@@ -337,6 +600,34 @@ new class extends Component
     {
         return User::orderBy('nombres', 'asc')->get();
     }
+
+    #[\Livewire\Attributes\Computed]
+    public function categorias()
+    {
+        return \App\Models\InventarioCategoria::where('school_id', auth()->user()->current_school_id)
+            ->orderBy('nombre', 'asc')
+            ->get();
+    }
+
+    #[\Livewire\Attributes\Computed]
+    public function subcategorias()
+    {
+        if (!$this->editCategoriaId) {
+            return collect();
+        }
+        return \App\Models\InventarioSubcategoria::where('school_id', auth()->user()->current_school_id)
+            ->where('categoria_id', $this->editCategoriaId)
+            ->orderBy('nombre', 'asc')
+            ->get();
+    }
+
+    #[\Livewire\Attributes\Computed]
+    public function ubicaciones()
+    {
+        return \App\Models\InventarioUbicacion::where('school_id', auth()->user()->current_school_id)
+            ->orderBy('nombre', 'asc')
+            ->get();
+    }
 };
 ?>
 
@@ -353,6 +644,14 @@ new class extends Component
 
     {{-- Resumen del Lote --}}
     <flux:card class="bg-zinc-50/50 dark:bg-zinc-900/50 backdrop-blur-md">
+        <div class="flex justify-between items-start mb-4">
+            <h3 class="font-bold text-zinc-900 dark:text-white text-base">
+                {{ __('Resumen del Lote') }}
+            </h3>
+            <flux:button wire:click="abrirEditarArticulo" size="sm" variant="outline" icon="pencil">
+                {{ __('Editar Información') }}
+            </flux:button>
+        </div>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-6 text-sm">
             <div>
                 <span class="text-zinc-400 text-xs uppercase font-semibold tracking-wider">{{ __('Artículo') }}</span>
@@ -360,7 +659,12 @@ new class extends Component
             </div>
             <div>
                 <span class="text-zinc-400 text-xs uppercase font-semibold tracking-wider">{{ __('Categoría') }}</span>
-                <div class="font-bold text-lg text-zinc-900 dark:text-white mt-1">{{ $this->articuloBase->categoria }}</div>
+                <div class="font-bold text-lg text-zinc-900 dark:text-white mt-1">
+                    {{ $this->articuloBase->categoria }}
+                    @if($this->articuloBase->subcategoriaRel)
+                        <span class="text-xs text-zinc-400 block">{{ $this->articuloBase->subcategoriaRel->nombre }}</span>
+                    @endif
+                </div>
             </div>
             <div>
                 <span class="text-zinc-400 text-xs uppercase font-semibold tracking-wider">{{ __('Marca / Modelo') }}</span>
@@ -381,8 +685,13 @@ new class extends Component
     <flux:card class="bg-zinc-50/50 dark:bg-zinc-900/50 backdrop-blur-md overflow-hidden">
         <div class="flex justify-between items-center mb-4">
             <h3 class="font-bold text-zinc-900 dark:text-white text-base">
-                {{ __('Unidades Registradas') }} ({{ count($this->editingItems) }} {{ __('ítems') }})
+                {{ $this->articuloBase->tipo === 'consumible' ? __('Insumos / Consumibles') : __('Unidades Registradas') }} ({{ count($this->editingItems) }} {{ __('ítems') }})
             </h3>
+            @if($this->articuloBase->tipo === 'activo')
+                <flux:button wire:click="abrirAgregarUnidades" variant="primary" icon="plus" class="bg-green-600 dark:bg-green-600 hover:bg-green-700 text-white">
+                    {{ __('Agregar Unidades') }}
+                </flux:button>
+            @endif
         </div>
 
         <div class="border border-zinc-200 dark:border-zinc-700 rounded-xl overflow-hidden">
@@ -422,6 +731,15 @@ new class extends Component
                                         {{ $item['cantidad'] }}
                                     </td>
                                     <td class="px-4 py-2 text-center align-middle space-x-1">
+                                        <button 
+                                            type="button" 
+                                            wire:click="abrirAgregarStock({{ $itemId }})" 
+                                            class="text-green-600 hover:text-green-800 p-1 hover:bg-green-50 dark:hover:bg-green-950/30 rounded"
+                                            title="{{ __('Agregar Stock') }}"
+                                        >
+                                            <flux:icon.plus-circle class="size-4" />
+                                        </button>
+
                                         <button 
                                             type="button" 
                                             wire:click="abrirDescontar({{ $itemId }})" 
@@ -534,12 +852,140 @@ new class extends Component
 
         <form wire:submit.prevent="guardarFisicos" class="space-y-4">
             <flux:input wire:model="editSerial" :label="__('Número de Serie')" placeholder="S/N de fábrica..." />
-            <flux:input wire:model="editUbicacion" :label="__('Ubicación Física')" placeholder="Ej: Laboratorio B, Sala de Profesores..." />
+            
+            <flux:select wire:model="editUbicacionId" variant="combobox" :label="__('Ubicación Física')">
+                <x-slot name="input">
+                    <flux:select.input wire:model="searchUbicacion" placeholder="Buscar o crear..." />
+                </x-slot>
+                @foreach($this->ubicaciones as $ub)
+                    <flux:select.option :value="$ub->id" :wire:key="'edit-ub-'.$ub->id">{{ $ub->nombre }}</flux:select.option>
+                @endforeach
+                <flux:select.option.create wire:click="crearUbicacion" min-length="2">
+                    Crear "<span wire:text="searchUbicacion"></span>"
+                </flux:select.option.create>
+            </flux:select>
+
             <flux:textarea wire:model="editObservaciones" :label="__('Observaciones')" placeholder="Observaciones técnicas adicionales..." />
 
             <div class="flex justify-end gap-2 pt-4">
                 <flux:button wire:click="$set('modalFisicos', false)" variant="ghost">{{ __('Cancelar') }}</flux:button>
                 <flux:button type="submit" variant="primary" class="bg-[#00376e] dark:bg-blue-600 text-white">{{ __('Guardar Detalles') }}</flux:button>
+            </div>
+        </form>
+    </flux:modal>
+
+    {{-- Modal Editar Artículo --}}
+    <flux:modal wire:model="modalEditarArticulo" class="md:w-[35rem] space-y-6">
+        <div>
+            <flux:heading size="lg">{{ __('Editar Información del Lote') }}</flux:heading>
+            <flux:text>{{ __('Edite los detalles generales de todos los artículos pertenecientes a este lote.') }}</flux:text>
+        </div>
+
+        <form wire:submit.prevent="guardarEdicionArticulo" class="space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+                <flux:input wire:model="editNombre" :label="__('Nombre del Artículo')" placeholder="Ej: Laptop Lenovo L14" />
+                
+                <flux:select wire:model.live="editCategoriaId" variant="combobox" :label="__('Categoría')">
+                    <x-slot name="input">
+                        <flux:select.input wire:model="searchCategoria" placeholder="Buscar o crear..." />
+                    </x-slot>
+                    @foreach($this->categorias as $cat)
+                        <flux:select.option :value="$cat->id" :wire:key="'edit-cat-'.$cat->id">{{ $cat->nombre }}</flux:select.option>
+                    @endforeach
+                    <flux:select.option.create wire:click="crearCategoria" min-length="2">
+                        Crear "<span wire:text="searchCategoria"></span>"
+                    </flux:select.option.create>
+                </flux:select>
+            </div>
+
+            <div class="grid grid-cols-3 gap-4">
+                <flux:select wire:model.live="editSubcategoriaId" variant="combobox" :label="__('Subcategoría')" :disabled="!$editCategoriaId">
+                    <x-slot name="input">
+                        <flux:select.input wire:model="searchSubcategoria" placeholder="Buscar o crear..." />
+                    </x-slot>
+                    @foreach($this->subcategorias as $sub)
+                        <flux:select.option :value="$sub->id" :wire:key="'edit-sub-'.$sub->id">{{ $sub->nombre }}</flux:select.option>
+                    @endforeach
+                    <flux:select.option.create wire:click="crearSubcategoria" min-length="2">
+                        Crear "<span wire:text="searchSubcategoria"></span>"
+                    </flux:select.option.create>
+                </flux:select>
+
+                <flux:input wire:model="editMarca" :label="__('Marca (Opcional)')" />
+                <flux:input wire:model="editModelo" :label="__('Modelo (Opcional)')" />
+            </div>
+
+            <div class="flex justify-end gap-2 pt-4">
+                <flux:button wire:click="$set('modalEditarArticulo', false)" variant="ghost">{{ __('Cancelar') }}</flux:button>
+                <flux:button type="submit" variant="primary" class="bg-[#00376e] dark:bg-blue-600 text-white">{{ __('Guardar Cambios') }}</flux:button>
+            </div>
+        </form>
+    </flux:modal>
+
+    {{-- Modal Agregar Stock (Consumibles) --}}
+    <flux:modal wire:model="modalAgregarStock" class="md:w-[30rem] space-y-6">
+        <div>
+            <flux:heading size="lg" class="text-green-600 dark:text-green-400">{{ __('Agregar Stock de Consumible') }}</flux:heading>
+            <flux:text>{{ __('Incremente el stock de este insumo registrando la cantidad y la procedencia o justificación del ingreso.') }}</flux:text>
+        </div>
+
+        <form wire:submit.prevent="confirmarAgregarStock" class="space-y-4">
+            <flux:input type="number" wire:model="agregarStockCantidad" :label="__('Cantidad a Agregar')" min="1" />
+            <flux:textarea wire:model="agregarStockMotivo" :label="__('Detalle / Origen del Ingreso')" placeholder="Escriba el motivo detallado del ingreso o donación..." rows="3" />
+
+            <div class="flex justify-end gap-2 pt-4">
+                <flux:button wire:click="$set('modalAgregarStock', false)" variant="ghost">{{ __('Cancelar') }}</flux:button>
+                <flux:button type="submit" variant="primary" class="bg-green-600 dark:bg-green-500 text-white">{{ __('Agregar Stock') }}</flux:button>
+            </div>
+        </form>
+    </flux:modal>
+
+    {{-- Modal Agregar Unidades (Activos Fijos) --}}
+    <flux:modal wire:model="modalAgregarUnidades" class="md:w-[35rem] space-y-6">
+        <div>
+            <flux:heading size="lg">{{ __('Agregar Unidades al Lote') }}</flux:heading>
+            <flux:text>{{ __('Agregue nuevas unidades individuales de este activo al inventario. Se generarán los códigos patrimoniales automáticamente.') }}</flux:text>
+        </div>
+
+        <form wire:submit.prevent="confirmarAgregarUnidades" class="space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+                <flux:input type="number" wire:model="agregarUnidadesCantidad" :label="__('Cantidad de Unidades')" min="1" />
+                
+                <flux:select wire:model="agregarUnidadesUbicacionId" variant="combobox" :label="__('Ubicación Física')">
+                    <x-slot name="input">
+                        <flux:select.input wire:model="searchUbicacion" placeholder="Buscar o crear..." />
+                    </x-slot>
+                    @foreach($this->ubicaciones as $ub)
+                        <flux:select.option :value="$ub->id" :wire:key="'add-ub-'.$ub->id">{{ $ub->nombre }}</flux:select.option>
+                    @endforeach
+                    <flux:select.option.create wire:click="crearUbicacion" min-length="2">
+                        Crear "<span wire:text="searchUbicacion"></span>"
+                    </flux:select.option.create>
+                </flux:select>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <flux:select wire:model="agregarUnidadesEstado" :label="__('Estado de Conservación')">
+                    <flux:select.option value="excelente">{{ __('Excelente') }}</flux:select.option>
+                    <flux:select.option value="bueno">{{ __('Bueno') }}</flux:select.option>
+                    <flux:select.option value="usado">{{ __('Usado') }}</flux:select.option>
+                    <flux:select.option value="regular">{{ __('Regular') }}</flux:select.option>
+                    <flux:select.option value="malo">{{ __('Malo') }}</flux:select.option>
+                </flux:select>
+
+                <flux:select wire:model="agregarUnidadesResponsableId" :label="__('Responsable de Custodia (Opcional)')">
+                    <flux:select.option value="">{{ __('En Bodega (Sin Responsable)') }}</flux:select.option>
+                    @foreach($this->usuarios as $u)
+                        <flux:select.option value="{{ $u->id }}">{{ $u->nombreCompleto() }}</flux:select.option>
+                    @endforeach
+                </flux:select>
+            </div>
+
+            <flux:textarea wire:model="agregarUnidadesObservaciones" :label="__('Observaciones')" placeholder="Comentarios adicionales..." />
+
+            <div class="flex justify-end gap-2 pt-4">
+                <flux:button wire:click="$set('modalAgregarUnidades', false)" variant="ghost">{{ __('Cancelar') }}</flux:button>
+                <flux:button type="submit" variant="primary" class="bg-[#00376e] dark:bg-blue-600 text-white">{{ __('Agregar Unidades') }}</flux:button>
             </div>
         </form>
     </flux:modal>

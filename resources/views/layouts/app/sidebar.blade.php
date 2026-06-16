@@ -250,13 +250,15 @@
     @fluxScripts
     <script>
         document.addEventListener('livewire:init', () => {
-            Livewire.onError((message, statusCode) => {
-                // Manejar silenciosamente problemas de red/servidor (502, 503, 504) y expiración de sesión (419)
-                // durante el polling en segundo plano para evitar modales molestos al usuario.
-                if ([419, 502, 503, 504].includes(statusCode)) {
-                    console.warn('Livewire: error de conexión temporal (' + statusCode + '). Reintentando...');
-                    return false; // Evita el modal de error por defecto de Livewire
-                }
+            Livewire.hook('request', ({ fail }) => {
+                fail(({ status, content, preventDefault }) => {
+                    // Manejar silenciosamente problemas de red/servidor (502, 503, 504) y expiración de sesión (419)
+                    // durante el polling en segundo plano para evitar modales molestos al usuario.
+                    if ([419, 502, 503, 504].includes(status)) {
+                        console.warn('Livewire: error de conexión temporal (' + status + '). Reintentando...');
+                        preventDefault();
+                    }
+                });
             });
         });
     </script>

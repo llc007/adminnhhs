@@ -30,7 +30,7 @@
         <livewire:admin.seleccionar-colegio />
 
         <flux:sidebar.nav>
-            @if ($isAdmin || ($modulos['entrevistas'] ?? false))
+            @if (auth()->user()->hasRole(['administrador', 'directivo', 'superadmin', 'recepcion', 'inspector', 'docente', 'estudiante']) && ($isAdmin || ($modulos['entrevistas'] ?? false)))
                 <flux:sidebar.group :heading="__('Entrevistas')" class="grid">
                     @if (auth()->user()->hasRole(['administrador', 'directivo', 'superadmin']))
                         <flux:sidebar.item icon="home" :href="route('dashboard')"
@@ -70,7 +70,7 @@
                 </flux:sidebar.group>
             @endif
 
-            @if ($isAdmin || ($modulos['estudiantes'] ?? false))
+            @if (auth()->user()->hasRole(['directivo', 'administrador', 'superadmin', 'inspector', 'docente', 'asistente', 'psicosocial', 'recepcion']) && ($isAdmin || ($modulos['estudiantes'] ?? false)))
                 <flux:sidebar.group :heading="__('Gestión Académica')" class="grid mt-4">
                     @if (auth()->user()->hasRole([
                                 'directivo',
@@ -118,7 +118,7 @@
 
 
             @php
-                $canSeeAdquisicionesGroup = auth()->user()->hasRole(['solicitante_adquisiciones', 'administrador', 'superadmin']);
+                $canSeeAdquisicionesGroup = auth()->user()->hasRole(['solicitante_adquisiciones', 'administrador', 'superadmin', 'ti']);
             @endphp
             @if ($canSeeAdquisicionesGroup && ($isAdmin || ($modulos['adquisiciones'] ?? false)))
                 <flux:sidebar.group :heading="__('Adquisiciones e Inventario')" class="grid mt-4">
@@ -139,7 +139,9 @@
                             :current="request()->routeIs('adquisiciones.compras')" wire:navigate>
                             {{ __('Recepción de Compras') }}
                         </flux:sidebar.item>
+                    @endif
 
+                    @if (auth()->user()->hasRole(['administrador', 'superadmin', 'ti']))
                         <flux:sidebar.item icon="archive-box" :href="route('inventario.index')"
                             :current="request()->routeIs('inventario.index')" wire:navigate>
                             {{ __('Inventario General') }}

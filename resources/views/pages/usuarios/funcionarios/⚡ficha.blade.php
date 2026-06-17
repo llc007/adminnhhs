@@ -215,6 +215,7 @@ new class extends Component
             <flux:checkbox wire:model="roles" value="directivo" :label="__('Cuerpo Directivo')" />
             <flux:checkbox border="zinc" wire:model="roles" value="administrador" label="Admin del Colegio" />
             <flux:checkbox wire:model="roles" value="solicitante_adquisiciones" :label="__('Solicitante de Adquisiciones')" />
+            <flux:checkbox wire:model="roles" value="ti" :label="__('Personal de TI / Informática')" />
             @if(auth()->user()->hasRole('superadmin'))
                 <flux:checkbox wire:model="roles" value="superadmin" label="Superusuario Global" class="text-red-500 font-bold" />
             @endif

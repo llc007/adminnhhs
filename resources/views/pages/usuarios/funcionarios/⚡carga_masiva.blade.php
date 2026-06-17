@@ -231,7 +231,7 @@ new class extends Component {
                 </div>
                 <flux:separator />
                 <flux:text class="text-xs">
-                    {{ __('Roles admitidos: docente, inspector, asistente, psicosocial, recepcion, directivo, administrador, solicitante_adquisiciones.') }}
+                    {{ __('Roles admitidos: docente, inspector, asistente, psicosocial, recepcion, directivo, administrador, solicitante_adquisiciones, ti.') }}
                 </flux:text>
             </flux:card>
         </div>

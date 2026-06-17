@@ -27,7 +27,7 @@ class CheckRole
 
         // If the user has ONLY the default 'externo' role (newly registered and unauthorized),
         // redirect them to the access request page rather than showing a static 403 error.
-        if ($request->user()->hasRole(['externo']) && ! $request->user()->hasRole(['docente', 'inspector', 'administrador', 'directivo', 'superadmin', 'asistente', 'psicosocial', 'recepcion', 'estudiante'])) {
+        if ($request->user()->hasRole(['externo']) && ! $request->user()->hasRole(['docente', 'inspector', 'administrador', 'directivo', 'superadmin', 'asistente', 'psicosocial', 'recepcion', 'estudiante', 'ti', 'solicitante_adquisiciones'])) {
             return redirect()->route('sin-permiso');
         }
 

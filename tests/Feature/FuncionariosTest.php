@@ -102,3 +102,31 @@ test('assigning a real role to a pending user via index modal removes the extern
     expect($roles)->toContain('docente');
     expect($roles)->not->toContain('externo');
 });
+
+test('it can assign the ti role to a staff member', function () {
+    $admin = User::factory()->create();
+    $schoolId = DB::table('schools')->insertGetId([
+        'name' => 'Test School',
+        'domain' => 'test.com',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    $admin->update(['current_school_id' => $schoolId]);
+    $admin->schools()->attach($schoolId, ['roles' => json_encode(['administrador'])]);
+
+    $this->actingAs($admin);
+
+    Livewire::test('pages::usuarios.funcionarios.index')
+        ->call('abrirCrear')
+        ->set('nombres', 'NUEVO')
+        ->set('apellidoPat', 'FUNCIONARIO')
+        ->set('email', 'ti.user@test.com')
+        ->set('roles', ['ti'])
+        ->call('guardar');
+
+    $newUser = User::where('email', 'ti.user@test.com')->first();
+    expect($newUser)->not->toBeNull();
+
+    $roles = json_decode($newUser->schools()->where('school_id', $schoolId)->first()->pivot->roles, true);
+    expect($roles)->toContain('ti');
+});

@@ -213,8 +213,9 @@ new class extends Component {
                                 <flux:select.option value="psicosocial">{{ __('Psicosocial') }}</flux:select.option>
                                 <flux:select.option value="recepcion">{{ __('Recepción') }}</flux:select.option>
                                 <flux:select.option value="directivo">{{ __('Directivo') }}</flux:select.option>
-                                <flux:select.option value="administrador">{{ __('Administrador') }}
-                                </flux:select.option>
+                                <flux:select.option value="administrador">{{ __('Administrador') }}</flux:select.option>
+                                <flux:select.option value="solicitante_adquisiciones">{{ __('Solicitante Adq.') }}</flux:select.option>
+                                <flux:select.option value="ti">{{ __('Personal de TI') }}</flux:select.option>
                             </flux:select>
                         </flux:field>
 
@@ -305,6 +306,8 @@ new class extends Component {
                                             'administrador' => ['label' => 'Administrador', 'color' => 'rose'],
                                             'superadmin' => ['label' => 'Superadmin', 'color' => 'red'],
                                             'externo' => ['label' => 'Pendiente', 'color' => 'orange'],
+                                            'solicitante_adquisiciones' => ['label' => 'Solicitante Adq.', 'color' => 'amber'],
+                                            'ti' => ['label' => 'Personal de TI', 'color' => 'sky'],
                                         ];
                                     @endphp
                                     @forelse ($funcionario->active_roles as $role)
@@ -408,6 +411,7 @@ new class extends Component {
                     <flux:checkbox wire:model="roles" value="directivo" :label="__('Directivo')" />
                     <flux:checkbox wire:model="roles" value="administrador" :label="__('Administrador')" />
                     <flux:checkbox wire:model="roles" value="solicitante_adquisiciones" :label="__('Solicitante Adq.')" />
+                    <flux:checkbox wire:model="roles" value="ti" :label="__('Personal de TI')" />
                     @if(auth()->user()->hasRole('superadmin'))
                         <flux:checkbox wire:model="roles" value="superadmin" :label="__('Superadmin')" />
                     @endif

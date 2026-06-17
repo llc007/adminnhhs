@@ -80,8 +80,8 @@ Route::middleware(['auth', 'verified', 'role:administrador,superadmin'])->group(
     Route::livewire('/adquisiciones/compras', 'pages::adquisiciones.compras')->name('adquisiciones.compras');
 });
 
-// Inventario General — Solo Administrador y Superadmin (NO directivos)
-Route::middleware(['auth', 'verified', 'role:administrador,superadmin'])->group(function () {
+// Inventario General — Solo Administrador, Superadmin y TI (NO directivos)
+Route::middleware(['auth', 'verified', 'role:ti,administrador,superadmin'])->group(function () {
     Route::livewire('/inventario', 'pages::inventario.index')->name('inventario.index');
     Route::livewire('/inventario/detalles/{id}', 'pages::inventario.detalles')->name('inventario.detalles');
 });

@@ -38,6 +38,9 @@ new #[Title('Registrar Préstamo')] class extends Component
             $this->sugerencias = ArticuloInventario::query()
                 ->where('school_id', auth()->user()->current_school_id)
                 ->whereNull('fecha_baja')
+                ->whereDoesntHave('prestamos', function ($q) {
+                    $q->where('estado', 'prestado');
+                })
                 ->where(function ($q) {
                     $q->where('nombre', 'like', '%' . $this->search_articulo . '%')
                       ->orWhere('codigo_patrimonial', 'like', '%' . $this->search_articulo . '%');
@@ -125,6 +128,16 @@ new #[Title('Registrar Préstamo')] class extends Component
             'fecha_devolucion_estimada.after_or_equal' => 'La fecha estimada de devolución no puede ser anterior a la fecha de préstamo.',
         ]);
 
+        if ($this->articulo_inventario_id) {
+            $yaPrestado = Prestamo::where('articulo_inventario_id', $this->articulo_inventario_id)
+                ->where('estado', 'prestado')
+                ->exists();
+            if ($yaPrestado) {
+                $this->addError('search_articulo', 'Este artículo ya se encuentra prestado actualmente.');
+                return;
+            }
+        }
+
         $prestamo = Prestamo::create([
             'school_id' => auth()->user()->current_school_id,
             'user_id' => $this->user_id,
@@ -189,6 +202,7 @@ new #[Title('Registrar Préstamo')] class extends Component
                     @if($articulo_inventario_id)
                         <flux:button size="sm" variant="ghost" icon="x-mark" class="absolute right-2 top-8" wire:click="limpiarArticulo" />
                     @endif
+                    <flux:error name="search_articulo" />
                 </flux:field>
 
                 {{-- Resultados del Autocompletar --}}

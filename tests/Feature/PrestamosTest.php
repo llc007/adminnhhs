@@ -283,3 +283,94 @@ test('ti staff can edit an active loan details', function () {
     expect($prestamo->fecha_devolucion_estimada->toDateString())->toBe(now()->addDays(10)->toDateString());
     expect($prestamo->observaciones)->toBe('Modificado por error tipográfico');
 });
+
+test('an active loan prevents the article from appearing in search suggestions and registering a new loan', function () {
+    $user = User::factory()->create();
+    $docente = User::factory()->create();
+
+    $schoolId = DB::table('schools')->insertGetId([
+        'name' => 'Test School',
+        'domain' => 'test.com',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $user->update(['current_school_id' => $schoolId]);
+    $user->schools()->attach($schoolId, ['roles' => json_encode(['ti'])]);
+    $docente->update(['current_school_id' => $schoolId]);
+    $docente->schools()->attach($schoolId, ['roles' => json_encode(['docente'])]);
+
+    $this->actingAs($user);
+
+    // Create an inventory article
+    $articulo = ArticuloInventario::create([
+        'school_id' => $schoolId,
+        'tipo' => 'activo',
+        'codigo_patrimonial' => 'ASUS-LTP-001',
+        'nombre' => 'Asus Notebook X515',
+        'categoria' => 'Tecnología',
+        'marca' => 'Asus',
+        'modelo' => 'X515',
+        'cantidad' => 1,
+        'fecha_ingreso' => now()->toDateString(),
+        'estado_conservacion' => 'bueno',
+    ]);
+
+    // Initially, it should be in the suggestions
+    Livewire::test('pages::ti.prestamos.crear')
+        ->set('search_articulo', 'Asus')
+        ->assertCount('sugerencias', 1)
+        ->assertSet('sugerencias.0.id', $articulo->id);
+
+    // Create an active loan for this article
+    $prestamo = Prestamo::create([
+        'school_id' => $schoolId,
+        'user_id' => $docente->id,
+        'articulo_inventario_id' => $articulo->id,
+        'nombre_articulo' => $articulo->nombre,
+        'cantidad' => 1,
+        'fecha_prestamo' => now()->toDateString(),
+        'fecha_devolucion_estimada' => now()->addWeek()->toDateString(),
+        'estado' => 'prestado',
+        'creado_por_user_id' => $user->id,
+    ]);
+
+    // Now, search suggestions should NOT return the article
+    Livewire::test('pages::ti.prestamos.crear')
+        ->set('search_articulo', 'Asus')
+        ->assertSet('sugerencias', []);
+
+    // Try to register a loan for this article anyway (e.g. bypass suggestion)
+    Livewire::test('pages::ti.prestamos.crear')
+        ->set('user_id', $docente->id)
+        ->set('search_articulo', 'Asus')
+        ->call('seleccionarArticulo', $articulo->id)
+        ->set('cantidad', 1)
+        ->set('fecha_prestamo', now()->toDateString())
+        ->set('fecha_devolucion_estimada', now()->addWeek()->toDateString())
+        ->call('guardar')
+        ->assertHasErrors(['search_articulo']);
+
+    // Mark the loan as returned
+    $prestamo->update([
+        'estado' => 'devuelto',
+        'fecha_devolucion_real' => now()->toDateString(),
+    ]);
+
+    // It should be searchable again
+    Livewire::test('pages::ti.prestamos.crear')
+        ->set('search_articulo', 'Asus')
+        ->assertCount('sugerencias', 1)
+        ->assertSet('sugerencias.0.id', $articulo->id);
+
+    // And we should be able to register it
+    Livewire::test('pages::ti.prestamos.crear')
+        ->set('user_id', $docente->id)
+        ->set('search_articulo', 'Asus')
+        ->call('seleccionarArticulo', $articulo->id)
+        ->set('cantidad', 1)
+        ->set('fecha_prestamo', now()->toDateString())
+        ->set('fecha_devolucion_estimada', now()->addWeek()->toDateString())
+        ->call('guardar')
+        ->assertHasNoErrors();
+});

@@ -85,4 +85,9 @@ class ArticuloInventario extends Model
     {
         return $this->belongsTo(InventarioUbicacion::class, 'ubicacion_id');
     }
+
+    public function prestamos()
+    {
+        return $this->hasMany(Prestamo::class, 'articulo_inventario_id');
+    }
 }

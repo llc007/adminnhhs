@@ -18,8 +18,22 @@
     RewriteCond %{REQUEST_URI} (.+)/$
     RewriteRule ^ %1 [L,R=301]
 
+
     # Send Requests To Front Controller...
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
+
+# Disable LiteSpeed Cache for Livewire and POST requests
+<IfModule LiteSpeed>
+    RewriteEngine On
+    # Do not cache Livewire requests
+    RewriteCond %{REQUEST_URI} livewire [NC]
+    RewriteRule .* - [E=Cache-Control:no-cache]
+
+    # Do not cache POST requests
+    RewriteCond %{REQUEST_METHOD} POST
+    RewriteRule .* - [E=Cache-Control:no-cache]
+</IfModule>
+

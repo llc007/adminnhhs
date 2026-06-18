@@ -176,11 +176,7 @@
 
         <flux:spacer />
 
-        <flux:sidebar.nav>
-            <flux:sidebar.item icon="folder-git-2" href="https://github.com/luisferlop/adminnhhs" target="_blank">
-                {{ __('Repositorio') }}
-            </flux:sidebar.item>
-        </flux:sidebar.nav>
+
 
         <x-desktop-user-menu class="hidden lg:block" :name="auth()->user()->name" />
     </flux:sidebar>

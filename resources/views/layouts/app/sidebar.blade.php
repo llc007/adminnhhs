@@ -245,6 +245,10 @@
         <span class="hidden 2xl:inline">2XL (&gt;= 1536px)</span>
     </div>
 
+    @if (app()->isLocal())
+        <livewire:layout.role-switcher />
+    @endif
+
     @fluxScripts
     <script>
         document.addEventListener('livewire:init', () => {

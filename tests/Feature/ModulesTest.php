@@ -168,3 +168,37 @@ test('notifications on the mail channel are cancelled when envio_correos is disa
     $databaseResult = $listener->handle($databaseEvent);
     expect($databaseResult)->toBeNull(); // Should not cancel (returns null)
 });
+
+test('role switcher component can toggle user roles in development', function () {
+    $user = User::factory()->create();
+    $schoolId = DB::table('schools')->insertGetId([
+        'name' => 'Test School',
+        'domain' => 'test.com',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    $user->update(['current_school_id' => $schoolId]);
+    $user->schools()->attach($schoolId, ['roles' => json_encode(['docente'])]);
+
+    $this->actingAs($user);
+
+    // Initial role is docente
+    expect($user->active_roles)->toEqual(['docente']);
+
+    // Toggle 'ti' role
+    Livewire::test('layout.role-switcher')
+        ->call('toggleRole', 'ti');
+
+    $user->refresh();
+    // It should now contain both docente and ti
+    expect($user->active_roles)->toContain('ti');
+    expect($user->active_roles)->toContain('docente');
+
+    // Toggle 'ti' role again to remove it
+    Livewire::test('layout.role-switcher')
+        ->call('toggleRole', 'ti');
+
+    $user->refresh();
+    expect($user->active_roles)->not->toContain('ti');
+    expect($user->active_roles)->toContain('docente');
+});

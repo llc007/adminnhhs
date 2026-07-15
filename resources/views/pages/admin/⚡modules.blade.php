@@ -57,6 +57,7 @@ new #[Title('Módulos Publicados')] class extends Component {
             'estudiantes' => filter_var($this->modulos['estudiantes'] ?? true, FILTER_VALIDATE_BOOLEAN),
             'adquisiciones' => filter_var($this->modulos['adquisiciones'] ?? true, FILTER_VALIDATE_BOOLEAN),
             'prestamos' => filter_var($this->modulos['prestamos'] ?? true, FILTER_VALIDATE_BOOLEAN),
+            'envio_correos' => filter_var($this->modulos['envio_correos'] ?? true, FILTER_VALIDATE_BOOLEAN),
         ];
         $school->save();
 
@@ -118,6 +119,16 @@ new #[Title('Módulos Publicados')] class extends Component {
                     <div>
                         <flux:label class="font-bold">{{ __('Préstamos de Informática') }}</flux:label>
                         <flux:description>{{ __('Permite a los funcionarios visualizar sus préstamos activos e históricos.') }}</flux:description>
+                    </div>
+                </flux:field>
+
+                <flux:separator variant="subtle" />
+
+                <flux:field variant="inline">
+                    <flux:switch wire:model="modulos.envio_correos" />
+                    <div>
+                        <flux:label class="font-bold">{{ __('Envío de Correos Electrónicos') }}</flux:label>
+                        <flux:description>{{ __('Habilita o deshabilita el envío de notificaciones automáticas por correo para este colegio.') }}</flux:description>
                     </div>
                 </flux:field>
             </div>

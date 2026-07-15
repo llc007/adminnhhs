@@ -25,6 +25,7 @@ class School extends Model
             'estudiantes' => true,
             'adquisiciones' => true,
             'prestamos' => true,
+            'envio_correos' => true,
         ];
 
         if (is_null($value)) {
@@ -34,6 +35,14 @@ class School extends Model
         $decoded = is_string($value) ? json_decode($value, true) : $value;
 
         return array_merge($defaults, is_array($decoded) ? $decoded : []);
+    }
+
+    /**
+     * Check if email notifications are enabled for this school.
+     */
+    public function emailsEnabled(): bool
+    {
+        return (bool) ($this->modulos_publicados['envio_correos'] ?? true);
     }
 
     /**

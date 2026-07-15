@@ -11,10 +11,38 @@ new #[Title('Auditoría de Correos')] class extends Component
 
     public string $search = '';
     public string $filtroStatus = 'todos';
+    public bool $envioCorreosHabilitado = true;
     
     // Modal de Detalle
     public bool $modalDetalle = false;
     public ?int $selectedLogId = null;
+
+    public function mount(): void
+    {
+        $school = auth()->user()->currentSchool;
+        if ($school) {
+            $this->envioCorreosHabilitado = (bool) ($school->modulos_publicados['envio_correos'] ?? true);
+        }
+    }
+
+    public function updatedEnvioCorreosHabilitado(bool $value): void
+    {
+        $school = auth()->user()->currentSchool;
+        if ($school) {
+            $modulos = $school->modulos_publicados;
+            $modulos['envio_correos'] = $value;
+            $school->modulos_publicados = $modulos;
+            $school->save();
+
+            Flux::toast(
+                heading: $value ? __('Correos Habilitados') : __('Correos Deshabilitados'),
+                text: $value 
+                    ? __('El envío de correos y notificaciones automáticas ha sido activado.') 
+                    : __('El envío de correos ha sido desactivado temporalmente.'),
+                variant: $value ? 'success' : 'warning'
+            );
+        }
+    }
 
     public function updatedSearch()
     {
@@ -72,6 +100,22 @@ new #[Title('Auditoría de Correos')] class extends Component
             <flux:field class="flex-1 w-full">
                 <flux:label>{{ __('Buscar Correo') }}</flux:label>
                 <flux:input wire:model.live.debounce.300ms="search" icon="magnifying-glass" :placeholder="__('Buscar por destinatario, asunto o Message-ID...')" />
+            </flux:field>
+
+            <div class="h-10 w-px bg-zinc-200 dark:bg-zinc-700 hidden md:block"></div>
+
+            <flux:field class="shrink-0 w-full md:w-auto">
+                <div class="flex items-center gap-3 h-10">
+                    <flux:switch wire:model.live="envioCorreosHabilitado" />
+                    <div>
+                        <flux:label class="font-bold cursor-pointer" wire:click="$toggle('envioCorreosHabilitado')">
+                            {{ __('Envío de Correos') }}
+                        </flux:label>
+                        <flux:description class="text-xs">
+                            {{ __('Activar/Desactivar notificaciones globales') }}
+                        </flux:description>
+                    </div>
+                </div>
             </flux:field>
 
             <div class="h-10 w-px bg-zinc-200 dark:bg-zinc-700 hidden md:block"></div>

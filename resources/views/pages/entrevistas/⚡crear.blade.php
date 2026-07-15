@@ -420,7 +420,14 @@ new class extends Component {
                     <span>RUT</span>
                 </div>
 
-                <div class="overflow-y-auto w-full divide-y divide-zinc-100 dark:divide-zinc-800">
+                <div class="overflow-y-auto w-full divide-y divide-zinc-100 dark:divide-zinc-800 relative min-h-[150px]">
+                    <div wire:loading wire:target="filtroCursoId" class="absolute inset-0 bg-white/70 dark:bg-zinc-900/70 flex items-center justify-center z-10">
+                        <div class="flex flex-col items-center gap-2">
+                            <flux:icon.arrow-path class="size-6 animate-spin text-blue-600 dark:text-blue-400" />
+                            <span class="text-xs font-bold text-zinc-500 dark:text-zinc-400">{{ __('Cargando alumnos...') }}</span>
+                        </div>
+                    </div>
+
                     @forelse($this->alumnosDelCurso as $al)
                         <button type="button" wire:click="seleccionarEstudiante({{ $al->id }})"
                             class="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800 focus:outline-none transition-colors group">

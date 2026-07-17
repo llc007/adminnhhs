@@ -17,6 +17,9 @@ new class extends Component {
 
     public function mount()
     {
+        if (!auth()->user()->can('ver-entrevistas-propias') && !auth()->user()->hasRole(['administrador', 'superadmin', 'directivo'])) {
+            abort(403, 'No tienes permiso para acceder a esta página.');
+        }
         // Al entrar ver el día actual
         $this->fechaSeleccionada = now()->toDateString();
     }
@@ -222,11 +225,13 @@ new class extends Component {
                     @endforelse
                 </div>
 
-                <div class="mt-6 flex justify-center">
-                    <flux:button href="{{ route('entrevistas.crear') }}" variant="primary" icon="plus" class="w-full sm:w-auto">
-                        Agendar Nueva Entrevista
-                    </flux:button>
-                </div>
+                @if (auth()->user()->can('crear-entrevistas') || auth()->user()->hasRole(['administrador', 'superadmin', 'directivo']))
+                    <div class="mt-6 flex justify-center">
+                        <flux:button href="{{ route('entrevistas.crear') }}" variant="primary" icon="plus" class="w-full sm:w-auto">
+                            Agendar Nueva Entrevista
+                        </flux:button>
+                    </div>
+                @endif
             </div>
 
             <!-- Stats & Mini Widgets (Columna 4/12) -->

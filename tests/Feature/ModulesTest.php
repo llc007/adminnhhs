@@ -9,6 +9,7 @@ use App\Notifications\EntrevistaAgendadaApoderado;
 use Illuminate\Notifications\Events\NotificationSending;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
+use Spatie\Permission\Models\Role;
 
 test('guests are redirected to the login page from modules management', function () {
     $response = $this->get(route('admin.modules'));
@@ -24,7 +25,7 @@ test('regular teachers cannot visit the modules management page', function () {
         'updated_at' => now(),
     ]);
     $user->update(['current_school_id' => $schoolId]);
-    $user->schools()->attach($schoolId, ['roles' => json_encode(['docente'])]);
+    $user->syncRolesForSchool($schoolId, ['docente']);
 
     $this->actingAs($user);
 
@@ -41,7 +42,7 @@ test('administrators can visit the modules management page', function () {
         'updated_at' => now(),
     ]);
     $user->update(['current_school_id' => $schoolId]);
-    $user->schools()->attach($schoolId, ['roles' => json_encode(['administrador'])]);
+    $user->syncRolesForSchool($schoolId, ['administrador']);
 
     $this->actingAs($user);
 
@@ -58,7 +59,7 @@ test('modules configuration can be updated by administrators', function () {
         'updated_at' => now(),
     ]);
     $user->update(['current_school_id' => $schoolId]);
-    $user->schools()->attach($schoolId, ['roles' => json_encode(['administrador'])]);
+    $user->syncRolesForSchool($schoolId, ['administrador']);
 
     $this->actingAs($user);
 
@@ -91,7 +92,7 @@ test('email sending configuration can be toggled from mail logs page', function 
         'updated_at' => now(),
     ]);
     $user->update(['current_school_id' => $schoolId]);
-    $user->schools()->attach($schoolId, ['roles' => json_encode(['administrador'])]);
+    $user->syncRolesForSchool($schoolId, ['administrador']);
 
     $this->actingAs($user);
 
@@ -122,7 +123,7 @@ test('notifications on the mail channel are cancelled when envio_correos is disa
         'updated_at' => now(),
     ]);
     $user->update(['current_school_id' => $schoolId]);
-    $user->schools()->attach($schoolId, ['roles' => json_encode(['administrador'])]);
+    $user->syncRolesForSchool($schoolId, ['administrador']);
 
     $school = School::find($schoolId);
 
@@ -178,7 +179,7 @@ test('role switcher component can toggle user roles in development', function ()
         'updated_at' => now(),
     ]);
     $user->update(['current_school_id' => $schoolId]);
-    $user->schools()->attach($schoolId, ['roles' => json_encode(['docente'])]);
+    $user->syncRolesForSchool($schoolId, ['docente']);
 
     $this->actingAs($user);
 
@@ -201,4 +202,52 @@ test('role switcher component can toggle user roles in development', function ()
     $user->refresh();
     expect($user->active_roles)->not->toContain('ti');
     expect($user->active_roles)->toContain('docente');
+});
+
+test('unauthorized users cannot visit roles and permissions manager', function () {
+    $user = User::factory()->create();
+    $schoolId = DB::table('schools')->insertGetId([
+        'name' => 'Test School',
+        'domain' => 'test.com',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    $user->update(['current_school_id' => $schoolId]);
+    $user->syncRolesForSchool($schoolId, ['docente']);
+
+    $this->actingAs($user);
+
+    $response = $this->get(route('admin.roles_permissions'));
+    $response->assertStatus(403);
+});
+
+test('administrators can load and save role permissions', function () {
+    $user = User::factory()->create();
+    $schoolId = DB::table('schools')->insertGetId([
+        'name' => 'Test School',
+        'domain' => 'test.com',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    $user->update(['current_school_id' => $schoolId]);
+    $user->syncRolesForSchool($schoolId, ['administrador']);
+
+    $this->actingAs($user);
+
+    $response = $this->get(route('admin.roles_permissions'));
+    $response->assertOk();
+
+    // Check we can toggle permission
+    $role = Role::where('team_id', $schoolId)->where('name', 'docente')->first();
+    expect($role)->not->toBeNull();
+
+    Livewire::test('pages::admin.roles_permissions')
+        ->call('selectRole', $role->id)
+        ->set('permisosSeleccionados', ['ver-estudiantes', 'crear-entrevistas'])
+        ->call('guardar');
+
+    $role->refresh();
+    expect($role->hasPermissionTo('ver-estudiantes'))->toBeTrue();
+    expect($role->hasPermissionTo('crear-entrevistas'))->toBeTrue();
+    expect($role->hasPermissionTo('gestionar-funcionarios'))->toBeFalse();
 });

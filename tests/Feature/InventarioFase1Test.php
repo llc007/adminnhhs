@@ -21,7 +21,7 @@ function setupInventarioTestUser(array $roles = ['docente'])
     ]);
 
     $user->update(['current_school_id' => $schoolId]);
-    $user->schools()->attach($schoolId, ['roles' => json_encode($roles)]);
+    $user->syncRolesForSchool($schoolId, $roles);
 
     return [$user, $schoolId];
 }

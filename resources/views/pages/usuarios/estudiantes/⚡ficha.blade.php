@@ -79,6 +79,9 @@ new class extends Component {
 
     public function guardar(): void
     {
+        if (!auth()->user()->can('editar-estudiantes') && !auth()->user()->hasRole(['administrador', 'superadmin', 'directivo'])) {
+            abort(403, 'No tienes permiso para realizar esta acción.');
+        }
         $this->validate([
             'nombresCsv'          => ['nullable', 'string', 'max:255'],
             'rutNumero'           => ['nullable', 'digits_between:7,9'],
@@ -266,8 +269,10 @@ new class extends Component {
         <flux:button href="{{ route('estudiantes.index') }}" variant="ghost">
             {{ __('Cancelar') }}
         </flux:button>
-        <flux:button wire:click="guardar" variant="primary" icon="check">
-            {{ __('Guardar Ficha') }}
-        </flux:button>
+        @if (auth()->user()->can('editar-estudiantes') || auth()->user()->hasRole(['administrador', 'superadmin', 'directivo']))
+            <flux:button wire:click="guardar" variant="primary" icon="check">
+                {{ __('Guardar Ficha') }}
+            </flux:button>
+        @endif
     </div>
 </div>

@@ -20,7 +20,7 @@ test('authenticated users with admin role can visit the calculator', function ()
     ]);
 
     $user->update(['current_school_id' => $schoolId]);
-    $user->schools()->attach($schoolId, ['roles' => json_encode(['administrador'])]);
+    $user->syncRolesForSchool($schoolId, ['administrador']);
 
     $this->actingAs($user);
 
@@ -39,7 +39,7 @@ test('the calculator page computes weekly hours correctly', function () {
     ]);
 
     $user->update(['current_school_id' => $schoolId]);
-    $user->schools()->attach($schoolId, ['roles' => json_encode(['administrador'])]);
+    $user->syncRolesForSchool($schoolId, ['administrador']);
 
     $this->actingAs($user);
 

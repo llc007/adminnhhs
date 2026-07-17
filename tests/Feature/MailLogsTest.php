@@ -22,7 +22,7 @@ test('authenticated administrators can visit the mail logs page', function () {
     ]);
 
     $user->update(['current_school_id' => $schoolId]);
-    $user->schools()->attach($schoolId, ['roles' => json_encode(['administrador'])]);
+    $user->syncRolesForSchool($schoolId, ['administrador']);
 
     $this->actingAs($user);
 
@@ -62,7 +62,7 @@ test('livewire search and status filters work correctly', function () {
         'updated_at' => now(),
     ]);
     $user->update(['current_school_id' => $schoolId]);
-    $user->schools()->attach($schoolId, ['roles' => json_encode(['administrador'])]);
+    $user->syncRolesForSchool($schoolId, ['administrador']);
     $this->actingAs($user);
 
     MailLog::truncate();

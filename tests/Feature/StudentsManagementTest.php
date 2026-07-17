@@ -35,7 +35,7 @@ function setupTestAdmin()
     ]);
 
     $user->update(['current_school_id' => $schoolId]);
-    $user->schools()->attach($schoolId, ['roles' => json_encode(['administrador'])]);
+    $user->syncRolesForSchool($schoolId, ['administrador']);
 
     return [$user, $schoolId, $cursoId];
 }

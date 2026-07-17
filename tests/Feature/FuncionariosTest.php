@@ -28,14 +28,14 @@ test('administrators can view last login column in staff list', function () {
         'updated_at' => now(),
     ]);
     $admin->update(['current_school_id' => $schoolId]);
-    $admin->schools()->attach($schoolId, ['roles' => json_encode(['administrador'])]);
+    $admin->syncRolesForSchool($schoolId, ['administrador']);
 
     $staff = User::factory()->create([
         'ultimo_ingreso_at' => now()->subHours(2),
         'nombres' => 'JUAN PEDRO',
         'apellido_pat' => 'LOPEZ',
     ]);
-    $staff->schools()->attach($schoolId, ['roles' => json_encode(['docente'])]);
+    $staff->syncRolesForSchool($schoolId, ['docente']);
 
     $this->actingAs($admin);
 
@@ -81,13 +81,13 @@ test('assigning a real role to a pending user via index modal removes the extern
         'updated_at' => now(),
     ]);
     $admin->update(['current_school_id' => $schoolId]);
-    $admin->schools()->attach($schoolId, ['roles' => json_encode(['administrador'])]);
+    $admin->syncRolesForSchool($schoolId, ['administrador']);
 
     $pendingStaff = User::factory()->create([
         'nombres' => 'PENDING',
         'apellido_pat' => 'STAFF',
     ]);
-    $pendingStaff->schools()->attach($schoolId, ['roles' => json_encode(['externo'])]);
+    $pendingStaff->syncRolesForSchool($schoolId, ['externo']);
 
     $this->actingAs($admin);
 
@@ -97,7 +97,10 @@ test('assigning a real role to a pending user via index modal removes the extern
         ->call('guardar');
 
     $pendingStaff->refresh();
-    $roles = json_decode($pendingStaff->schools()->where('school_id', $schoolId)->first()->pivot->roles, true);
+    $roles = $pendingStaff->roles()
+        ->where('roles.team_id', $schoolId)
+        ->pluck('roles.name')
+        ->toArray();
 
     expect($roles)->toContain('docente');
     expect($roles)->not->toContain('externo');
@@ -112,7 +115,7 @@ test('it can assign the ti role to a staff member', function () {
         'updated_at' => now(),
     ]);
     $admin->update(['current_school_id' => $schoolId]);
-    $admin->schools()->attach($schoolId, ['roles' => json_encode(['administrador'])]);
+    $admin->syncRolesForSchool($schoolId, ['administrador']);
 
     $this->actingAs($admin);
 
@@ -127,6 +130,5 @@ test('it can assign the ti role to a staff member', function () {
     $newUser = User::where('email', 'ti.user@test.com')->first();
     expect($newUser)->not->toBeNull();
 
-    $roles = json_decode($newUser->schools()->where('school_id', $schoolId)->first()->pivot->roles, true);
-    expect($roles)->toContain('ti');
+    expect($newUser->active_roles)->toContain('ti');
 });

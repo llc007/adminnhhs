@@ -62,12 +62,12 @@ class GoogleAuthController extends Controller
 
             $schoolUser = $user->schools()->where('school_id', $school->id)->first();
             if (! $schoolUser) {
-                $user->schools()->attach($school->id, ['roles' => json_encode([$roleToAssign])]);
+                $user->syncRolesForSchool($school->id, [$roleToAssign]);
             } elseif ($isStudent) {
                 // Si ya existe pero tiene solo 'externo', actualizamos a 'estudiante'
-                $currentRoles = json_decode($schoolUser->pivot->roles, true) ?: [];
+                $currentRoles = json_decode($schoolUser->pivot->roles ?? '[]', true) ?: [];
                 if (empty($currentRoles) || (count($currentRoles) === 1 && $currentRoles[0] === 'externo')) {
-                    $user->schools()->updateExistingPivot($school->id, ['roles' => json_encode(['estudiante'])]);
+                    $user->syncRolesForSchool($school->id, ['estudiante']);
                 }
             }
 

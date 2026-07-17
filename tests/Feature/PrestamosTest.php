@@ -7,6 +7,8 @@ use App\Notifications\PrestamoRegistrado;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\PermissionRegistrar;
 
 test('guests are redirected to the login page from loans pages', function () {
     $response = $this->get(route('ti.prestamos.index'));
@@ -28,7 +30,7 @@ test('authenticated administrators or ti staff can visit the loans page', functi
         'updated_at' => now(),
     ]);
     $user->update(['current_school_id' => $schoolId]);
-    $user->schools()->attach($schoolId, ['roles' => json_encode(['ti'])]);
+    $user->syncRolesForSchool($schoolId, ['ti']);
     $this->actingAs($user);
 
     $response = $this->get(route('ti.prestamos.index'));
@@ -47,7 +49,10 @@ test('regular teachers can only access their own mis_prestamos page', function (
         'updated_at' => now(),
     ]);
     $user->update(['current_school_id' => $schoolId]);
-    $user->schools()->attach($schoolId, ['roles' => json_encode(['docente'])]);
+    $user->syncRolesForSchool($schoolId, ['docente']);
+    app(PermissionRegistrar::class)->setPermissionsTeamId($schoolId);
+    $permission = Permission::findOrCreate('ver-prestamos-propios', 'web');
+    $user->givePermissionTo($permission);
     $this->actingAs($user);
 
     // Regular docente should NOT be able to access management
@@ -76,10 +81,10 @@ test('submitting a new loan registration works and redirects and sends notificat
     ]);
 
     $user->update(['current_school_id' => $schoolId]);
-    $user->schools()->attach($schoolId, ['roles' => json_encode(['ti'])]);
+    $user->syncRolesForSchool($schoolId, ['ti']);
 
     $docente->update(['current_school_id' => $schoolId]);
-    $docente->schools()->attach($schoolId, ['roles' => json_encode(['docente'])]);
+    $docente->syncRolesForSchool($schoolId, ['docente']);
 
     $this->actingAs($user);
 
@@ -135,10 +140,10 @@ test('ti staff can receive a returned loan', function () {
     ]);
 
     $user->update(['current_school_id' => $schoolId]);
-    $user->schools()->attach($schoolId, ['roles' => json_encode(['ti'])]);
+    $user->syncRolesForSchool($schoolId, ['ti']);
 
     $docente->update(['current_school_id' => $schoolId]);
-    $docente->schools()->attach($schoolId, ['roles' => json_encode(['docente'])]);
+    $docente->syncRolesForSchool($schoolId, ['docente']);
 
     $this->actingAs($user);
 
@@ -177,9 +182,9 @@ test('loans dashboard separates active and returned loans using tabs', function 
     ]);
 
     $user->update(['current_school_id' => $schoolId]);
-    $user->schools()->attach($schoolId, ['roles' => json_encode(['ti'])]);
+    $user->syncRolesForSchool($schoolId, ['ti']);
     $docente->update(['current_school_id' => $schoolId]);
-    $docente->schools()->attach($schoolId, ['roles' => json_encode(['docente'])]);
+    $docente->syncRolesForSchool($schoolId, ['docente']);
 
     $this->actingAs($user);
 
@@ -245,11 +250,11 @@ test('ti staff can edit an active loan details', function () {
     ]);
 
     $user->update(['current_school_id' => $schoolId]);
-    $user->schools()->attach($schoolId, ['roles' => json_encode(['ti'])]);
+    $user->syncRolesForSchool($schoolId, ['ti']);
     $docente1->update(['current_school_id' => $schoolId]);
-    $docente1->schools()->attach($schoolId, ['roles' => json_encode(['docente'])]);
+    $docente1->syncRolesForSchool($schoolId, ['docente']);
     $docente2->update(['current_school_id' => $schoolId]);
-    $docente2->schools()->attach($schoolId, ['roles' => json_encode(['docente'])]);
+    $docente2->syncRolesForSchool($schoolId, ['docente']);
 
     $this->actingAs($user);
 
@@ -296,9 +301,9 @@ test('an active loan prevents the article from appearing in search suggestions a
     ]);
 
     $user->update(['current_school_id' => $schoolId]);
-    $user->schools()->attach($schoolId, ['roles' => json_encode(['ti'])]);
+    $user->syncRolesForSchool($schoolId, ['ti']);
     $docente->update(['current_school_id' => $schoolId]);
-    $docente->schools()->attach($schoolId, ['roles' => json_encode(['docente'])]);
+    $docente->syncRolesForSchool($schoolId, ['docente']);
 
     $this->actingAs($user);
 

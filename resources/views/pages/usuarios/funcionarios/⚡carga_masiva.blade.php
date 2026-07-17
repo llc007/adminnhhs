@@ -146,11 +146,7 @@ new class extends Component {
 
                 // Asegurar que quede atado al colegio siempre y actualizar rol
                 $roles = [$fila['rol']];
-                if ($user->schools()->where('school_id', $schoolId)->exists()) {
-                    $user->schools()->updateExistingPivot($schoolId, ['roles' => json_encode($roles)]);
-                } else {
-                    $user->schools()->attach($schoolId, ['roles' => json_encode($roles)]);
-                }
+                $user->syncRolesForSchool($schoolId, $roles);
 
                 $importados++;
             }

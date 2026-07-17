@@ -38,12 +38,7 @@ new class extends Component {
             $roles = ['externo'];
         }
 
-        $user->schools()->updateExistingPivot($user->current_school_id, [
-            'roles' => json_encode($roles),
-        ]);
-
-        // Force refresh relations
-        $user->unsetRelation('schools');
+        $user->syncRolesForSchool($user->current_school_id, $roles);
 
         Flux::toast(
             heading: __('Rol Actualizado'),

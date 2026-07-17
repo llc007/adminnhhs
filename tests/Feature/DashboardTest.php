@@ -19,7 +19,7 @@ test('authenticated users can visit the dashboard', function () {
     ]);
 
     $user->update(['current_school_id' => $schoolId]);
-    $user->schools()->attach($schoolId, ['roles' => json_encode(['administrador'])]);
+    $user->syncRolesForSchool($schoolId, ['administrador']);
 
     $this->actingAs($user);
 
@@ -38,7 +38,7 @@ test('authenticated assistants are redirected to mis prestamos', function () {
     ]);
 
     $user->update(['current_school_id' => $schoolId]);
-    $user->schools()->attach($schoolId, ['roles' => json_encode(['asistente'])]);
+    $user->syncRolesForSchool($schoolId, ['asistente']);
 
     $this->actingAs($user);
 

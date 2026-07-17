@@ -65,15 +65,7 @@ class SchoolSeeder extends Seeder
         $user->update(['current_school_id' => $school->id]);
 
         // Adjuntar al colegio con roles (o actualizar si ya existe)
-        if ($user->schools()->where('school_id', $school->id)->exists()) {
-            $user->schools()->updateExistingPivot($school->id, [
-                'roles' => json_encode(['administrador', 'docente']),
-            ]);
-        } else {
-            $user->schools()->attach($school->id, [
-                'roles' => json_encode(['administrador', 'docente']),
-            ]);
-        }
+        $user->syncRolesForSchool($school->id, ['administrador', 'docente']);
 
         $this->command->info("👤 Usuario administrador ({$user->email}) asociado con roles: administrador, docente");
     }

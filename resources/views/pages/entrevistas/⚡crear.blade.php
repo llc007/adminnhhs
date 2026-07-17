@@ -112,6 +112,9 @@ new class extends Component {
 
     public function agendar()
     {
+        if (!auth()->user()->can('crear-entrevistas') && !auth()->user()->hasRole(['administrador', 'superadmin', 'directivo'])) {
+            abort(403, 'No tienes permiso para realizar esta acción.');
+        }
         $this->validate(
             [
                 'estudianteId' => ['required'],
@@ -172,6 +175,10 @@ new class extends Component {
 
     public function mount()
     {
+        if (!auth()->user()->can('crear-entrevistas') && !auth()->user()->hasRole(['administrador', 'superadmin', 'directivo'])) {
+            abort(403, 'No tienes permiso para acceder a esta página.');
+        }
+
         // Preseleccionar fecha a hoy en zona horaria de Chile
         $this->fecha = now('America/Santiago')->format('Y-m-d');
 

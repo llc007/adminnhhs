@@ -34,12 +34,9 @@ new #[Layout('layouts.blank')] class extends Component {
 
         if ($schoolId) {
             // Find all administrators and superadministrators for the current school
-            $administradores = \App\Models\User::whereHas('schools', function ($q) use ($schoolId) {
-                $q->where('school_id', $schoolId)
-                  ->where(function($sub) {
-                      $sub->whereJsonContains('school_user.roles', 'administrador')
-                          ->orWhereJsonContains('school_user.roles', 'superadmin');
-                  });
+            $administradores = \App\Models\User::whereHas('roles', function ($q) use ($schoolId) {
+                $q->where('roles.team_id', $schoolId)
+                  ->whereIn('roles.name', ['administrador', 'superadmin']);
             })->get();
 
             // Create notification instance

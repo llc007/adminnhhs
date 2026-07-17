@@ -57,9 +57,9 @@ new class extends Component {
     #[\Livewire\Attributes\Computed]
     public function docentes()
     {
-        return \App\Models\User::whereHas('schools', function ($q) {
-            $q->where('school_id', auth()->user()->current_school_id)
-              ->whereJsonContains('school_user.roles', 'docente');
+        return \App\Models\User::whereHas('roles', function ($q) {
+            $q->where('roles.team_id', auth()->user()->current_school_id)
+              ->where('roles.name', 'docente');
         })->orderBy('nombres')->get();
     }
 

@@ -17,18 +17,18 @@ Route::middleware(['auth', 'verified', 'role:administrador,directivo,superadmin'
     Route::livewire('/entrevistas/dashboard', 'pages::entrevistas.dashboard')->name('entrevistas.dashboard');
 });
 
-// Recepción / Portería — Recepción, Inspectores, Administradores, Directivos
-Route::middleware(['auth', 'verified', 'role:recepcion,inspector,administrador,directivo,superadmin'])->group(function () {
+// Recepción / Portería — Recepción, Inspectores, Administradores, Directivos, o permiso ingresar-apoderado
+Route::middleware(['auth', 'verified', 'role_or_permission:recepcion|inspector|administrador|directivo|superadmin|ingresar-apoderado'])->group(function () {
     Route::livewire('/entrevistas/recepcion', 'pages::entrevistas.recepcion')->name('entrevistas.recepcion');
 });
 
-// Historial General — Docentes, Inspectores, Administradores, Directivos, Estudiantes
-Route::middleware(['auth', 'verified', 'role:docente,inspector,administrador,directivo,superadmin,estudiante'])->group(function () {
+// Historial General — Permite acceso con rol o permiso de ver entrevistas
+Route::middleware(['auth', 'verified', 'role_or_permission:docente|inspector|administrador|directivo|superadmin|estudiante|ver-entrevistas-propias|ver-entrevistas-general'])->group(function () {
     Route::livewire('/entrevistas', 'pages::entrevistas.index')->name('entrevistas.index');
 });
 
-// Agenda y Agendar Entrevista — Docentes, Inspectores, Administradores, Directivos
-Route::middleware(['auth', 'verified', 'role:docente,inspector,administrador,directivo,superadmin'])->group(function () {
+// Agenda y Agendar Entrevista — Docentes, Inspectores, Administradores, Directivos, o permiso ver-entrevistas-propias
+Route::middleware(['auth', 'verified', 'role_or_permission:docente|inspector|administrador|directivo|superadmin|ver-entrevistas-propias|crear-entrevistas'])->group(function () {
     Route::livewire('/entrevistas/agenda', 'pages::entrevistas.agenda')->name('entrevistas.agenda');
     Route::livewire('/entrevistas/crear', 'pages::entrevistas.crear')->name('entrevistas.crear');
 });
@@ -37,7 +37,7 @@ Route::middleware(['auth', 'verified', 'role:docente,inspector,administrador,dir
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('/entrevistas/{entrevista}/bitacora', 'pages::entrevistas.bitacora')
         ->name('entrevistas.bitacora')
-        ->middleware('can:update,entrevista');
+        ->middleware('can:view,entrevista');
 
     Route::livewire('/sin-permiso', 'pages::auth.sin-permiso')->name('sin-permiso');
 });
@@ -63,6 +63,7 @@ Route::middleware(['auth', 'verified', 'role:administrador,superadmin'])->group(
     Route::livewire('/estudiantes/agregar-rut', 'pages::usuarios.estudiantes.agregar-rut')->name('estudiantes.agregar_rut');
     Route::livewire('/admin/historial-correos', 'pages::admin.mail_logs')->name('admin.mail_logs');
     Route::livewire('/admin/modulos', 'pages::admin.modules')->name('admin.modules');
+    Route::livewire('/admin/roles-permisos', 'pages::admin.roles_permissions')->name('admin.roles_permissions');
 });
 
 Route::get('/office', function () {
@@ -81,13 +82,13 @@ Route::middleware(['auth', 'verified', 'role:administrador,superadmin'])->group(
 });
 
 // Inventario General — Solo Administrador, Superadmin y TI (NO directivos)
-Route::middleware(['auth', 'verified', 'role:ti,administrador,superadmin'])->group(function () {
+Route::middleware(['auth', 'verified', 'role_or_permission:ti|administrador|superadmin|ver-prestamos-general'])->group(function () {
     Route::livewire('/inventario', 'pages::inventario.index')->name('inventario.index');
     Route::livewire('/inventario/detalles/{id}', 'pages::inventario.detalles')->name('inventario.detalles');
 });
 
 // Módulo de Informática (TI) — Préstamos
-Route::middleware(['auth', 'verified', 'role:ti,administrador,superadmin'])->group(function () {
+Route::middleware(['auth', 'verified', 'role_or_permission:ti|administrador|superadmin|gestionar-prestamos'])->group(function () {
     Route::livewire('/ti/prestamos', 'pages::ti.prestamos.index')->name('ti.prestamos.index');
     Route::livewire('/ti/prestamos/crear', 'pages::ti.prestamos.crear')->name('ti.prestamos.crear');
 });

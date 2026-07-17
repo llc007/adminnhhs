@@ -122,7 +122,7 @@ test('dashboard page redirects student users to index route of entrevistas', fun
     ]);
 
     $user->update(['current_school_id' => $schoolId]);
-    $user->schools()->attach($schoolId, ['roles' => json_encode(['estudiante'])]);
+    $user->syncRolesForSchool($schoolId, ['estudiante']);
 
     $response = $this->actingAs($user)->get(route('dashboard'));
 
@@ -163,10 +163,10 @@ test('interviews index page scopes records to the authenticated student', functi
     ]);
 
     $userStudent1->update(['current_school_id' => $schoolId]);
-    $userStudent1->schools()->attach($schoolId, ['roles' => json_encode(['estudiante'])]);
+    $userStudent1->syncRolesForSchool($schoolId, ['estudiante']);
 
     $userStudent2->update(['current_school_id' => $schoolId]);
-    $userStudent2->schools()->attach($schoolId, ['roles' => json_encode(['estudiante'])]);
+    $userStudent2->syncRolesForSchool($schoolId, ['estudiante']);
 
     // Link students to their Estudiante records
     $student1 = Estudiante::create([
@@ -234,7 +234,7 @@ test('student role cannot access restricted interview routes', function () {
     ]);
 
     $user->update(['current_school_id' => $schoolId]);
-    $user->schools()->attach($schoolId, ['roles' => json_encode(['estudiante'])]);
+    $user->syncRolesForSchool($schoolId, ['estudiante']);
 
     $this->actingAs($user);
 
@@ -253,7 +253,7 @@ test('student sidebar displays Mi Historial link', function () {
     ]);
 
     $user->update(['current_school_id' => $schoolId]);
-    $user->schools()->attach($schoolId, ['roles' => json_encode(['estudiante'])]);
+    $user->syncRolesForSchool($schoolId, ['estudiante']);
 
     $response = $this->actingAs($user)->get(route('entrevistas.index'));
     $response->assertSee('Mi Historial');

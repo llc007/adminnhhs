@@ -100,12 +100,14 @@ new class extends Component {
 
     public function guardarBorrador()
     {
+        $this->authorize('update', $this->entrevista);
         $this->guardarColeccion('borrador');
         \Flux::toast('Borrador actualizado correctamente.', variant: 'success');
     }
 
     public function finalizarBitacora()
     {
+        $this->authorize('update', $this->entrevista);
         $this->guardarColeccion('finalizado');
         
         // Si la entrevista estaba 'ingresada' y no se había marcado salida manual, el cierre asume la salida.
@@ -154,6 +156,9 @@ new class extends Component {
 
     public function abrirModalNoRealizada()
     {
+        if (!auth()->user()->can('cancelar-entrevistas') && !auth()->user()->hasRole(['administrador', 'superadmin', 'directivo'])) {
+            abort(403, 'No tienes permiso para realizar esta acción.');
+        }
         $this->motivoNoRealizada = '';
         $this->estadoNoRealizada = '';
         $this->modalNoRealizada = true;
@@ -161,12 +166,18 @@ new class extends Component {
 
     public function setMotivoPredeterminado($motivo, $estado)
     {
+        if (!auth()->user()->can('cancelar-entrevistas') && !auth()->user()->hasRole(['administrador', 'superadmin', 'directivo'])) {
+            abort(403, 'No tienes permiso para realizar esta acción.');
+        }
         $this->motivoNoRealizada = $motivo;
         $this->estadoNoRealizada = $estado;
     }
 
     public function marcarNoRealizada()
     {
+        if (!auth()->user()->can('cancelar-entrevistas') && !auth()->user()->hasRole(['administrador', 'superadmin', 'directivo'])) {
+            abort(403, 'No tienes permiso para realizar esta acción.');
+        }
         $this->validate([
             'motivoNoRealizada' => 'required|min:5',
             'estadoNoRealizada' => 'required|in:ausente,cancelada',
@@ -258,9 +269,11 @@ new class extends Component {
                 <flux:button variant="ghost" class="w-full md:w-auto cursor-pointer" wire:click="guardarBorrador">
                     {{ __('Guardar Borrador') }}
                 </flux:button>
-                <flux:button variant="danger" icon="x-circle" class="w-full md:w-auto cursor-pointer" wire:click="abrirModalNoRealizada">
-                    {{ __('No Realizada') }}
-                </flux:button>
+                @if (auth()->user()->can('cancelar-entrevistas') || auth()->user()->hasRole(['administrador', 'superadmin', 'directivo']))
+                    <flux:button variant="danger" icon="x-circle" class="w-full md:w-auto cursor-pointer" wire:click="abrirModalNoRealizada">
+                        {{ __('No Realizada') }}
+                    </flux:button>
+                @endif
                 <flux:button variant="primary" icon="check-circle" class="w-full md:w-auto bg-gradient-to-br from-[#00376e] to-blue-800 hover:from-blue-800 hover:to-blue-900 transition-colors cursor-pointer" wire:click="finalizarBitacora">
                     {{ __('Finalizar Entrevista') }}
                 </flux:button>

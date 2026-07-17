@@ -88,15 +88,7 @@ new class extends Component
                 $nuevosRoles = ['estudiante'];
             }
             if ($funcionario->current_school_id) {
-                if ($funcionario->schools()->where('school_id', $funcionario->current_school_id)->exists()) {
-                    $funcionario->schools()->updateExistingPivot($funcionario->current_school_id, [
-                        'roles' => json_encode($nuevosRoles),
-                    ]);
-                } else {
-                    $funcionario->schools()->attach($funcionario->current_school_id, [
-                        'roles' => json_encode($nuevosRoles),
-                    ]);
-                }
+                $funcionario->syncRolesForSchool($funcionario->current_school_id, $nuevosRoles);
             }
         }
 

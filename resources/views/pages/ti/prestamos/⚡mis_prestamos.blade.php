@@ -9,6 +9,13 @@ new #[Title('Mis Préstamos')] class extends Component
 {
     use WithPagination;
 
+    public function mount(): void
+    {
+        if (!auth()->user()->can('ver-prestamos-propios') && !auth()->user()->hasRole(['ti', 'administrador', 'superadmin'])) {
+            abort(403, 'No tienes permiso para acceder a esta página.');
+        }
+    }
+
     #[\Livewire\Attributes\Computed]
     public function misPrestamos()
     {

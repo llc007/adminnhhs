@@ -50,12 +50,18 @@ new class extends Component {
 
     public function abrirCrear(): void
     {
+        if (!auth()->user()->can('editar-estudiantes') && !auth()->user()->hasRole(['administrador', 'superadmin', 'directivo'])) {
+            abort(403, 'No tienes permiso para realizar esta acción.');
+        }
         $this->reset(['estudianteId', 'nombres', 'rutNumero', 'rutDv', 'email', 'formCursoId', 'apoderadoNombres', 'apoderadoTelefono', 'apoderadoEmail', 'apoderadoDomicilio']);
         $this->modalAbierto = true;
     }
 
     public function abrirEditar(int $id): void
     {
+        if (!auth()->user()->can('editar-estudiantes') && !auth()->user()->hasRole(['administrador', 'superadmin', 'directivo'])) {
+            abort(403, 'No tienes permiso para realizar esta acción.');
+        }
         $estudiante = Estudiante::findOrFail($id);
         $this->estudianteId = $estudiante->id;
         $this->nombres = $estudiante->nombres_csv ?? '';
@@ -79,6 +85,9 @@ new class extends Component {
 
     public function guardar(): void
     {
+        if (!auth()->user()->can('editar-estudiantes') && !auth()->user()->hasRole(['administrador', 'superadmin', 'directivo'])) {
+            abort(403, 'No tienes permiso para realizar esta acción.');
+        }
         $this->validate([
             'nombres' => ['required', 'string', 'max:255'],
             'rutNumero' => [
@@ -153,12 +162,18 @@ new class extends Component {
 
     public function confirmarEliminar(int $id): void
     {
+        if (!auth()->user()->can('editar-estudiantes') && !auth()->user()->hasRole(['administrador', 'superadmin', 'directivo'])) {
+            abort(403, 'No tienes permiso para realizar esta acción.');
+        }
         $this->eliminarId = $id;
         $this->modalEliminar = true;
     }
 
     public function eliminar(): void
     {
+        if (!auth()->user()->can('editar-estudiantes') && !auth()->user()->hasRole(['administrador', 'superadmin', 'directivo'])) {
+            abort(403, 'No tienes permiso para realizar esta acción.');
+        }
         if ($this->eliminarId) {
             Estudiante::findOrFail($this->eliminarId)->delete();
         }
@@ -275,12 +290,16 @@ new class extends Component {
                 <flux:button variant="ghost" icon="document-arrow-down" wire:click="exportarExcel">
                     {{ __('Exportar') }}
                 </flux:button>
-                <flux:button variant="ghost" icon="document-arrow-up" href="{{ route('estudiantes.carga_masiva') }}">
-                    {{ __('Importar CSV') }}
-                </flux:button>
-                <flux:button variant="primary" icon="plus" class="shrink-0" wire:click="abrirCrear">
-                    {{ __('Nuevo Estudiante') }}
-                </flux:button>
+                @if (auth()->user()->can('importar-estudiantes') || auth()->user()->hasRole(['administrador', 'superadmin', 'directivo']))
+                    <flux:button variant="ghost" icon="document-arrow-up" href="{{ route('estudiantes.carga_masiva') }}">
+                        {{ __('Importar CSV') }}
+                    </flux:button>
+                @endif
+                @if (auth()->user()->can('editar-estudiantes') || auth()->user()->hasRole(['administrador', 'superadmin', 'directivo']))
+                    <flux:button variant="primary" icon="plus" class="shrink-0" wire:click="abrirCrear">
+                        {{ __('Nuevo Estudiante') }}
+                    </flux:button>
+                @endif
             </x-header>
         </div>
 
@@ -429,11 +448,13 @@ new class extends Component {
                                         <flux:button variant="ghost" size="sm" icon="eye"
                                             :tooltip="__('Ver Ficha')"
                                             href="{{ route('estudiantes.ficha', $estudiante->id) }}" />
-                                        <flux:button variant="ghost" size="sm" icon="pencil-square"
-                                            :tooltip="__('Editar')" wire:click="abrirEditar({{ $estudiante->id }})" />
-                                        <flux:button variant="ghost" size="sm" icon="trash"
-                                            :tooltip="__('Eliminar')"
-                                            wire:click="confirmarEliminar({{ $estudiante->id }})" />
+                                        @if (auth()->user()->can('editar-estudiantes') || auth()->user()->hasRole(['administrador', 'superadmin', 'directivo']))
+                                            <flux:button variant="ghost" size="sm" icon="pencil-square"
+                                                :tooltip="__('Editar')" wire:click="abrirEditar({{ $estudiante->id }})" />
+                                            <flux:button variant="ghost" size="sm" icon="trash"
+                                                :tooltip="__('Eliminar')"
+                                                wire:click="confirmarEliminar({{ $estudiante->id }})" />
+                                        @endif
                                     </div>
                                 </flux:table.cell>
                             </flux:table.row>

@@ -13,15 +13,19 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
+use Spatie\Permission\Traits\HasRoles;
 
 #[Fillable(['nombres', 'apellido_pat', 'apellido_mat', 'email', 'password', 'google_id', 'avatar', 'current_school_id', 'rut_numero', 'rut_dv', 'fecha_nacimiento', 'telefono', 'direccion'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, TwoFactorAuthenticatable;
+    use HasFactory, HasRoles, Notifiable, TwoFactorAuthenticatable;
 
     /**
      * The "booted" method of the model.
@@ -113,7 +117,7 @@ class User extends Authenticatable
      */
     public function schools(): BelongsToMany
     {
-        return $this->belongsToMany(School::class)->withPivot('roles')->withTimestamps();
+        return $this->belongsToMany(School::class)->withTimestamps();
     }
 
     /**
@@ -149,28 +153,77 @@ class User extends Authenticatable
             return [];
         }
 
-        $school = $this->schools->where('id', $this->current_school_id)->first();
-
-        if (! $school || ! $school->pivot->roles) {
-            return [];
-        }
-
-        $roles = json_decode($school->pivot->roles, true);
-
-        return is_array($roles) ? $roles : [];
+        return $this->roles()
+            ->where('roles.team_id', $this->current_school_id)
+            ->pluck('roles.name')
+            ->toArray();
     }
 
     /**
-     * Check if user has a specific role or any of an array of roles.
+     * Check if user has a specific role or any of an array/collection of roles.
      */
-    public function hasRole(string|array $roles): bool
+    public function hasRole(string|array|Collection|\Spatie\Permission\Contracts\Role $roles): bool
     {
         $activeRoles = $this->active_roles;
 
+        if ($roles instanceof \Spatie\Permission\Contracts\Role) {
+            return in_array($roles->name, $activeRoles);
+        }
+
+        if ($roles instanceof Collection) {
+            $roles = $roles->pluck('name')->toArray();
+        }
+
         if (is_array($roles)) {
+            $flatRoles = [];
+            foreach ($roles as $role) {
+                if (is_array($role)) {
+                    foreach ($role as $r) {
+                        $flatRoles[] = $r;
+                    }
+                } elseif ($role instanceof Collection) {
+                    foreach ($role->pluck('name')->toArray() as $r) {
+                        $flatRoles[] = $r;
+                    }
+                } else {
+                    $flatRoles[] = $role;
+                }
+            }
+            $roles = $flatRoles;
+
+            $roles = array_map(function ($role) {
+                return $role instanceof \Spatie\Permission\Contracts\Role ? $role->name : $role;
+            }, $roles);
+
             return count(array_intersect($roles, $activeRoles)) > 0;
         }
 
         return in_array($roles, $activeRoles);
+    }
+
+    /**
+     * Sync roles for a specific school in Spatie model_has_roles and ensure school membership.
+     */
+    public function syncRolesForSchool(int $schoolId, array $roles): void
+    {
+        // 1. Sync to Spatie scoped by school team_id (with auto-create if they do not exist)
+        app(PermissionRegistrar::class)->setPermissionsTeamId($schoolId);
+
+        foreach ($roles as $roleName) {
+            if (! empty($roleName)) {
+                Role::findOrCreate($roleName, 'web');
+            }
+        }
+
+        $this->syncRoles($roles);
+
+        // 2. Ensure user is attached to the school (membership)
+        if (! $this->schools()->where('school_id', $schoolId)->exists()) {
+            $this->schools()->attach($schoolId);
+        }
+
+        // Force relationship refresh
+        $this->unsetRelation('roles');
+        $this->unsetRelation('schools');
     }
 }

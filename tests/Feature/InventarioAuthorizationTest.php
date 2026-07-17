@@ -16,7 +16,7 @@ test('directivo role cannot access general inventory, revision, compras, and adm
     ]);
 
     $user->update(['current_school_id' => $schoolId]);
-    $user->schools()->attach($schoolId, ['roles' => json_encode(['directivo'])]);
+    $user->syncRolesForSchool($schoolId, ['directivo']);
 
     $this->actingAs($user);
 
@@ -45,7 +45,7 @@ test('users with solicitante_adquisiciones role can access create acquisitions p
     ]);
 
     $user->update(['current_school_id' => $schoolId]);
-    $user->schools()->attach($schoolId, ['roles' => json_encode(['solicitante_adquisiciones'])]);
+    $user->syncRolesForSchool($schoolId, ['solicitante_adquisiciones']);
 
     $this->actingAs($user);
 
@@ -64,7 +64,7 @@ test('users without solicitante_adquisiciones role cannot access create acquisit
 
     // Give them directivo role instead
     $user->update(['current_school_id' => $schoolId]);
-    $user->schools()->attach($schoolId, ['roles' => json_encode(['directivo'])]);
+    $user->syncRolesForSchool($schoolId, ['directivo']);
 
     $this->actingAs($user);
 
@@ -82,7 +82,7 @@ test('administrador can access both inventory and acquisitions pages', function 
     ]);
 
     $user->update(['current_school_id' => $schoolId]);
-    $user->schools()->attach($schoolId, ['roles' => json_encode(['administrador'])]);
+    $user->syncRolesForSchool($schoolId, ['administrador']);
 
     $this->actingAs($user);
 
@@ -102,7 +102,7 @@ test('ti role can access general inventory and loans but nothing else', function
     ]);
 
     $user->update(['current_school_id' => $schoolId]);
-    $user->schools()->attach($schoolId, ['roles' => json_encode(['ti'])]);
+    $user->syncRolesForSchool($schoolId, ['ti']);
 
     // Create dummy article to test details access
     $articulo = ArticuloInventario::create([

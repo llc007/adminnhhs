@@ -25,7 +25,10 @@ new class extends Component
     public function funcionarios()
     {
         return User::whereHas('schools', function ($q) {
-            $q->where('school_id', auth()->user()->current_school_id)->whereJsonDoesntContain('school_user.roles', 'estudiante');
+            $q->where('school_id', auth()->user()->current_school_id);
+        })->whereDoesntHave('roles', function ($q) {
+            $q->where('roles.team_id', auth()->user()->current_school_id)
+              ->where('roles.name', 'estudiante');
         })->orderBy('nombres')->get();
     }
 

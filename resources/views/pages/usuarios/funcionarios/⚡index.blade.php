@@ -98,15 +98,7 @@ new class extends Component {
             ]);
 
             $schoolId = auth()->user()->current_school_id;
-            if ($funcionario->schools()->where('school_id', $schoolId)->exists()) {
-                $funcionario->schools()->updateExistingPivot($schoolId, [
-                    'roles' => json_encode($nuevosRoles),
-                ]);
-            } else {
-                $funcionario->schools()->attach($schoolId, [
-                    'roles' => json_encode($nuevosRoles),
-                ]);
-            }
+            $funcionario->syncRolesForSchool($schoolId, $nuevosRoles);
         } else {
             $funcionario = \App\Models\User::create([
                 'nombres' => $this->nombres,
@@ -118,7 +110,7 @@ new class extends Component {
                 'password' => \Illuminate\Support\Facades\Hash::make(\Illuminate\Support\Str::random(16)),
                 'current_school_id' => auth()->user()->current_school_id,
             ]);
-            $funcionario->schools()->attach(auth()->user()->current_school_id, ['roles' => json_encode($nuevosRoles)]);
+            $funcionario->syncRolesForSchool(auth()->user()->current_school_id, $nuevosRoles);
         }
 
         $this->modalAbierto = false;
@@ -147,10 +139,17 @@ new class extends Component {
     {
         return \App\Models\User::query()
             ->whereHas('schools', function ($q) {
-                $q->where('school_id', auth()->user()->current_school_id)->whereJsonDoesntContain('school_user.roles', 'estudiante');
-                if ($this->cargo !== 'todos') {
-                    $q->whereJsonContains('school_user.roles', $this->cargo);
-                }
+                $q->where('school_id', auth()->user()->current_school_id);
+            })
+            ->whereDoesntHave('roles', function ($q) {
+                $q->where('roles.team_id', auth()->user()->current_school_id)
+                  ->where('roles.name', 'estudiante');
+            })
+            ->when($this->cargo !== 'todos', function ($query) {
+                $query->whereHas('roles', function ($q) {
+                    $q->where('roles.team_id', auth()->user()->current_school_id)
+                      ->where('roles.name', $this->cargo);
+                });
             })
             ->when(strlen($this->search) >= 2, function ($query) {
                 $query->where(function ($q) {

@@ -23,7 +23,7 @@ function setupTestEnvironment()
         'current_school_id' => $schoolId,
     ]);
 
-    $user->schools()->attach($schoolId, ['roles' => json_encode(['administrador', 'docente'])]);
+    $user->syncRolesForSchool($schoolId, ['administrador', 'docente']);
 
     $academicYearId = DB::table('academic_years')->insertGetId([
         'school_id' => $schoolId,
@@ -174,7 +174,7 @@ test('receptionist can add a new attention place successfully', function () {
     ]);
 
     $user->update(['current_school_id' => $schoolId]);
-    $user->schools()->attach($schoolId, ['roles' => json_encode(['recepcion'])]);
+    $user->syncRolesForSchool($schoolId, ['recepcion']);
 
     $this->actingAs($user);
 

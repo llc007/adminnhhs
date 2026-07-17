@@ -18,7 +18,7 @@ test('unregistered users with only externo role are redirected to sin-permiso', 
     ]);
 
     $user->update(['current_school_id' => $schoolId]);
-    $user->schools()->attach($schoolId, ['roles' => json_encode(['externo'])]);
+    $user->syncRolesForSchool($schoolId, ['externo']);
 
     // Try to visit dashboard (requires administrador/directivo/superadmin)
     $response = $this->actingAs($user)->get(route('dashboard'));
@@ -40,11 +40,11 @@ test('unregistered users can render sin-permiso page and submit access requests'
 
     // Setup user with 'externo' role
     $user->update(['current_school_id' => $schoolId]);
-    $user->schools()->attach($schoolId, ['roles' => json_encode(['externo'])]);
+    $user->syncRolesForSchool($schoolId, ['externo']);
 
     // Setup admin with 'administrador' role in same school
     $admin->update(['current_school_id' => $schoolId]);
-    $admin->schools()->attach($schoolId, ['roles' => json_encode(['administrador'])]);
+    $admin->syncRolesForSchool($schoolId, ['administrador']);
 
     // 1. Assert the page renders
     $component = Livewire::actingAs($user)->test('pages::auth.sin-permiso');
@@ -92,7 +92,7 @@ test('inspectors are redirected to recepcion when visiting the dashboard', funct
     ]);
 
     $user->update(['current_school_id' => $schoolId]);
-    $user->schools()->attach($schoolId, ['roles' => json_encode(['inspector', 'docente'])]);
+    $user->syncRolesForSchool($schoolId, ['inspector', 'docente']);
 
     $response = $this->actingAs($user)->get(route('dashboard'));
 
@@ -110,7 +110,7 @@ test('teachers are redirected to agenda when visiting the dashboard', function (
     ]);
 
     $user->update(['current_school_id' => $schoolId]);
-    $user->schools()->attach($schoolId, ['roles' => json_encode(['docente'])]);
+    $user->syncRolesForSchool($schoolId, ['docente']);
 
     $response = $this->actingAs($user)->get(route('dashboard'));
 

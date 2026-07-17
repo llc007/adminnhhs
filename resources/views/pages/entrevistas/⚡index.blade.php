@@ -29,6 +29,18 @@ new class extends Component {
     #[Url]
     public $filtroTemporal = ''; // dia, semana, mes
 
+    public function mount()
+    {
+        $user = auth()->user();
+        if (
+            !$user->can('ver-entrevistas-general') &&
+            !$user->can('ver-entrevistas-propias') &&
+            !$user->hasRole(['administrador', 'superadmin', 'directivo', 'estudiante'])
+        ) {
+            abort(403, 'No tienes permiso para acceder a esta página.');
+        }
+    }
+
     public function updating($field)
     {
         $this->resetPage();
@@ -64,6 +76,10 @@ new class extends Component {
                 $query->where('estudiante_id', $estudiante->id);
             } else {
                 $query->whereRaw('1 = 0');
+            }
+        } elseif (!auth()->user()->hasRole(['administrador', 'superadmin', 'directivo'])) {
+            if (!auth()->user()->can('ver-entrevistas-general') && auth()->user()->can('ver-entrevistas-propias')) {
+                $query->where('user_id', auth()->id());
             }
         }
 

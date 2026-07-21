@@ -7,6 +7,8 @@ use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\PermissionRegistrar;
 
 function setupTestEnvironment()
 {
@@ -24,6 +26,17 @@ function setupTestEnvironment()
     ]);
 
     $user->syncRolesForSchool($schoolId, ['administrador', 'docente']);
+
+    // Grant explicit permissions since roles no longer bypass authorization
+    app(PermissionRegistrar::class)->setPermissionsTeamId($schoolId);
+    $user->givePermissionTo([
+        Permission::findOrCreate('ver-entrevistas-general', 'web'),
+        Permission::findOrCreate('ver-entrevistas-propias', 'web'),
+        Permission::findOrCreate('cancelar-entrevistas', 'web'),
+        Permission::findOrCreate('crear-entrevistas', 'web'),
+    ]);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+    $user->refresh();
 
     $academicYearId = DB::table('academic_years')->insertGetId([
         'school_id' => $schoolId,

@@ -156,7 +156,7 @@ new class extends Component {
 
     public function abrirModalNoRealizada()
     {
-        if (!auth()->user()->can('cancelar-entrevistas') && !auth()->user()->hasRole(['administrador', 'superadmin', 'directivo'])) {
+        if (!auth()->user()->can('cancelar-entrevistas') && !auth()->user()->hasRole('superadmin')) {
             abort(403, 'No tienes permiso para realizar esta acción.');
         }
         $this->motivoNoRealizada = '';
@@ -166,7 +166,7 @@ new class extends Component {
 
     public function setMotivoPredeterminado($motivo, $estado)
     {
-        if (!auth()->user()->can('cancelar-entrevistas') && !auth()->user()->hasRole(['administrador', 'superadmin', 'directivo'])) {
+        if (!auth()->user()->can('cancelar-entrevistas') && !auth()->user()->hasRole('superadmin')) {
             abort(403, 'No tienes permiso para realizar esta acción.');
         }
         $this->motivoNoRealizada = $motivo;
@@ -175,7 +175,7 @@ new class extends Component {
 
     public function marcarNoRealizada()
     {
-        if (!auth()->user()->can('cancelar-entrevistas') && !auth()->user()->hasRole(['administrador', 'superadmin', 'directivo'])) {
+        if (!auth()->user()->can('cancelar-entrevistas') && !auth()->user()->hasRole('superadmin')) {
             abort(403, 'No tienes permiso para realizar esta acción.');
         }
         $this->validate([
@@ -269,7 +269,7 @@ new class extends Component {
                 <flux:button variant="ghost" class="w-full md:w-auto cursor-pointer" wire:click="guardarBorrador">
                     {{ __('Guardar Borrador') }}
                 </flux:button>
-                @if (auth()->user()->can('cancelar-entrevistas') || auth()->user()->hasRole(['administrador', 'superadmin', 'directivo']))
+                @if (auth()->user()->can('cancelar-entrevistas') || auth()->user()->hasRole('superadmin'))
                     <flux:button variant="danger" icon="x-circle" class="w-full md:w-auto cursor-pointer" wire:click="abrirModalNoRealizada">
                         {{ __('No Realizada') }}
                     </flux:button>
@@ -288,7 +288,7 @@ new class extends Component {
                     </flux:button>
                 @endif
                 
-                @if(auth()->user()->hasRole(['administrador', 'superadmin']))
+                @if (auth()->user()->hasRole('superadmin'))
                     <flux:modal.trigger name="reabrir-bitacora">
                         <flux:button variant="ghost" icon="arrow-path" class="w-full md:w-auto cursor-pointer">
                             {{ __('Reabrir Bitácora') }}

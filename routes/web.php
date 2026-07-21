@@ -17,18 +17,18 @@ Route::middleware(['auth', 'verified', 'role:administrador,directivo,superadmin'
     Route::livewire('/entrevistas/dashboard', 'pages::entrevistas.dashboard')->name('entrevistas.dashboard');
 });
 
-// Recepción / Portería — Recepción, Inspectores, Administradores, Directivos, o permiso ingresar-apoderado
-Route::middleware(['auth', 'verified', 'role_or_permission:recepcion|inspector|administrador|directivo|superadmin|ingresar-apoderado'])->group(function () {
+// Recepción / Portería — requiere permiso ingresar-apoderado o superadmin
+Route::middleware(['auth', 'verified', 'role_or_permission:superadmin|ingresar-apoderado'])->group(function () {
     Route::livewire('/entrevistas/recepcion', 'pages::entrevistas.recepcion')->name('entrevistas.recepcion');
 });
 
-// Historial General — Permite acceso con rol o permiso de ver entrevistas
-Route::middleware(['auth', 'verified', 'role_or_permission:docente|inspector|administrador|directivo|superadmin|estudiante|ver-entrevistas-propias|ver-entrevistas-general'])->group(function () {
+// Historial General — requiere permiso de ver entrevistas, superadmin, o rol estudiante
+Route::middleware(['auth', 'verified', 'role_or_permission:superadmin|estudiante|ver-entrevistas-propias|ver-entrevistas-general'])->group(function () {
     Route::livewire('/entrevistas', 'pages::entrevistas.index')->name('entrevistas.index');
 });
 
-// Agenda y Agendar Entrevista — Docentes, Inspectores, Administradores, Directivos, o permiso ver-entrevistas-propias
-Route::middleware(['auth', 'verified', 'role_or_permission:docente|inspector|administrador|directivo|superadmin|ver-entrevistas-propias|crear-entrevistas'])->group(function () {
+// Agenda y Agendar Entrevista — requiere permiso ver-entrevistas-propias o crear-entrevistas, o superadmin
+Route::middleware(['auth', 'verified', 'role_or_permission:superadmin|ver-entrevistas-propias|crear-entrevistas'])->group(function () {
     Route::livewire('/entrevistas/agenda', 'pages::entrevistas.agenda')->name('entrevistas.agenda');
     Route::livewire('/entrevistas/crear', 'pages::entrevistas.crear')->name('entrevistas.crear');
 });

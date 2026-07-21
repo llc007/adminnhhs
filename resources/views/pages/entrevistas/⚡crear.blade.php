@@ -112,7 +112,7 @@ new class extends Component {
 
     public function agendar()
     {
-        if (!auth()->user()->can('crear-entrevistas') && !auth()->user()->hasRole(['administrador', 'superadmin', 'directivo'])) {
+        if (!auth()->user()->can('crear-entrevistas') && !auth()->user()->hasRole('superadmin')) {
             abort(403, 'No tienes permiso para realizar esta acción.');
         }
         $this->validate(
@@ -175,7 +175,7 @@ new class extends Component {
 
     public function mount()
     {
-        if (!auth()->user()->can('crear-entrevistas') && !auth()->user()->hasRole(['administrador', 'superadmin', 'directivo'])) {
+        if (!auth()->user()->can('crear-entrevistas') && !auth()->user()->hasRole('superadmin')) {
             abort(403, 'No tienes permiso para acceder a esta página.');
         }
 

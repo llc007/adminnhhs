@@ -17,7 +17,7 @@ new class extends Component {
 
     public function mount()
     {
-        if (!auth()->user()->can('ver-entrevistas-propias') && !auth()->user()->hasRole(['administrador', 'superadmin', 'directivo'])) {
+        if (!auth()->user()->can('ver-entrevistas-propias') && !auth()->user()->hasRole('superadmin')) {
             abort(403, 'No tienes permiso para acceder a esta página.');
         }
         // Al entrar ver el día actual
@@ -225,7 +225,7 @@ new class extends Component {
                     @endforelse
                 </div>
 
-                @if (auth()->user()->can('crear-entrevistas') || auth()->user()->hasRole(['administrador', 'superadmin', 'directivo']))
+                @if (auth()->user()->can('crear-entrevistas') || auth()->user()->hasRole('superadmin'))
                     <div class="mt-6 flex justify-center">
                         <flux:button href="{{ route('entrevistas.crear') }}" variant="primary" icon="plus" class="w-full sm:w-auto">
                             Agendar Nueva Entrevista

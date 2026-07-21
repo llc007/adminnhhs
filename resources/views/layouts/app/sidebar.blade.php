@@ -30,23 +30,23 @@
         <livewire:admin.seleccionar-colegio />
 
         <flux:sidebar.nav>
-            @if ((auth()->user()->hasRole(['administrador', 'directivo', 'superadmin', 'recepcion', 'inspector', 'docente', 'estudiante']) || auth()->user()->canAny(['ver-entrevistas-propias', 'ver-entrevistas-general', 'crear-entrevistas', 'cancelar-entrevistas', 'ingresar-apoderado'])) && ($isAdmin || ($modulos['entrevistas'] ?? false)))
+            @if ((auth()->user()->hasRole(['superadmin', 'estudiante']) || auth()->user()->canAny(['ver-entrevistas-propias', 'ver-entrevistas-general', 'crear-entrevistas', 'cancelar-entrevistas', 'ingresar-apoderado'])) && ($isAdmin || ($modulos['entrevistas'] ?? false)))
                 <flux:sidebar.group :heading="__('Entrevistas')" class="grid">
-                    @if (auth()->user()->hasRole(['administrador', 'directivo', 'superadmin']) || auth()->user()->can('ver-entrevistas-general'))
+                    @if (auth()->user()->hasRole('superadmin') || auth()->user()->can('ver-entrevistas-general'))
                         <flux:sidebar.item icon="home" :href="route('dashboard')"
                             :current="request()->routeIs('dashboard')" wire:navigate>
                             {{ 'Dashboard' }}
                         </flux:sidebar.item>
                     @endif
 
-                    @if (auth()->user()->hasRole(['recepcion', 'directivo', 'administrador', 'superadmin', 'inspector']) || auth()->user()->can('ingresar-apoderado'))
+                    @if (auth()->user()->can('ingresar-apoderado') || auth()->user()->hasRole('superadmin'))
                         <flux:sidebar.item icon="building-office-2" :href="route('entrevistas.recepcion')"
                             :current="request()->routeIs('entrevistas.recepcion')" wire:navigate>
                             {{ __('Recepción / Portería') }}
                         </flux:sidebar.item>
                     @endif
 
-                    @if ((auth()->user()->hasRole(['administrador', 'directivo', 'superadmin']) || auth()->user()->can('ver-entrevistas-propias')) &&
+                    @if ((auth()->user()->hasRole('superadmin') || auth()->user()->can('ver-entrevistas-propias')) &&
                             ($isAdmin || ($modulos['entrevistas'] ?? false)))
                         <flux:sidebar.item icon="calendar-days" :href="route('entrevistas.agenda')"
                             :current="request()->routeIs('entrevistas.agenda')" wire:navigate>
@@ -54,7 +54,7 @@
                         </flux:sidebar.item>
                     @endif
 
-                    @if ((auth()->user()->hasRole(['administrador', 'directivo', 'superadmin', 'estudiante']) || auth()->user()->canAny(['ver-entrevistas-propias', 'ver-entrevistas-general'])) &&
+                    @if ((auth()->user()->hasRole(['superadmin', 'estudiante']) || auth()->user()->canAny(['ver-entrevistas-propias', 'ver-entrevistas-general'])) &&
                             ($isAdmin || ($modulos['entrevistas'] ?? false)))
                         <flux:sidebar.item icon="table-cells" :href="route('entrevistas.index')"
                             :current="request()->routeIs('entrevistas.index')" wire:navigate>

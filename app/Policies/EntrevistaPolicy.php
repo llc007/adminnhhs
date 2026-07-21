@@ -20,8 +20,8 @@ class EntrevistaPolicy
      */
     public function view(User $user, Entrevista $entrevista): bool
     {
-        // Solo directivos y administradores pueden ver TODAS las bitácoras por rol
-        if ($user->hasRole(['administrador', 'directivo', 'superadmin'])) {
+        // Solo superadmin puede ver TODAS las bitácoras sin permiso explícito
+        if ($user->hasRole('superadmin')) {
             return true;
         }
 
@@ -43,7 +43,7 @@ class EntrevistaPolicy
      */
     public function create(User $user): bool
     {
-        return $user->can('crear-entrevistas') || $user->hasRole(['administrador', 'directivo', 'superadmin']);
+        return $user->can('crear-entrevistas') || $user->hasRole('superadmin');
     }
 
     /**
@@ -51,8 +51,8 @@ class EntrevistaPolicy
      */
     public function update(User $user, Entrevista $entrevista): bool
     {
-        // Directivos y administradores pueden editar cualquier bitácora por rol
-        if ($user->hasRole(['administrador', 'directivo', 'superadmin'])) {
+        // Solo superadmin puede editar cualquier bitácora sin permiso explícito
+        if ($user->hasRole('superadmin')) {
             return true;
         }
 
@@ -70,7 +70,7 @@ class EntrevistaPolicy
     public function delete(User $user, Entrevista $entrevista): bool
     {
         // Solo superadmin o administrador pueden borrar una entrevista (y sus bitácoras)
-        return $user->hasRole(['superadmin', 'administrador']);
+        return $user->hasRole('superadmin') || $user->can('gestionar-prestamos');
     }
 
     /**
@@ -79,6 +79,6 @@ class EntrevistaPolicy
     public function export(User $user): bool
     {
         // Solo administradores (o superadmin) pueden exportar
-        return $user->hasRole(['administrador']);
+        return $user->hasRole('superadmin') || $user->can('ver-entrevistas-general');
     }
 }

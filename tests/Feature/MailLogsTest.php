@@ -22,7 +22,7 @@ test('authenticated administrators can visit the mail logs page', function () {
     ]);
 
     $user->update(['current_school_id' => $schoolId]);
-    $user->syncRolesForSchool($schoolId, ['administrador']);
+    $user->syncRolesForSchool($schoolId, ['superadmin']);
 
     $this->actingAs($user);
 

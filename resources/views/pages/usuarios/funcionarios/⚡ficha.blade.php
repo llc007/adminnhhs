@@ -31,6 +31,9 @@ new class extends Component
 
     public function mount(int $id): void
     {
+        if (!auth()->user()->can('gestionar-funcionarios') && !auth()->user()->hasRole('superadmin')) {
+            abort(403, 'No tienes permiso para acceder a esta página.');
+        }
         $this->id = $id;
 
         $funcionario = User::findOrFail($id);
@@ -54,6 +57,9 @@ new class extends Component
 
     public function guardar(): void
     {
+        if (!auth()->user()->can('gestionar-funcionarios') && !auth()->user()->hasRole('superadmin')) {
+            abort(403, 'No tienes permiso para realizar esta acción.');
+        }
         $this->validate([
             'nombres' => ['required', 'string', 'max:255'],
             'apellidoPat' => ['required', 'string', 'max:255'],
@@ -220,8 +226,10 @@ new class extends Component
         <flux:button href="{{ route('funcionarios.index') }}" variant="ghost">
             {{ __('Cancelar') }}
         </flux:button>
-        <flux:button wire:click="guardar" variant="primary" icon="check">
-            {{ __('Guardar Ficha') }}
-        </flux:button>
+        @if (auth()->user()->can('gestionar-funcionarios') || auth()->user()->hasRole('superadmin'))
+            <flux:button wire:click="guardar" variant="primary" icon="check">
+                {{ __('Guardar Ficha') }}
+            </flux:button>
+        @endif
     </div>
 </div>

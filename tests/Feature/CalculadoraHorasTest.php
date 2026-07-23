@@ -20,7 +20,7 @@ test('authenticated users with admin role can visit the calculator', function ()
     ]);
 
     $user->update(['current_school_id' => $schoolId]);
-    $user->syncRolesForSchool($schoolId, ['administrador']);
+    $user->syncRolesForSchool($schoolId, ['superadmin']);
 
     $this->actingAs($user);
 

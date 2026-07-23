@@ -33,7 +33,7 @@ test('regular teachers cannot visit the modules management page', function () {
     $response->assertStatus(403);
 });
 
-test('administrators can visit the modules management page', function () {
+test('superadmin can visit the modules management page', function () {
     $user = User::factory()->create();
     $schoolId = DB::table('schools')->insertGetId([
         'name' => 'Test School',
@@ -42,7 +42,7 @@ test('administrators can visit the modules management page', function () {
         'updated_at' => now(),
     ]);
     $user->update(['current_school_id' => $schoolId]);
-    $user->syncRolesForSchool($schoolId, ['administrador']);
+    $user->syncRolesForSchool($schoolId, ['superadmin']);
 
     $this->actingAs($user);
 
@@ -50,7 +50,7 @@ test('administrators can visit the modules management page', function () {
     $response->assertOk();
 });
 
-test('modules configuration can be updated by administrators', function () {
+test('modules configuration can be updated by superadmin', function () {
     $user = User::factory()->create();
     $schoolId = DB::table('schools')->insertGetId([
         'name' => 'Test School',
@@ -59,7 +59,7 @@ test('modules configuration can be updated by administrators', function () {
         'updated_at' => now(),
     ]);
     $user->update(['current_school_id' => $schoolId]);
-    $user->syncRolesForSchool($schoolId, ['administrador']);
+    $user->syncRolesForSchool($schoolId, ['superadmin']);
 
     $this->actingAs($user);
 
@@ -92,7 +92,7 @@ test('email sending configuration can be toggled from mail logs page', function 
         'updated_at' => now(),
     ]);
     $user->update(['current_school_id' => $schoolId]);
-    $user->syncRolesForSchool($schoolId, ['administrador']);
+    $user->syncRolesForSchool($schoolId, ['superadmin']);
 
     $this->actingAs($user);
 
@@ -123,7 +123,7 @@ test('notifications on the mail channel are cancelled when envio_correos is disa
         'updated_at' => now(),
     ]);
     $user->update(['current_school_id' => $schoolId]);
-    $user->syncRolesForSchool($schoolId, ['administrador']);
+    $user->syncRolesForSchool($schoolId, ['superadmin']);
 
     $school = School::find($schoolId);
 
@@ -221,7 +221,7 @@ test('unauthorized users cannot visit roles and permissions manager', function (
     $response->assertStatus(403);
 });
 
-test('administrators can load and save role permissions', function () {
+test('superadmin can load and save role permissions', function () {
     $user = User::factory()->create();
     $schoolId = DB::table('schools')->insertGetId([
         'name' => 'Test School',
@@ -230,7 +230,7 @@ test('administrators can load and save role permissions', function () {
         'updated_at' => now(),
     ]);
     $user->update(['current_school_id' => $schoolId]);
-    $user->syncRolesForSchool($schoolId, ['administrador']);
+    $user->syncRolesForSchool($schoolId, ['superadmin']);
 
     $this->actingAs($user);
 

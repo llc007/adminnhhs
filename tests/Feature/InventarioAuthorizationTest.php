@@ -3,6 +3,8 @@
 use App\Models\ArticuloInventario;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\PermissionRegistrar;
 
 test('directivo role cannot access general inventory, revision, compras, and admin pages', function () {
     $user = User::factory()->create();
@@ -17,6 +19,8 @@ test('directivo role cannot access general inventory, revision, compras, and adm
 
     $user->update(['current_school_id' => $schoolId]);
     $user->syncRolesForSchool($schoolId, ['directivo']);
+    app(PermissionRegistrar::class)->setPermissionsTeamId($schoolId);
+    $user->givePermissionTo(Permission::findOrCreate('gestionar-funcionarios', 'web'));
 
     $this->actingAs($user);
 

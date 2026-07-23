@@ -5,6 +5,8 @@ use Illuminate\Auth\Events\Login;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Livewire\Livewire;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\PermissionRegistrar;
 
 test('it updates ultimo_ingreso_at on user login event', function () {
     $user = User::factory()->create(['ultimo_ingreso_at' => null]);
@@ -29,6 +31,8 @@ test('administrators can view last login column in staff list', function () {
     ]);
     $admin->update(['current_school_id' => $schoolId]);
     $admin->syncRolesForSchool($schoolId, ['administrador']);
+    app(PermissionRegistrar::class)->setPermissionsTeamId($schoolId);
+    $admin->givePermissionTo(Permission::findOrCreate('gestionar-funcionarios', 'web'));
 
     $staff = User::factory()->create([
         'ultimo_ingreso_at' => now()->subHours(2),
@@ -82,6 +86,8 @@ test('assigning a real role to a pending user via index modal removes the extern
     ]);
     $admin->update(['current_school_id' => $schoolId]);
     $admin->syncRolesForSchool($schoolId, ['administrador']);
+    app(PermissionRegistrar::class)->setPermissionsTeamId($schoolId);
+    $admin->givePermissionTo(Permission::findOrCreate('gestionar-funcionarios', 'web'));
 
     $pendingStaff = User::factory()->create([
         'nombres' => 'PENDING',
@@ -116,6 +122,8 @@ test('it can assign the ti role to a staff member', function () {
     ]);
     $admin->update(['current_school_id' => $schoolId]);
     $admin->syncRolesForSchool($schoolId, ['administrador']);
+    app(PermissionRegistrar::class)->setPermissionsTeamId($schoolId);
+    $admin->givePermissionTo(Permission::findOrCreate('gestionar-funcionarios', 'web'));
 
     $this->actingAs($admin);
 

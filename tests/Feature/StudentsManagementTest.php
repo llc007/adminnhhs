@@ -4,6 +4,8 @@ use App\Models\Estudiante;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\PermissionRegistrar;
 
 function setupTestAdmin()
 {
@@ -36,6 +38,8 @@ function setupTestAdmin()
 
     $user->update(['current_school_id' => $schoolId]);
     $user->syncRolesForSchool($schoolId, ['administrador']);
+    app(PermissionRegistrar::class)->setPermissionsTeamId($schoolId);
+    $user->givePermissionTo(Permission::findOrCreate('editar-estudiantes', 'web'));
 
     return [$user, $schoolId, $cursoId];
 }

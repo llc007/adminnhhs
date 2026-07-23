@@ -64,26 +64,16 @@
                 </flux:sidebar.group>
             @endif
 
-            @if ((auth()->user()->hasRole(['directivo', 'administrador', 'superadmin', 'inspector', 'docente', 'asistente', 'psicosocial', 'recepcion']) || auth()->user()->canAny(['ver-estudiantes', 'gestionar-funcionarios'])) && ($isAdmin || ($modulos['estudiantes'] ?? false)))
+            @if ((auth()->user()->hasRole('superadmin') || auth()->user()->canAny(['ver-estudiantes', 'gestionar-funcionarios'])) && ($isAdmin || ($modulos['estudiantes'] ?? false)))
                 <flux:sidebar.group :heading="__('Gestión Académica')" class="grid mt-4">
-                    @if ((auth()->user()->hasRole([
-                                'directivo',
-                                'administrador',
-                                'superadmin',
-                                'inspector',
-                                'docente',
-                                'asistente',
-                                'psicosocial',
-                                'recepcion',
-                            ]) || auth()->user()->can('ver-estudiantes')) &&
-                            ($isAdmin || ($modulos['estudiantes'] ?? false)))
+                    @if ((auth()->user()->hasRole('superadmin') || auth()->user()->can('ver-estudiantes')) && ($isAdmin || ($modulos['estudiantes'] ?? false)))
                         <flux:sidebar.item icon="users" :href="route('estudiantes.index')"
                             :current="request()->routeIs('estudiantes.*')" wire:navigate>
                             {{ __('Estudiantes') }}
                         </flux:sidebar.item>
                     @endif
 
-                    @if (auth()->user()->hasRole(['directivo', 'administrador', 'superadmin']) || auth()->user()->can('gestionar-funcionarios'))
+                    @if (auth()->user()->hasRole('superadmin') || auth()->user()->can('gestionar-funcionarios'))
                         <flux:sidebar.item icon="briefcase" :href="route('funcionarios.index')"
                             :current="request()->routeIs('funcionarios.index') || request()->routeIs('funcionarios.ficha') || request()->routeIs('funcionarios.carga_masiva')"
                             wire:navigate>
@@ -93,32 +83,24 @@
                 </flux:sidebar.group>
             @endif
 
-            @if (auth()->user()->hasRole(['administrador', 'superadmin']) || auth()->user()->canAny(['gestionar-modulos', 'gestionar-funcionarios', 'gestionar-roles-permisos']))
+            @if (auth()->user()->hasRole('superadmin'))
                 <flux:sidebar.group :heading="__('Administración')" class="grid mt-4">
-                    @if (auth()->user()->hasRole(['administrador', 'superadmin']) || auth()->user()->can('gestionar-modulos'))
-                        <flux:sidebar.item icon="adjustments-horizontal" :href="route('admin.modules')"
-                            :current="request()->routeIs('admin.modules')" wire:navigate>
-                            {{ __('Módulos') }}
-                        </flux:sidebar.item>
-                    @endif
-                    @if (auth()->user()->hasRole(['administrador', 'superadmin']) || auth()->user()->can('gestionar-funcionarios'))
-                        <flux:sidebar.item icon="clock" :href="route('funcionarios.calculadora_horas')"
-                            :current="request()->routeIs('funcionarios.calculadora_horas')" wire:navigate>
-                            {{ __('Calculadora 42 Hrs') }}
-                        </flux:sidebar.item>
-                    @endif
-                    @if (auth()->user()->hasRole(['administrador', 'superadmin']) || auth()->user()->can('gestionar-modulos'))
-                        <flux:sidebar.item icon="envelope" :href="route('admin.mail_logs')"
-                            :current="request()->routeIs('admin.mail_logs')" wire:navigate>
-                            {{ __('Historial de Correos') }}
-                        </flux:sidebar.item>
-                    @endif
-                    @if (auth()->user()->hasRole(['administrador', 'superadmin']) || auth()->user()->can('gestionar-roles-permisos'))
-                        <flux:sidebar.item icon="key" :href="route('admin.roles_permissions')"
-                            :current="request()->routeIs('admin.roles_permissions')" wire:navigate>
-                            {{ __('Roles y Permisos') }}
-                        </flux:sidebar.item>
-                    @endif
+                    <flux:sidebar.item icon="adjustments-horizontal" :href="route('admin.modules')"
+                        :current="request()->routeIs('admin.modules')" wire:navigate>
+                        {{ __('Módulos') }}
+                    </flux:sidebar.item>
+                    <flux:sidebar.item icon="clock" :href="route('funcionarios.calculadora_horas')"
+                        :current="request()->routeIs('funcionarios.calculadora_horas')" wire:navigate>
+                        {{ __('Calculadora 42 Hrs') }}
+                    </flux:sidebar.item>
+                    <flux:sidebar.item icon="envelope" :href="route('admin.mail_logs')"
+                        :current="request()->routeIs('admin.mail_logs')" wire:navigate>
+                        {{ __('Historial de Correos') }}
+                    </flux:sidebar.item>
+                    <flux:sidebar.item icon="key" :href="route('admin.roles_permissions')"
+                        :current="request()->routeIs('admin.roles_permissions')" wire:navigate>
+                        {{ __('Roles y Permisos') }}
+                    </flux:sidebar.item>
                 </flux:sidebar.group>
             @endif
 

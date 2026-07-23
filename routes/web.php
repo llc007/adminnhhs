@@ -42,20 +42,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('/sin-permiso', 'pages::auth.sin-permiso')->name('sin-permiso');
 });
 
-// Vistas de Estudiantes — Todo el staff
-Route::middleware(['auth', 'verified', 'role:directivo,administrador,superadmin,inspector,docente,asistente,psicosocial,recepcion'])->group(function () {
+// Vistas de Estudiantes — requiere permiso ver-estudiantes o superadmin
+Route::middleware(['auth', 'verified', 'role_or_permission:superadmin|ver-estudiantes'])->group(function () {
     Route::livewire('/estudiantes', 'pages::usuarios.estudiantes.index')->name('estudiantes.index');
     Route::livewire('/estudiantes/ficha/{id}', 'pages::usuarios.estudiantes.ficha')->name('estudiantes.ficha');
 });
 
-// Gestión de Funcionarios (Accesible por Directivos)
-Route::middleware(['auth', 'verified', 'role:directivo,administrador,superadmin'])->group(function () {
+// Gestión de Funcionarios — requiere permiso gestionar-funcionarios o superadmin
+Route::middleware(['auth', 'verified', 'role_or_permission:superadmin|gestionar-funcionarios'])->group(function () {
     Route::livewire('/funcionarios', 'pages::usuarios.funcionarios.index')->name('funcionarios.index');
     Route::livewire('/funcionarios/ficha/{id}', 'pages::usuarios.funcionarios.ficha')->name('funcionarios.ficha');
 });
 
-// Configuración y Cargas Administrativas — Solo Administradores y Superadmins
-Route::middleware(['auth', 'verified', 'role:administrador,superadmin'])->group(function () {
+// Configuración y Cargas Administrativas — Solo Superadmin
+Route::middleware(['auth', 'verified', 'role:superadmin'])->group(function () {
     Route::livewire('/funcionarios/calculadora-horas', 'pages::usuarios.funcionarios.calculadora_horas')->name('funcionarios.calculadora_horas');
     Route::livewire('/funcionarios/carga-masiva', 'pages::usuarios.funcionarios.carga_masiva')->name('funcionarios.carga_masiva');
     Route::livewire('/estudiantes/carga-masiva', 'pages::usuarios.estudiantes.carga_masiva')->name('estudiantes.carga_masiva');

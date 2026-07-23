@@ -40,8 +40,18 @@ new class extends Component {
         }
     }
 
+    public function mount(): void
+    {
+        if (!auth()->user()->can('gestionar-funcionarios') && !auth()->user()->hasRole('superadmin')) {
+            abort(403, 'No tienes permiso para acceder a esta página.');
+        }
+    }
+
     public function abrirCrear(): void
     {
+        if (!auth()->user()->can('gestionar-funcionarios') && !auth()->user()->hasRole('superadmin')) {
+            abort(403, 'No tienes permiso para realizar esta acción.');
+        }
         $this->reset(['funcionarioId', 'nombres', 'apellidoPat', 'apellidoMat', 'email', 'rutNumero', 'rutDv']);
         $this->roles = ['docente'];
         $this->modalAbierto = true;
@@ -49,6 +59,9 @@ new class extends Component {
 
     public function abrirEditar(int $id): void
     {
+        if (!auth()->user()->can('gestionar-funcionarios') && !auth()->user()->hasRole('superadmin')) {
+            abort(403, 'No tienes permiso para realizar esta acción.');
+        }
         $funcionario = \App\Models\User::findOrFail($id);
         $this->funcionarioId = $funcionario->id;
         $this->nombres = $funcionario->nombres ?? '';
@@ -70,21 +83,26 @@ new class extends Component {
 
     public function guardar(): void
     {
-        $this->validate([
+        if (!auth()->user()->can('gestionar-funcionarios') && !auth()->user()->hasRole('superadmin')) {
+            abort(403, 'No tienes permiso para realizar esta acción.');
+        }
+
+        $canManageRoles = auth()->user()->hasRole(['administrador', 'superadmin']);
+
+        $rules = [
             'nombres' => ['required', 'string', 'max:255'],
             'apellidoPat' => ['nullable', 'string', 'max:255'],
             'apellidoMat' => ['nullable', 'string', 'max:255'],
             'email' => ['required', 'email', Rule::unique('users', 'email')->ignore($this->funcionarioId)],
             'rutNumero' => ['nullable', 'digits_between:7,9'],
             'rutDv' => ['nullable', 'max:1', 'regex:/^[0-9Kk]$/'],
-            'roles' => ['required', 'array', 'min:1'],
-        ]);
+        ];
 
-        $nuevosRoles = $this->roles;
-        $realRoles = array_diff($nuevosRoles, ['externo']);
-        if (! empty($realRoles)) {
-            $nuevosRoles = array_values($realRoles);
+        if ($canManageRoles) {
+            $rules['roles'] = ['required', 'array', 'min:1'];
         }
+
+        $this->validate($rules);
 
         if ($this->funcionarioId) {
             $funcionario = \App\Models\User::findOrFail($this->funcionarioId);
@@ -97,8 +115,15 @@ new class extends Component {
                 'rut_dv' => $this->rutDv !== '' ? strtoupper($this->rutDv) : null,
             ]);
 
-            $schoolId = auth()->user()->current_school_id;
-            $funcionario->syncRolesForSchool($schoolId, $nuevosRoles);
+            if ($canManageRoles) {
+                $nuevosRoles = $this->roles;
+                $realRoles = array_diff($nuevosRoles, ['externo']);
+                if (! empty($realRoles)) {
+                    $nuevosRoles = array_values($realRoles);
+                }
+                $schoolId = auth()->user()->current_school_id;
+                $funcionario->syncRolesForSchool($schoolId, $nuevosRoles);
+            }
         } else {
             $funcionario = \App\Models\User::create([
                 'nombres' => $this->nombres,
@@ -110,6 +135,12 @@ new class extends Component {
                 'password' => \Illuminate\Support\Facades\Hash::make(\Illuminate\Support\Str::random(16)),
                 'current_school_id' => auth()->user()->current_school_id,
             ]);
+
+            $nuevosRoles = $canManageRoles ? $this->roles : ['docente'];
+            $realRoles = array_diff($nuevosRoles, ['externo']);
+            if (! empty($realRoles)) {
+                $nuevosRoles = array_values($realRoles);
+            }
             $funcionario->syncRolesForSchool(auth()->user()->current_school_id, $nuevosRoles);
         }
 
@@ -120,12 +151,18 @@ new class extends Component {
 
     public function confirmarEliminar(int $id): void
     {
+        if (!auth()->user()->can('gestionar-funcionarios') && !auth()->user()->hasRole('superadmin')) {
+            abort(403, 'No tienes permiso para realizar esta acción.');
+        }
         $this->eliminarId = $id;
         $this->modalEliminar = true;
     }
 
     public function eliminar(): void
     {
+        if (!auth()->user()->can('gestionar-funcionarios') && !auth()->user()->hasRole('superadmin')) {
+            abort(403, 'No tienes permiso para realizar esta acción.');
+        }
         if ($this->eliminarId) {
             $funcionario = \App\Models\User::findOrFail($this->eliminarId);
             $funcionario->schools()->detach(auth()->user()->current_school_id);
@@ -397,26 +434,28 @@ new class extends Component {
             <flux:error name="rutNumero" />
             <flux:error name="rutDv" />
 
-            <flux:field>
-                <flux:label class="mb-2 uppercase tracking-widest text-[10px] font-bold text-zinc-500 dark:text-zinc-400">
-                    {{ __('Roles de Acceso') }}
-                </flux:label>
-                <div class="grid grid-cols-2 md:grid-cols-3 gap-y-3 gap-x-4 mt-2">
-                    <flux:checkbox wire:model="roles" value="docente" :label="__('Docente')" />
-                    <flux:checkbox wire:model="roles" value="inspector" :label="__('Inspectoría')" />
-                    <flux:checkbox wire:model="roles" value="asistente" :label="__('Asistente')" />
-                    <flux:checkbox wire:model="roles" value="psicosocial" :label="__('Psicosocial')" />
-                    <flux:checkbox wire:model="roles" value="recepcion" :label="__('Recepción')" />
-                    <flux:checkbox wire:model="roles" value="directivo" :label="__('Directivo')" />
-                    <flux:checkbox wire:model="roles" value="administrador" :label="__('Administrador')" />
-                    <flux:checkbox wire:model="roles" value="solicitante_adquisiciones" :label="__('Solicitante Adq.')" />
-                    <flux:checkbox wire:model="roles" value="ti" :label="__('Personal de TI')" />
-                    @if(auth()->user()->hasRole('superadmin'))
-                        <flux:checkbox wire:model="roles" value="superadmin" :label="__('Superadmin')" />
-                    @endif
-                </div>
-                <flux:error name="roles" class="mt-2" />
-            </flux:field>
+            @if (auth()->user()->hasRole(['administrador', 'superadmin']))
+                <flux:field>
+                    <flux:label class="mb-2 uppercase tracking-widest text-[10px] font-bold text-zinc-500 dark:text-zinc-400">
+                        {{ __('Roles de Acceso') }}
+                    </flux:label>
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-y-3 gap-x-4 mt-2">
+                        <flux:checkbox wire:model="roles" value="docente" :label="__('Docente')" />
+                        <flux:checkbox wire:model="roles" value="inspector" :label="__('Inspectoría')" />
+                        <flux:checkbox wire:model="roles" value="asistente" :label="__('Asistente')" />
+                        <flux:checkbox wire:model="roles" value="psicosocial" :label="__('Psicosocial')" />
+                        <flux:checkbox wire:model="roles" value="recepcion" :label="__('Recepción')" />
+                        <flux:checkbox wire:model="roles" value="directivo" :label="__('Directivo')" />
+                        <flux:checkbox wire:model="roles" value="administrador" :label="__('Administrador')" />
+                        <flux:checkbox wire:model="roles" value="solicitante_adquisiciones" :label="__('Solicitante Adq.')" />
+                        <flux:checkbox wire:model="roles" value="ti" :label="__('Personal de TI')" />
+                        @if(auth()->user()->hasRole('superadmin'))
+                            <flux:checkbox wire:model="roles" value="superadmin" :label="__('Superadmin')" />
+                        @endif
+                    </div>
+                    <flux:error name="roles" class="mt-2" />
+                </flux:field>
+            @endif
 
             <div class="flex">
                 <flux:spacer />

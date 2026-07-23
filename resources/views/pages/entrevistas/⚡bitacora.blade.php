@@ -34,9 +34,30 @@ new class extends Component {
     public string $nuevaFecha = '';
     public string $nuevaHora = '';
 
+    // Modal Firma Presencial
+    public bool $modalFirmaPresencial = false;
+    public string $firmanteNombre = '';
+    public string $firmanteRutNumero = '';
+    public string $firmanteRutDv = '';
+    public string $firmaSvg = '';
+
+    // Modal Firma Online
+    public bool $modalFirmaOnline = false;
+    public string $firmanteEmail = '';
+
+    // Modal Enviar Resumen
+    public bool $modalEnviarResumen = false;
+    public bool $enviarApoderado = true;
+    public string $emailApoderado = '';
+    public bool $enviarEstudiante = false;
+    public string $emailEstudiante = '';
+    public bool $enviarOtro = false;
+    public string $emailOtro = '';
+    public string $nombreOtro = '';
+
     public function mount(Entrevista $entrevista)
     {
-        $this->entrevista = $entrevista->load(['estudiante.curso', 'user']);
+        $this->entrevista = $entrevista->load(['estudiante.curso', 'user', 'bitacora']);
 
         if ($this->entrevista->bitacora) {
             $this->bitacora = $this->entrevista->bitacora;
@@ -44,6 +65,15 @@ new class extends Component {
             $this->observaciones = $this->bitacora->observaciones ?? '';
             $this->acuerdos = $this->bitacora->acuerdos ?? [];
             $this->adjuntosDrive = $this->bitacora->adjuntos_drive ?? [];
+        }
+
+        if (session()->has('status_toast')) {
+            $toast = session('status_toast');
+            \Flux::toast(
+                heading: $toast['heading'],
+                text: $toast['text'],
+                variant: $toast['variant'] ?? 'success'
+            );
         }
     }
 
@@ -125,8 +155,13 @@ new class extends Component {
         // Cerrar el ciclo de vida de la entrevista
         $this->entrevista->update(['estado' => 'realizada']);
         
-        \Flux::toast('Bitácora finalizada y entrevista cerrada exitosamente.', variant: 'success');
-        return redirect()->route('entrevistas.agenda');
+        session()->flash('status_toast', [
+            'heading' => 'Entrevista Finalizada',
+            'text' => 'La bitácora ha sido cerrada y guardada exitosamente.',
+            'variant' => 'success',
+        ]);
+
+        return redirect()->route('entrevistas.bitacora', $this->entrevista->id);
     }
 
     public function abrirModalReagendar()
@@ -225,10 +260,157 @@ new class extends Component {
         $this->entrevista->refresh();
     }
 
+    public function abrirModalFirmaPresencial()
+    {
+        if (in_array($this->entrevista->estado, ['realizada', 'ausente', 'cancelada'])) {
+            abort(403, 'No se puede modificar la firma de una entrevista finalizada.');
+        }
+
+        $estudiante = $this->entrevista->estudiante;
+        $this->firmanteNombre = ($this->bitacora && $this->bitacora->firmante_nombre) 
+            ? $this->bitacora->firmante_nombre 
+            : ($estudiante ? ($estudiante->apoderado_nombres ?? '') : '');
+
+        if ($this->bitacora && $this->bitacora->firmante_rut) {
+            $parts = explode('-', $this->bitacora->firmante_rut);
+            $this->firmanteRutNumero = $parts[0] ?? '';
+            $this->firmanteRutDv = $parts[1] ?? '';
+        } else {
+            $this->firmanteRutNumero = $estudiante ? ($estudiante->apoderado_rut_numero ?? '') : '';
+            $this->firmanteRutDv = $estudiante ? ($estudiante->apoderado_rut_dv ?? '') : '';
+        }
+
+        $this->firmaSvg = ($this->bitacora && $this->bitacora->firma_svg) ? $this->bitacora->firma_svg : '';
+        $this->modalFirmaPresencial = true;
+    }
+
+    public function guardarFirmaPresencial()
+    {
+        if (in_array($this->entrevista->estado, ['realizada', 'ausente', 'cancelada'])) {
+            abort(403, 'No se puede modificar la firma de una entrevista finalizada.');
+        }
+
+        $this->validate([
+            'firmanteNombre' => 'required|string|min:3|max:255',
+            'firmanteRutNumero' => 'required|string|min:7|max:12',
+        ], [
+            'firmanteNombre.required' => 'Ingrese el nombre del firmante.',
+            'firmanteRutNumero.required' => 'Ingrese el RUT del firmante.',
+        ]);
+
+        $this->guardarColeccion('borrador');
+
+        $rutCompleto = trim($this->firmanteRutNumero);
+        if (trim($this->firmanteRutDv) !== '') {
+            $rutCompleto .= '-' . strtoupper(trim($this->firmanteRutDv));
+        }
+
+        $this->bitacora->update([
+            'estado_firma' => 'firmada_presencial',
+            'firmante_nombre' => mb_strtoupper($this->firmanteNombre, 'UTF-8'),
+            'firmante_rut' => $rutCompleto,
+            'firma_svg' => $this->firmaSvg ?: null,
+            'firmado_at' => now(),
+        ]);
+
+        $this->modalFirmaPresencial = false;
+        \Flux::toast('Firma presencial registrada correctamente.', variant: 'success');
+    }
+
+    public function abrirModalFirmaOnline()
+    {
+        if (in_array($this->entrevista->estado, ['realizada', 'ausente', 'cancelada'])) {
+            abort(403, 'No se puede solicitar firma en una entrevista finalizada.');
+        }
+
+        $estudiante = $this->entrevista->estudiante;
+        $this->firmanteEmail = ($this->bitacora && $this->bitacora->firmante_email) 
+            ? $this->bitacora->firmante_email 
+            : ($estudiante ? ($estudiante->apoderado_email ?? '') : '');
+        $this->modalFirmaOnline = true;
+    }
+
+    public function enviarFirmaOnline()
+    {
+        if (in_array($this->entrevista->estado, ['realizada', 'ausente', 'cancelada'])) {
+            abort(403, 'No se puede solicitar firma en una entrevista finalizada.');
+        }
+
+        $this->validate([
+            'firmanteEmail' => 'required|email',
+        ], [
+            'firmanteEmail.required' => 'Ingrese el correo electrónico del firmante.',
+            'firmanteEmail.email' => 'Ingrese un correo electrónico válido.',
+        ]);
+
+        $this->guardarColeccion('borrador');
+
+        $token = \Illuminate\Support\Str::random(40);
+        $this->bitacora->update([
+            'firmante_email' => $this->firmanteEmail,
+            'firma_token' => $token,
+            'firma_token_expires_at' => now()->addDays(7),
+        ]);
+
+        $signedUrl = route('entrevistas.firma_publica', ['token' => $token]);
+
+        \Illuminate\Support\Facades\Notification::route('mail', $this->firmanteEmail)
+            ->notify(new \App\Notifications\BitacoraSolicitudFirmaNotification($this->bitacora, $signedUrl));
+
+        $this->modalFirmaOnline = false;
+        \Flux::toast('Solicitud de firma enviada por correo exitosamente.', variant: 'success');
+    }
+
+    public function abrirModalEnviarResumen()
+    {
+        $estudiante = $this->entrevista->estudiante;
+        $this->emailApoderado = $estudiante ? ($estudiante->apoderado_email ?? '') : '';
+        $this->emailEstudiante = $estudiante ? ($estudiante->email ?? '') : '';
+        $this->modalEnviarResumen = true;
+    }
+
+    public function enviarResumenCorreos()
+    {
+        $this->guardarColeccion('finalizado');
+
+        $enviados = 0;
+
+        if ($this->enviarApoderado && !empty($this->emailApoderado)) {
+            \Illuminate\Support\Facades\Notification::route('mail', $this->emailApoderado)
+                ->notify(new \App\Notifications\BitacoraResumenNotification($this->bitacora, 'Apoderado/a'));
+            $enviados++;
+        }
+
+        if ($this->enviarEstudiante && !empty($this->emailEstudiante)) {
+            \Illuminate\Support\Facades\Notification::route('mail', $this->emailEstudiante)
+                ->notify(new \App\Notifications\BitacoraResumenNotification($this->bitacora, 'Estudiante'));
+            $enviados++;
+        }
+
+        if ($this->enviarOtro && !empty($this->emailOtro)) {
+            \Illuminate\Support\Facades\Notification::route('mail', $this->emailOtro)
+                ->notify(new \App\Notifications\BitacoraResumenNotification($this->bitacora, $this->nombreOtro ?: 'Familiar/Tutor'));
+            $enviados++;
+        }
+
+        $this->modalEnviarResumen = false;
+
+        return $this->finalizarBitacora();
+    }
+
     private function guardarColeccion($estado)
     {
+        if (trim($this->nuevoAcuerdoTitulo) !== '') {
+            $this->acuerdos[] = [
+                'titulo' => trim($this->nuevoAcuerdoTitulo),
+                'descripcion' => trim($this->nuevoAcuerdoDesc),
+            ];
+            $this->nuevoAcuerdoTitulo = '';
+            $this->nuevoAcuerdoDesc = '';
+        }
+
         if (!$this->bitacora) {
-            $this->bitacora = new Bitacora(['entrevista_id' => $this->entrevista->id]);
+            $this->bitacora = Bitacora::firstOrNew(['entrevista_id' => $this->entrevista->id]);
         }
         
         $this->bitacora->resumen = $this->resumen;
@@ -262,35 +444,20 @@ new class extends Component {
         @endphp
 
         <div class="flex items-center gap-3 w-full md:w-auto">
-            @if(!$isCerrada)
-                <flux:button variant="ghost" class="w-full md:w-auto cursor-pointer" wire:click="abrirModalReagendar">
-                    {{ __('Reagendar') }}
-                </flux:button>
-                <flux:button variant="ghost" class="w-full md:w-auto cursor-pointer" wire:click="guardarBorrador">
-                    {{ __('Guardar Borrador') }}
-                </flux:button>
-                @if (auth()->user()->can('cancelar-entrevistas') || auth()->user()->hasRole('superadmin'))
-                    <flux:button variant="danger" icon="x-circle" class="w-full md:w-auto cursor-pointer" wire:click="abrirModalNoRealizada">
-                        {{ __('No Realizada') }}
-                    </flux:button>
-                @endif
-                <flux:button variant="primary" icon="check-circle" class="w-full md:w-auto bg-gradient-to-br from-[#00376e] to-blue-800 hover:from-blue-800 hover:to-blue-900 transition-colors cursor-pointer" wire:click="finalizarBitacora">
-                    {{ __('Finalizar Entrevista') }}
-                </flux:button>
-            @else
+            @if ($isCerrada)
                 @if($entrevista->estado === 'realizada')
-                    <flux:button variant="primary" icon="check-circle" class="w-full md:w-auto bg-emerald-600 text-white hover:bg-emerald-600 pointer-events-none opacity-90 border-0" disabled>
-                        {{ __('Entrevista Finalizada') }}
-                    </flux:button>
+                    <flux:badge color="emerald" icon="check-circle" class="p-2 text-xs font-bold">
+                        {{ __('Entrevista Realizada') }}
+                    </flux:badge>
                 @else
-                    <flux:button variant="danger" icon="x-circle" class="w-full md:w-auto pointer-events-none opacity-90" disabled>
+                    <flux:badge color="red" icon="x-circle" class="p-2 text-xs font-bold">
                         {{ __('Entrevista ' . ucfirst($entrevista->estado)) }}
-                    </flux:button>
+                    </flux:badge>
                 @endif
-                
+
                 @if (auth()->user()->hasRole('superadmin'))
                     <flux:modal.trigger name="reabrir-bitacora">
-                        <flux:button variant="ghost" icon="arrow-path" class="w-full md:w-auto cursor-pointer">
+                        <flux:button variant="ghost" icon="arrow-path" class="cursor-pointer">
                             {{ __('Reabrir Bitácora') }}
                         </flux:button>
                     </flux:modal.trigger>
@@ -453,6 +620,153 @@ new class extends Component {
         <!-- Columna Derecha (Metadata Pura) -->
         <div class="xl:col-span-4 space-y-6">
             
+            <!-- Panel de Acciones y Firma Digital (En Columna Derecha - Primero) -->
+            <flux:card class="p-5 shadow-sm border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 rounded-xl space-y-4">
+                <div class="border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                    <h3 class="text-xs font-bold text-[#00376e] dark:text-blue-400 uppercase tracking-wider flex items-center gap-2 mb-2">
+                        <flux:icon.command-line class="size-4" />
+                        Acciones de Bitácora
+                    </h3>
+
+                    {{-- Badge Estado de Firma --}}
+                    @if ($bitacora && $bitacora->estado_firma === 'firmada_presencial')
+                        <div class="flex items-center justify-center gap-2 py-2 px-3 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 rounded-lg text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                            <flux:icon.check-circle class="size-4 text-emerald-600 shrink-0" />
+                            <span>Firmada Presencial ({{ $bitacora->firmante_nombre }})</span>
+                        </div>
+                    @elseif ($bitacora && $bitacora->estado_firma === 'firmada_online')
+                        <div class="flex items-center justify-center gap-2 py-2 px-3 bg-cyan-50 dark:bg-cyan-950/50 border border-cyan-200 dark:border-cyan-800 rounded-lg text-xs font-bold text-cyan-700 dark:text-cyan-300">
+                            <flux:icon.envelope class="size-4 text-cyan-600 shrink-0" />
+                            <span>Firmada Online ({{ $bitacora->firmante_nombre }})</span>
+                        </div>
+                    @else
+                        <div class="flex items-center justify-center gap-2 py-2 px-3 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 rounded-lg text-xs font-bold text-amber-700 dark:text-amber-300">
+                            <flux:icon.clock class="size-4 text-amber-600 shrink-0" />
+                            <span>Pendiente de Firma Digital</span>
+                        </div>
+                    @endif
+
+                    {{-- Visualización de la Firma Guardada --}}
+                    @if ($bitacora && $bitacora->firma_svg)
+                        <div class="mt-2.5 p-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl space-y-1.5 text-center">
+                            <div class="flex items-center justify-between text-[10px] uppercase font-bold text-zinc-400">
+                                <span>Firma Registrada</span>
+                                <span>{{ $bitacora->firmado_at ? $bitacora->firmado_at->format('d/m/Y H:i') : '' }}</span>
+                            </div>
+                            <div class="p-1 bg-zinc-50 dark:bg-zinc-900 rounded-lg flex justify-center border border-zinc-100 dark:border-zinc-800">
+                                <img src="{{ $bitacora->firma_svg }}" alt="Firma Digital" class="max-h-20 object-contain" />
+                            </div>
+                            <div class="text-[11px] text-zinc-600 dark:text-zinc-300 font-semibold truncate">
+                                {{ $bitacora->firmante_nombre }} ({{ $bitacora->firmante_rut }})
+                            </div>
+                        </div>
+                    @endif
+                </div>
+
+                {{-- Botones de Acción Uniformes --}}
+                <div class="space-y-2">
+                    @if (!$isCerrada)
+                        {{-- 1. Firmar Presencialmente --}}
+                        @if ($bitacora && in_array($bitacora->estado_firma, ['firmada_presencial', 'firmada_online']))
+                            <button 
+                                type="button" 
+                                wire:click="abrirModalFirmaPresencial"
+                                class="w-full flex items-center gap-3 px-3.5 py-2.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800 rounded-lg text-xs font-semibold text-emerald-800 dark:text-emerald-300 transition-colors cursor-pointer"
+                            >
+                                <flux:icon.pencil-square class="size-4 text-emerald-600 shrink-0" />
+                                <span class="flex-1 text-left">Ver / Refirmar Presencial</span>
+                                <flux:icon.chevron-right class="size-3.5 text-emerald-500" />
+                            </button>
+                        @else
+                            <button 
+                                type="button" 
+                                wire:click="abrirModalFirmaPresencial"
+                                class="w-full flex items-center gap-3 px-3.5 py-2.5 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-800/60 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-semibold text-zinc-700 dark:text-zinc-200 transition-colors cursor-pointer"
+                            >
+                                <flux:icon.pencil-square class="size-4 text-amber-600 shrink-0" />
+                                <span class="flex-1 text-left">Firmar Presencialmente</span>
+                                <flux:icon.chevron-right class="size-3.5 text-zinc-400" />
+                            </button>
+                        @endif
+
+                        {{-- 2. Enviar a Firma por Correo --}}
+                        <button 
+                            type="button" 
+                            wire:click="abrirModalFirmaOnline"
+                            class="w-full flex items-center gap-3 px-3.5 py-2.5 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-800/60 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-semibold text-zinc-700 dark:text-zinc-200 transition-colors cursor-pointer"
+                        >
+                            <flux:icon.paper-airplane class="size-4 text-cyan-600 shrink-0" />
+                            <span class="flex-1 text-left">Enviar a Firma por Correo</span>
+                            <flux:icon.chevron-right class="size-3.5 text-zinc-400" />
+                        </button>
+                    @endif
+
+                    {{-- 3. Reagendar Cita --}}
+                    @if(!$isCerrada)
+                        <button 
+                            type="button" 
+                            wire:click="abrirModalReagendar"
+                            class="w-full flex items-center gap-3 px-3.5 py-2.5 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-800/60 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-semibold text-zinc-700 dark:text-zinc-200 transition-colors cursor-pointer"
+                        >
+                            <flux:icon.calendar-days class="size-4 text-indigo-600 shrink-0" />
+                            <span class="flex-1 text-left">Reagendar Cita</span>
+                            <flux:icon.chevron-right class="size-3.5 text-zinc-400" />
+                        </button>
+                    @endif
+
+                    {{-- 4. Guardar Borrador --}}
+                    @if(!$isCerrada)
+                        <button 
+                            type="button" 
+                            wire:click="guardarBorrador"
+                            class="w-full flex items-center gap-3 px-3.5 py-2.5 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-800/60 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-semibold text-zinc-700 dark:text-zinc-200 transition-colors cursor-pointer"
+                        >
+                            <flux:icon.bookmark class="size-4 text-zinc-600 dark:text-zinc-400 shrink-0" />
+                            <span class="flex-1 text-left">Guardar Borrador</span>
+                            <flux:icon.chevron-right class="size-3.5 text-zinc-400" />
+                        </button>
+                    @endif
+
+                    <div class="pt-3 space-y-2 border-t border-zinc-100 dark:border-zinc-800">
+                        {{-- 5. No Realizada --}}
+                        @if(!$isCerrada && (auth()->user()->can('cancelar-entrevistas') || auth()->user()->hasRole('superadmin')))
+                            <button 
+                                type="button" 
+                                wire:click="abrirModalNoRealizada"
+                                class="w-full flex items-center justify-center gap-2 py-2.5 bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-900/50 border border-red-200 dark:border-red-800 rounded-lg text-xs font-bold text-red-600 dark:text-red-400 transition-colors cursor-pointer"
+                            >
+                                <flux:icon.x-circle class="size-4 shrink-0" />
+                                <span>Marcar como No Realizada</span>
+                            </button>
+                        @endif
+
+                        {{-- 6. Finalizar Entrevista --}}
+                        @if(!$isCerrada)
+                            <button 
+                                type="button" 
+                                wire:click="abrirModalEnviarResumen"
+                                class="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-[#00376e] to-blue-800 hover:from-blue-800 hover:to-blue-900 text-white rounded-lg text-xs font-bold shadow-sm transition-all cursor-pointer"
+                            >
+                                <flux:icon.check-circle class="size-4 shrink-0" />
+                                <span>Finalizar Entrevista</span>
+                            </button>
+                        @else
+                            @if($entrevista->estado === 'realizada')
+                                <div class="w-full flex items-center justify-center gap-2 py-2.5 bg-emerald-600 text-white rounded-lg text-xs font-bold">
+                                    <flux:icon.check-circle class="size-4" />
+                                    <span>Entrevista Finalizada</span>
+                                </div>
+                            @else
+                                <div class="w-full flex items-center justify-center gap-2 py-2.5 bg-red-600 text-white rounded-lg text-xs font-bold">
+                                    <flux:icon.x-circle class="size-4" />
+                                    <span>Entrevista {{ ucfirst($entrevista->estado) }}</span>
+                                </div>
+                            @endif
+                        @endif
+                    </div>
+                </div>
+            </flux:card>
+
             <!-- Information Pane -->
             <flux:card class="bg-zinc-50 dark:bg-zinc-800/40 p-6 shadow-sm border border-zinc-200 dark:border-zinc-700">
                 <h3 class="text-xs font-bold text-[#00376e] dark:text-blue-400 uppercase tracking-wider mb-4 border-b border-zinc-200 dark:border-zinc-700 pb-3">Estado Analítico</h3>
@@ -665,6 +979,233 @@ new class extends Component {
                 <div class="flex justify-end gap-3 pt-4">
                     <flux:button wire:click="$set('modalReagendar', false)" variant="ghost">Cancelar</flux:button>
                     <flux:button type="submit" variant="primary">Confirmar Cambio</flux:button>
+                </div>
+            </form>
+        </div>
+    </flux:modal>
+
+    <!-- Modal Firma Presencial -->
+    <flux:modal wire:model="modalFirmaPresencial" class="md:w-[32rem]">
+        <div class="space-y-6">
+            <div>
+                <flux:heading size="lg" class="flex items-center gap-2">
+                    <flux:icon.pencil-square class="size-5 text-blue-600" />
+                    Firma Presencial del Apoderado / Asistente
+                </flux:heading>
+                <flux:text class="mt-1">Confirme o modifique el nombre y RUT del asistente antes de realizar la firma en pantalla.</flux:text>
+            </div>
+
+            <form wire:submit.prevent="guardarFirmaPresencial" class="space-y-4">
+                <flux:input wire:model="firmanteNombre" label="Nombre Completo del Firmante" placeholder="EJ: MARÍA PAZ LÓPEZ" required class="uppercase" />
+                <flux:error name="firmanteNombre" />
+
+                <div class="flex gap-2 items-end">
+                    <flux:input wire:model="firmanteRutNumero" label="RUT del Firmante" placeholder="12345678" class="flex-1" required />
+                    <flux:input wire:model="firmanteRutDv" label="DV" placeholder="K" class="w-16 uppercase" maxlength="1" />
+                </div>
+                <flux:error name="firmanteRutNumero" />
+
+                {{-- Canvas Pad Táctil / Mouse --}}
+                <div x-data="{
+                    canvas: null,
+                    ctx: null,
+                    isDrawing: false,
+                    hasDrawn: false,
+                    init() {
+                        this.$nextTick(() => {
+                            this.setupCanvas();
+                        });
+                    },
+                    setupCanvas() {
+                        this.canvas = this.$refs.canvas;
+                        if (!this.canvas) return;
+                        this.ctx = this.canvas.getContext('2d');
+                        
+                        const rect = this.canvas.getBoundingClientRect();
+                        const w = (rect.width && rect.width > 0) ? Math.round(rect.width) : 450;
+                        const h = (rect.height && rect.height > 0) ? Math.round(rect.height) : 150;
+
+                        this.canvas.width = w;
+                        this.canvas.height = h;
+
+                        this.ctx.lineWidth = 3;
+                        this.ctx.lineCap = 'round';
+                        this.ctx.lineJoin = 'round';
+                        this.ctx.strokeStyle = '#020617';
+
+                        if ($wire.firmaSvg && !this.hasDrawn) {
+                            const img = new Image();
+                            img.onload = () => {
+                                if (this.ctx && this.canvas) {
+                                    this.ctx.drawImage(img, 0, 0, this.canvas.width, this.canvas.height);
+                                    this.hasDrawn = true;
+                                }
+                            };
+                            img.src = $wire.firmaSvg;
+                        }
+
+                        if (!this.canvas.dataset.listenersAttached) {
+                            this.canvas.dataset.listenersAttached = 'true';
+
+                            const getPos = (e) => {
+                                const r = this.canvas.getBoundingClientRect();
+                                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                                const scaleX = r.width > 0 ? (this.canvas.width / r.width) : 1;
+                                const scaleY = r.height > 0 ? (this.canvas.height / r.height) : 1;
+                                return {
+                                    x: (clientX - r.left) * scaleX,
+                                    y: (clientY - r.top) * scaleY
+                                };
+                            };
+
+                            const onDown = (e) => {
+                                e.preventDefault();
+                                if (e.pointerId && this.canvas.setPointerCapture) {
+                                    try { this.canvas.setPointerCapture(e.pointerId); } catch(err) {}
+                                }
+                                this.isDrawing = true;
+                                this.hasDrawn = true;
+                                const pos = getPos(e);
+                                this.ctx.beginPath();
+                                this.ctx.moveTo(pos.x, pos.y);
+                            };
+
+                            const onMove = (e) => {
+                                if (!this.isDrawing) return;
+                                e.preventDefault();
+                                const pos = getPos(e);
+                                this.ctx.lineTo(pos.x, pos.y);
+                                this.ctx.stroke();
+                            };
+
+                            const onUp = (e) => {
+                                if (this.isDrawing) {
+                                    this.isDrawing = false;
+                                    if (e.pointerId && this.canvas.releasePointerCapture) {
+                                        try { this.canvas.releasePointerCapture(e.pointerId); } catch(err) {}
+                                    }
+                                    $wire.set('firmaSvg', this.canvas.toDataURL('image/png'));
+                                }
+                            };
+
+                            this.canvas.addEventListener('pointerdown', onDown);
+                            this.canvas.addEventListener('pointermove', onMove);
+                            this.canvas.addEventListener('pointerup', onUp);
+                            this.canvas.addEventListener('pointercancel', onUp);
+
+                            this.canvas.addEventListener('mousedown', onDown);
+                            this.canvas.addEventListener('mousemove', onMove);
+                            this.canvas.addEventListener('mouseup', onUp);
+
+                            this.canvas.addEventListener('touchstart', onDown, { passive: false });
+                            this.canvas.addEventListener('touchmove', onMove, { passive: false });
+                            this.canvas.addEventListener('touchend', onUp);
+                        }
+                    },
+                    clearCanvas() {
+                        this.setupCanvas();
+                        if (this.canvas && this.ctx) {
+                            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                            this.hasDrawn = false;
+                            $wire.set('firmaSvg', '');
+                        }
+                    }
+                }" wire:ignore class="space-y-2 pt-2">
+                    <label class="block text-xs font-bold uppercase tracking-wider text-zinc-500">Trazar Firma Digital:</label>
+                    <div class="relative border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-xl bg-white dark:bg-zinc-950 overflow-hidden">
+                        <canvas 
+                            x-ref="canvas" 
+                            class="w-full h-36 touch-none cursor-crosshair bg-white"
+                        ></canvas>
+                        <div x-show="!hasDrawn" class="absolute inset-0 flex items-center justify-center pointer-events-none text-xs text-zinc-400">
+                            Firme aquí con mouse o pantalla táctil
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center text-xs">
+                        <button type="button" @click="clearCanvas()" class="text-zinc-500 hover:text-zinc-700 underline cursor-pointer">Limpiar trazado</button>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-3 pt-4 border-t border-zinc-100 dark:border-zinc-800">
+                    <flux:button wire:click="$set('modalFirmaPresencial', false)" variant="ghost">Cancelar</flux:button>
+                    <flux:button type="submit" variant="primary" icon="check">Guardar Firma</flux:button>
+                </div>
+            </form>
+        </div>
+    </flux:modal>
+
+    <!-- Modal Firma Online -->
+    <flux:modal wire:model="modalFirmaOnline" class="md:w-[30rem]">
+        <div class="space-y-6">
+            <div>
+                <flux:heading size="lg" class="flex items-center gap-2">
+                    <flux:icon.paper-airplane class="size-5 text-blue-600" />
+                    Enviar Enlace a Firma Digital por Correo
+                </flux:heading>
+                <flux:text class="mt-1">Se enviará un correo con un enlace seguro para que el apoderado o firmante apruebe y firme los acuerdos.</flux:text>
+            </div>
+
+            <form wire:submit.prevent="enviarFirmaOnline" class="space-y-4">
+                <flux:input wire:model="firmanteEmail" label="Correo Electrónico del Firmante" type="email" placeholder="apoderado@correo.com" required />
+                <flux:error name="firmanteEmail" />
+
+                <div class="flex justify-end gap-3 pt-4 border-t border-zinc-100 dark:border-zinc-800">
+                    <flux:button wire:click="$set('modalFirmaOnline', false)" variant="ghost">Cancelar</flux:button>
+                    <flux:button type="submit" variant="primary" icon="paper-airplane">Enviar Solicitud</flux:button>
+                </div>
+            </form>
+        </div>
+    </flux:modal>
+
+    <!-- Modal Enviar Resumen -->
+    <flux:modal wire:model="modalEnviarResumen" class="md:w-[32rem]">
+        <div class="space-y-6">
+            <div>
+                <flux:heading size="lg" class="flex items-center gap-2">
+                    <flux:icon.envelope class="size-5 text-[#00376e]" />
+                    Enviar Resumen de Entrevista y Compromisos
+                </flux:heading>
+                <flux:text class="mt-1">Seleccione a quiénes desea enviar el resumen formal y compromisos alcanzados.</flux:text>
+                <div class="mt-2 p-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 rounded-lg text-xs text-amber-800 dark:text-amber-300 flex items-center gap-2">
+                    <flux:icon.shield-exclamation class="size-4 shrink-0" />
+                    <span>Nota: Las observaciones generales internas NO serán incluidas en el correo.</span>
+                </div>
+            </div>
+
+            <form wire:submit.prevent="enviarResumenCorreos" class="space-y-5">
+                <div class="space-y-4">
+                    {{-- Opción Apoderado --}}
+                    <div class="p-3 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl space-y-2">
+                        <flux:checkbox wire:model.live="enviarApoderado" label="Enviar a Apoderado/a Titular" />
+                        @if($enviarApoderado)
+                            <flux:input wire:model="emailApoderado" type="email" placeholder="correo.apoderado@gmail.com" class="text-xs" />
+                        @endif
+                    </div>
+
+                    {{-- Opción Estudiante --}}
+                    <div class="p-3 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl space-y-2">
+                        <flux:checkbox wire:model.live="enviarEstudiante" label="Enviar a Estudiante" />
+                        @if($enviarEstudiante)
+                            <flux:input wire:model="emailEstudiante" type="email" placeholder="estudiante@colegio.cl" class="text-xs" />
+                        @endif
+                    </div>
+
+                    {{-- Opción Otro Correo --}}
+                    <div class="p-3 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl space-y-3">
+                        <flux:checkbox wire:model.live="enviarOtro" label="Enviar a otro destinatario / familiar" />
+                        @if($enviarOtro)
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <flux:input wire:model="nombreOtro" placeholder="Nombre (Ej: Tía María)" class="text-xs" />
+                                <flux:input wire:model="emailOtro" type="email" placeholder="familiar@correo.com" class="text-xs" />
+                            </div>
+                        @endif
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-3 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                    <flux:button wire:click="$set('modalEnviarResumen', false)" variant="ghost">Cancelar</flux:button>
+                    <flux:button type="submit" variant="primary" icon="check-circle" class="bg-gradient-to-r from-[#00376e] to-blue-800 hover:from-blue-800 hover:to-blue-900 text-white font-bold">Enviar Correo(s) y finalizar entrevista</flux:button>
                 </div>
             </form>
         </div>

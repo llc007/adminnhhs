@@ -16,11 +16,21 @@ class Bitacora extends Model
         'acuerdos',
         'adjuntos_drive',
         'estado_formulario',
+        'estado_firma',
+        'firmante_nombre',
+        'firmante_rut',
+        'firmante_email',
+        'firma_svg',
+        'firmado_at',
+        'firma_token',
+        'firma_token_expires_at',
     ];
 
     protected $casts = [
         'acuerdos' => 'array',
         'adjuntos_drive' => 'array',
+        'firmado_at' => 'datetime',
+        'firma_token_expires_at' => 'datetime',
     ];
 
     /**

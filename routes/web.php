@@ -42,6 +42,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('/sin-permiso', 'pages::auth.sin-permiso')->name('sin-permiso');
 });
 
+// Ruta pública para Firma Digital por correo
+Route::livewire('/entrevistas/firma/{token}', 'pages::entrevistas.firma_publica')->name('entrevistas.firma_publica');
+
 // Vistas de Estudiantes — requiere permiso ver-estudiantes o superadmin
 Route::middleware(['auth', 'verified', 'role_or_permission:superadmin|ver-estudiantes'])->group(function () {
     Route::livewire('/estudiantes', 'pages::usuarios.estudiantes.index')->name('estudiantes.index');

@@ -44,6 +44,42 @@ new #[Title('Auditoría de Correos')] class extends Component
         }
     }
 
+    public function reenviarCorreo(int $id): void
+    {
+        $log = MailLog::find($id);
+        if (!$log) return;
+
+        try {
+            \Illuminate\Support\Facades\Mail::html($log->body, function ($message) use ($log) {
+                $message->to($log->to)
+                    ->subject($log->subject);
+            });
+
+            $log->update([
+                'status' => 'sent',
+                'error_message' => null,
+                'sent_at' => now(),
+            ]);
+
+            Flux::toast(
+                heading: __('Correo Enviado'),
+                text: __('El correo ha sido enviado exitosamente a ') . $log->to,
+                variant: 'success'
+            );
+        } catch (\Throwable $e) {
+            $log->update([
+                'status' => 'failed',
+                'error_message' => $e->getMessage(),
+            ]);
+
+            Flux::toast(
+                heading: __('Error de Envío'),
+                text: $e->getMessage(),
+                variant: 'danger'
+            );
+        }
+    }
+
     public function updatedSearch()
     {
         $this->resetPage();
@@ -81,7 +117,7 @@ new #[Title('Auditoría de Correos')] class extends Component
             ->when($this->filtroStatus !== 'todos', function ($query) {
                 $query->where('status', $this->filtroStatus);
             })
-            ->orderBy('sent_at', 'desc')
+            ->orderBy('created_at', 'desc')
             ->paginate(15);
     }
 };
@@ -125,6 +161,7 @@ new #[Title('Auditoría de Correos')] class extends Component
                 <flux:select wire:model.live="filtroStatus">
                     <flux:select.option value="todos">{{ __('Todos los estados') }}</flux:select.option>
                     <flux:select.option value="sent">{{ __('Enviado (Sent)') }}</flux:select.option>
+                    <flux:select.option value="not_sent">{{ __('No Enviado (Bloqueado)') }}</flux:select.option>
                     <flux:select.option value="delivered">{{ __('Entregado (Delivered)') }}</flux:select.option>
                     <flux:select.option value="bounced">{{ __('Rebotado (Bounced)') }}</flux:select.option>
                     <flux:select.option value="failed">{{ __('Fallido (Failed)') }}</flux:select.option>
@@ -141,7 +178,7 @@ new #[Title('Auditoría de Correos')] class extends Component
                 <flux:table.column>{{ __('Destinatario') }}</flux:table.column>
                 <flux:table.column>{{ __('Asunto') }}</flux:table.column>
                 <flux:table.column>{{ __('Message-ID') }}</flux:table.column>
-                <flux:table.column>{{ __('Fecha Envío') }}</flux:table.column>
+                <flux:table.column>{{ __('Fecha Registro') }}</flux:table.column>
                 <flux:table.column class="text-right"></flux:table.column>
             </flux:table.columns>
 
@@ -153,6 +190,8 @@ new #[Title('Auditoría de Correos')] class extends Component
                                 <flux:badge color="green" icon="check-circle" size="sm">{{ __('Entregado') }}</flux:badge>
                             @elseif($log->status === 'sent')
                                 <flux:badge color="blue" icon="paper-airplane" size="sm">{{ __('Enviado') }}</flux:badge>
+                            @elseif($log->status === 'not_sent')
+                                <flux:badge color="amber" icon="clock" size="sm">{{ __('NO ENVIADO') }}</flux:badge>
                             @elseif($log->status === 'bounced')
                                 <flux:badge color="orange" icon="exclamation-triangle" size="sm">{{ __('Rebotado') }}</flux:badge>
                             @elseif($log->status === 'failed')
@@ -175,13 +214,20 @@ new #[Title('Auditoría de Correos')] class extends Component
                         </flux:table.cell>
 
                         <flux:table.cell class="text-xs text-zinc-600 dark:text-zinc-400">
-                            {{ $log->sent_at->format('d M Y, H:i') }}
+                            {{ $log->created_at ? $log->created_at->format('d M Y, H:i') : '-' }}
                         </flux:table.cell>
 
                         <flux:table.cell class="text-right">
-                            <flux:button variant="ghost" size="sm" icon="eye" wire:click="verDetalle({{ $log->id }})">
-                                {{ __('Ver') }}
-                            </flux:button>
+                            <div class="flex items-center justify-end gap-2">
+                                @if(in_array($log->status, ['not_sent', 'failed']))
+                                    <flux:button variant="subtle" size="sm" icon="paper-airplane" wire:click="reenviarCorreo({{ $log->id }})">
+                                        {{ __('Enviar Correo') }}
+                                    </flux:button>
+                                @endif
+                                <flux:button variant="ghost" size="sm" icon="eye" wire:click="verDetalle({{ $log->id }})">
+                                    {{ __('Ver') }}
+                                </flux:button>
+                            </div>
                         </flux:table.cell>
                     </flux:table.row>
                 @empty
@@ -202,9 +248,9 @@ new #[Title('Auditoría de Correos')] class extends Component
             <div class="space-y-6">
                 <div class="flex items-start justify-between border-b pb-4 dark:border-zinc-700">
                     <div>
-                        <flux:heading size="lg">{{ __('Detalle del Correo Enviado') }}</flux:heading>
+                        <flux:heading size="lg">{{ __('Detalle del Correo') }}</flux:heading>
                         <flux:subheading size="sm" class="mt-1">
-                            {{ __('Enviado el') }} {{ $selected->sent_at->format('d/m/Y a las H:i:s') }}
+                            {{ __('Registrado el') }} {{ $selected->created_at ? $selected->created_at->format('d/m/Y a las H:i:s') : '-' }}
                         </flux:subheading>
                     </div>
                     <div>
@@ -212,6 +258,8 @@ new #[Title('Auditoría de Correos')] class extends Component
                             <flux:badge color="green" icon="check-circle">{{ __('Entregado') }}</flux:badge>
                         @elseif($selected->status === 'sent')
                             <flux:badge color="blue" icon="paper-airplane">{{ __('Enviado') }}</flux:badge>
+                        @elseif($selected->status === 'not_sent')
+                            <flux:badge color="amber" icon="clock">{{ __('NO ENVIADO') }}</flux:badge>
                         @elseif($selected->status === 'bounced')
                             <flux:badge color="orange" icon="exclamation-triangle">{{ __('Rebotado') }}</flux:badge>
                         @elseif($selected->status === 'failed')
@@ -236,14 +284,14 @@ new #[Title('Auditoría de Correos')] class extends Component
                     </div>
                 </div>
 
-                {{-- Detalle del Error si falló o rebotó --}}
+                {{-- Detalle del Error o Estado --}}
                 @if($selected->error_message)
-                    <div class="p-4 bg-red-50 dark:bg-red-950/10 border border-red-200 dark:border-red-900/20 rounded-xl">
-                        <div class="flex gap-3 text-red-700 dark:text-red-400">
-                            <flux:icon.exclamation-circle class="size-5 shrink-0" />
+                    <div class="p-4 bg-amber-50 dark:bg-amber-950/10 border border-amber-200 dark:border-amber-900/20 rounded-xl">
+                        <div class="flex gap-3 text-amber-800 dark:text-amber-400">
+                            <flux:icon.exclamation-triangle class="size-5 shrink-0" />
                             <div>
-                                <h4 class="font-bold text-sm">{{ __('Error reportado en la entrega:') }}</h4>
-                                <p class="text-xs mt-1 font-mono bg-red-100/50 dark:bg-red-950/20 p-2 rounded">
+                                <h4 class="font-bold text-sm">{{ __('Estado / Diagnóstico:') }}</h4>
+                                <p class="text-xs mt-1 font-mono bg-amber-100/50 dark:bg-amber-950/20 p-2 rounded">
                                     {{ $selected->error_message }}
                                 </p>
                             </div>
@@ -263,7 +311,14 @@ new #[Title('Auditoría de Correos')] class extends Component
                     </div>
                 </div>
 
-                <div class="flex justify-end pt-4 border-t dark:border-zinc-700">
+                <div class="flex justify-between items-center pt-4 border-t dark:border-zinc-700">
+                    <div>
+                        @if(in_array($selected->status, ['not_sent', 'failed']))
+                            <flux:button variant="primary" icon="paper-airplane" wire:click="reenviarCorreo({{ $selected->id }})">
+                                {{ __('Enviar Correo Ahora') }}
+                            </flux:button>
+                        @endif
+                    </div>
                     <flux:button wire:click="$set('modalDetalle', false)" variant="ghost">
                         {{ __('Cerrar') }}
                     </flux:button>

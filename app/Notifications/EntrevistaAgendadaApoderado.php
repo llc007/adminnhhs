@@ -15,12 +15,15 @@ class EntrevistaAgendadaApoderado extends Notification implements ShouldQueue
 
     public $entrevista;
 
+    public string $destinatario;
+
     /**
      * Create a new notification instance.
      */
-    public function __construct(Entrevista $entrevista)
+    public function __construct(Entrevista $entrevista, string $destinatario = 'apoderado')
     {
         $this->entrevista = $entrevista;
+        $this->destinatario = $destinatario;
     }
 
     /**
@@ -43,10 +46,18 @@ class EntrevistaAgendadaApoderado extends Notification implements ShouldQueue
         $fecha = Carbon::parse($this->entrevista->fecha)->translatedFormat('l d \d\e F, Y');
         $hora = Carbon::parse($this->entrevista->hora)->format('H:i');
 
-        return (new MailMessage)
-            ->subject('Citación a Entrevista - Liceo New Heaven High School')
-            ->greeting('Estimado/a apoderado/a,')
-            ->line('Le informamos que ha sido citado a una entrevista respecto al estudiante **'.$estudiante->nombreCompleto().'**, por el/la docente **'.$docente->nombreCompleto().'**.')
+        $mail = (new MailMessage)
+            ->subject('Citación a Entrevista - Liceo New Heaven High School');
+
+        if ($this->destinatario === 'estudiante') {
+            $mail->greeting('Estimado/a estudiante,')
+                ->line('Te informamos que has sido citado/a a una entrevista por el/la docente **'.$docente->nombreCompleto().'**.');
+        } else {
+            $mail->greeting('Estimado/a apoderado/a,')
+                ->line('Le informamos que ha sido citado a una entrevista respecto al estudiante **'.$estudiante->nombreCompleto().'**, por el/la docente **'.$docente->nombreCompleto().'**.');
+        }
+
+        return $mail
             ->line('**Fecha de la entrevista:** '.$fecha)
             ->line('**Hora:** '.$hora)
             ->line('**Modalidad:** '.$this->entrevista->lugar)

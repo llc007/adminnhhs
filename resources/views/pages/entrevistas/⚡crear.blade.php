@@ -21,6 +21,10 @@ new class extends Component {
     public string $lugar = 'presencial';
     public string $notas = '';
 
+    // Notificaciones configurables por el usuario
+    public bool $notificarApoderado = true;
+    public bool $notificarEstudiante = true;
+
     public function updatedSearchEstudiante()
     {
         if (strlen($this->searchEstudiante) >= 3) {
@@ -44,11 +48,20 @@ new class extends Component {
     public function seleccionarEstudiante($id)
     {
         $this->estudianteId = $id;
-        $estudiante = \App\Models\Estudiante::find($id);
+        $estudiante = \App\Models\Estudiante::with('user')->find($id);
 
         $this->searchEstudiante = $estudiante ? $estudiante->nombreCompleto() : '';
         $this->resultadosBusqueda = [];
         $this->modalEstudiantes = false; // Cerramos el modal por si venía de ahí
+
+        if ($estudiante) {
+            $this->notificarApoderado = !empty($estudiante->apoderado_email);
+            $studentEmail = $estudiante->email ?? $estudiante->user?->email;
+            $this->notificarEstudiante = !empty($studentEmail);
+        } else {
+            $this->notificarApoderado = true;
+            $this->notificarEstudiante = true;
+        }
     }
 
     public function updatedFiltroCursoId()
@@ -95,7 +108,7 @@ new class extends Component {
         if (!$this->estudianteId) {
             return null;
         }
-        return \App\Models\Estudiante::with('curso')->find($this->estudianteId);
+        return \App\Models\Estudiante::with(['curso', 'user'])->find($this->estudianteId);
     }
 
     public $confirmarTope = false;
@@ -159,17 +172,24 @@ new class extends Component {
         // Enviar notificación al Docente (usamos auth()->user() o el owner de la cita)
         auth()->user()->notify(new \App\Notifications\EntrevistaAgendadaDocente($entrevista));
 
-        // Enviar notificación al Apoderado (si tiene email válido)
-        if (!empty($entrevista->estudiante->apoderado_email)) {
+        // Enviar notificación al Apoderado (si está activo y tiene email válido)
+        if ($this->notificarApoderado && !empty($entrevista->estudiante->apoderado_email)) {
             \Illuminate\Support\Facades\Notification::route('mail', $entrevista->estudiante->apoderado_email)
-                ->notify(new \App\Notifications\EntrevistaAgendadaApoderado($entrevista));
+                ->notify(new \App\Notifications\EntrevistaAgendadaApoderado($entrevista, 'apoderado'));
+        }
+
+        // Enviar notificación al Estudiante (si está activo y tiene email válido)
+        $emailEstudiante = $entrevista->estudiante->email ?? $entrevista->estudiante->user?->email;
+        if ($this->notificarEstudiante && !empty($emailEstudiante)) {
+            \Illuminate\Support\Facades\Notification::route('mail', $emailEstudiante)
+                ->notify(new \App\Notifications\EntrevistaAgendadaApoderado($entrevista, 'estudiante'));
         }
 
         // Feedback al usuario local e interfaz
-        \Flux::toast('Entrevista agendada y notificada con éxito.', variant: 'success');
+        \Flux::toast('Entrevista agendada con éxito.', variant: 'success');
 
         // Reset del form
-        $this->reset(['estudianteId', 'searchEstudiante', 'filtroCursoId', 'urgencia', 'lugar', 'motivo', 'notas', 'confirmarTope']);
+        $this->reset(['estudianteId', 'searchEstudiante', 'filtroCursoId', 'urgencia', 'lugar', 'motivo', 'notas', 'confirmarTope', 'notificarApoderado', 'notificarEstudiante']);
         $this->mount(); // Vuelve a resetear la hora a 09:00 y la fecha a hoy
     }
 
@@ -231,6 +251,10 @@ new class extends Component {
                             class="mb-0 h-10 w-10 shrink-0 flex items-center justify-center p-0"
                             :disabled="$filtroCursoId === ''" title="Ver lista de alumnos" />
                     </div>
+                    <div wire:loading wire:target="filtroCursoId, abrirModalCurso" class="mt-2 flex items-center gap-2 text-xs font-semibold text-blue-600 dark:text-blue-400">
+                        <flux:icon.arrow-path class="size-4 animate-spin shrink-0" />
+                        <span>{{ __('Cargando nómina del curso...') }}</span>
+                    </div>
                 </div>
 
                 {{-- Buscador Global Rápido --}}
@@ -238,6 +262,11 @@ new class extends Component {
                     <flux:input wire:model.live.debounce.300ms="searchEstudiante"
                         :label="__('2. O búsqueda rápida libre')" icon="magnifying-glass"
                         placeholder="Ej: Marcelo Paz (Nombre o RUT)..." autocomplete="off" />
+
+                    <div wire:loading wire:target="searchEstudiante" class="mt-2 flex items-center gap-2 text-xs font-semibold text-blue-600 dark:text-blue-400">
+                        <flux:icon.arrow-path class="size-4 animate-spin shrink-0" />
+                        <span>{{ __('Buscando estudiantes...') }}</span>
+                    </div>
 
                     {{-- Dropdown de resultados (se sobrepone) --}}
                     @if (count($resultadosBusqueda) > 0)
@@ -271,43 +300,119 @@ new class extends Component {
             <flux:separator variant="subtle" class="my-6" />
 
             {{-- Apoderado Auto-completado & Estudiante Actual --}}
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
+                {{-- Card Estudiante --}}
                 <div>
-                    @if ($this->estudiante)
-                        <div
-                            class="flex items-center gap-3 bg-zinc-50 p-4 rounded-xl border border-zinc-200 dark:bg-zinc-800/50 dark:border-zinc-700">
-                            <flux:icon.check-circle class="size-6 text-green-500" />
+                    <div wire:loading wire:target="seleccionarEstudiante" class="w-full h-full min-h-[140px]">
+                        <div class="flex items-center gap-3 bg-blue-50 p-5 rounded-xl border border-blue-200 dark:bg-blue-900/10 dark:border-blue-800/30 h-full">
+                            <flux:icon.arrow-path class="size-6 text-blue-600 dark:text-blue-400 animate-spin shrink-0" />
                             <div>
-                                <p class="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Estudiante
-                                    Seleccionado</p>
-                                <p class="text-sm font-medium text-zinc-900 dark:text-white mt-0.5">
-                                    {{ $this->estudiante->nombreCompleto() }}</p>
+                                <p class="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider">{{ __('Cargando Estudiante') }}</p>
+                                <p class="text-sm font-medium text-blue-700 dark:text-blue-300 mt-0.5">{{ __('Obteniendo datos del alumno...') }}</p>
                             </div>
                         </div>
-                    @else
-                        <div
-                            class="flex items-center gap-3 bg-red-50 p-4 rounded-xl border border-red-200 dark:bg-red-900/10 dark:border-red-800/30">
-                            <flux:icon.exclamation-circle class="size-6 text-red-500" />
-                            <div>
-                                <p
-                                    class="text-xs font-semibold text-red-600 dark:text-red-400 uppercase tracking-wider">
-                                    Estudiante Seleccionado</p>
-                                <p class="text-sm font-medium text-red-700 dark:text-red-300 mt-0.5">Pendiente de
-                                    selección</p>
+                    </div>
+
+                    <div wire:loading.remove wire:target="seleccionarEstudiante" class="h-full">
+                        @if ($this->estudiante)
+                            @php
+                                $emailEstudiante = $this->estudiante->email ?? $this->estudiante->user?->email;
+                            @endphp
+                            <div class="bg-zinc-50 dark:bg-zinc-800/50 p-5 rounded-xl border border-zinc-200 dark:border-zinc-700 h-full flex flex-col justify-between space-y-4">
+                                <div>
+                                    <div class="flex items-center gap-2 mb-1.5">
+                                        <flux:icon.check-circle class="size-5 text-green-500 shrink-0" />
+                                        <span class="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">{{ __('Estudiante Seleccionado') }}</span>
+                                    </div>
+                                    <p class="text-base font-bold text-zinc-900 dark:text-white">
+                                        {{ $this->estudiante->nombreCompleto() }}
+                                    </p>
+                                    <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1 flex items-center gap-1.5">
+                                        <flux:icon.envelope class="size-3.5 shrink-0" />
+                                        <span class="truncate">{{ $emailEstudiante ?: __('Sin correo registrado') }}</span>
+                                    </p>
+                                </div>
+
+                                @if ($emailEstudiante)
+                                    <div class="pt-3 border-t border-zinc-200 dark:border-zinc-700/60">
+                                        <flux:checkbox wire:model.live="notificarEstudiante"
+                                            :label="__('Enviar citación por correo al estudiante')"
+                                            class="text-xs font-medium text-zinc-700 dark:text-zinc-300" />
+                                    </div>
+                                @else
+                                    <div class="pt-3 border-t border-zinc-200 dark:border-zinc-700/60">
+                                        <span class="text-xs text-zinc-400 dark:text-zinc-500 italic">{{ __('No se enviará correo (sin email de estudiante registrado)') }}</span>
+                                    </div>
+                                @endif
                             </div>
-                        </div>
-                    @endif
+                        @else
+                            <div class="flex items-center gap-3 bg-red-50 p-5 rounded-xl border border-red-200 dark:bg-red-900/10 dark:border-red-800/30 h-full">
+                                <flux:icon.exclamation-circle class="size-6 text-red-500 shrink-0" />
+                                <div>
+                                    <p class="text-xs font-semibold text-red-600 dark:text-red-400 uppercase tracking-wider">{{ __('Estudiante Seleccionado') }}</p>
+                                    <p class="text-sm font-medium text-red-700 dark:text-red-300 mt-0.5">{{ __('Pendiente de selección') }}</p>
+                                </div>
+                            </div>
+                        @endif
+                    </div>
                 </div>
 
+                {{-- Card Apoderado --}}
                 <div>
-                    @if ($this->estudiante)
-                        <flux:input :label="__('Apoderado Titular')"
-                            value="{{ $this->estudiante->apoderado_nombres ? $this->estudiante->apoderado_nombres . ' ' . $this->estudiante->apoderado_apellido_pat : 'Sin apoderado registrado' }} {{ $this->estudiante->apoderado_parentesco ? '(' . $this->estudiante->apoderado_parentesco . ')' : '' }}"
-                            disabled />
-                    @else
-                        <flux:input :label="__('Apoderado Titular')" placeholder="Esperando selección de estudiante..."
-                            disabled />
-                    @endif
+                    <div wire:loading wire:target="seleccionarEstudiante" class="w-full h-full min-h-[140px]">
+                        <div class="flex items-center gap-3 bg-blue-50 p-5 rounded-xl border border-blue-200 dark:bg-blue-900/10 dark:border-blue-800/30 h-full">
+                            <flux:icon.arrow-path class="size-6 text-blue-600 dark:text-blue-400 animate-spin shrink-0" />
+                            <div>
+                                <p class="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider">{{ __('Cargando Apoderado') }}</p>
+                                <p class="text-sm font-medium text-blue-700 dark:text-blue-300 mt-0.5">{{ __('Obteniendo datos del apoderado...') }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div wire:loading.remove wire:target="seleccionarEstudiante" class="h-full">
+                        @if ($this->estudiante)
+                            @php
+                                $nombreApoderado = $this->estudiante->apoderado_nombres
+                                    ? trim($this->estudiante->apoderado_nombres . ' ' . $this->estudiante->apoderado_apellido_pat)
+                                    : null;
+                                $emailApoderado = $this->estudiante->apoderado_email;
+                            @endphp
+                            <div class="bg-zinc-50 dark:bg-zinc-800/50 p-5 rounded-xl border border-zinc-200 dark:border-zinc-700 h-full flex flex-col justify-between space-y-4">
+                                <div>
+                                    <div class="flex items-center gap-2 mb-1.5">
+                                        <flux:icon.user-group class="size-5 text-blue-500 shrink-0" />
+                                        <span class="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">{{ __('Apoderado Titular') }}</span>
+                                    </div>
+                                    <p class="text-base font-bold text-zinc-900 dark:text-white">
+                                        {{ $nombreApoderado ?: __('Sin apoderado registrado') }}
+                                        @if ($this->estudiante->apoderado_parentesco)
+                                            <span class="text-xs font-normal text-zinc-500">({{ $this->estudiante->apoderado_parentesco }})</span>
+                                        @endif
+                                    </p>
+                                    <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1 flex items-center gap-1.5">
+                                        <flux:icon.envelope class="size-3.5 shrink-0" />
+                                        <span class="truncate">{{ $emailApoderado ?: __('Sin correo registrado') }}</span>
+                                    </p>
+                                </div>
+
+                                @if ($emailApoderado)
+                                    <div class="pt-3 border-t border-zinc-200 dark:border-zinc-700/60">
+                                        <flux:checkbox wire:model.live="notificarApoderado"
+                                            :label="__('Enviar citación por correo al apoderado titular')"
+                                            class="text-xs font-medium text-zinc-700 dark:text-zinc-300" />
+                                    </div>
+                                @else
+                                    <div class="pt-3 border-t border-zinc-200 dark:border-zinc-700/60">
+                                        <span class="text-xs text-zinc-400 dark:text-zinc-500 italic">{{ __('No se enviará correo (sin email de apoderado registrado)') }}</span>
+                                    </div>
+                                @endif
+                            </div>
+                        @else
+                            <div class="bg-zinc-50 dark:bg-zinc-800/30 p-5 rounded-xl border border-dashed border-zinc-200 dark:border-zinc-700 h-full flex items-center">
+                                <p class="text-xs text-zinc-400 dark:text-zinc-500 italic">{{ __('Seleccione un estudiante para ver los datos del apoderado titular.') }}</p>
+                            </div>
+                        @endif
+                    </div>
                 </div>
             </div>
         </flux:card>
@@ -428,7 +533,7 @@ new class extends Component {
                 </div>
 
                 <div class="overflow-y-auto w-full divide-y divide-zinc-100 dark:divide-zinc-800 relative min-h-[150px]">
-                    <div wire:loading wire:target="filtroCursoId" class="absolute inset-0 bg-white/70 dark:bg-zinc-900/70 flex items-center justify-center z-10">
+                    <div wire:loading wire:target="filtroCursoId, abrirModalCurso, seleccionarEstudiante" class="absolute inset-0 bg-white/70 dark:bg-zinc-900/70 flex items-center justify-center z-10">
                         <div class="flex flex-col items-center gap-2">
                             <flux:icon.arrow-path class="size-6 animate-spin text-blue-600 dark:text-blue-400" />
                             <span class="text-xs font-bold text-zinc-500 dark:text-zinc-400">{{ __('Cargando alumnos...') }}</span>

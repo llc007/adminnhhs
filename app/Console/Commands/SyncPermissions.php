@@ -16,14 +16,14 @@ class SyncPermissions extends Command
      *
      * @var string
      */
-    protected $signature = 'app:sync-permissions';
+    protected $signature = 'app:sync-permissions {--force : Force reset all role permissions to factory defaults}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Sync Spatie roles and permissions for all schools and users';
+    protected $description = 'Sync Spatie roles and permissions for all schools and users without overwriting existing custom settings';
 
     /**
      * Execute the console command.
@@ -74,6 +74,8 @@ class SyncPermissions extends Command
             return Command::FAILURE;
         }
 
+        $force = $this->option('force');
+
         $this->info('3. Syncing role permissions for each school...');
         $rolePermissionsMap = [
             'superadmin' => $allPermissions,
@@ -89,9 +91,6 @@ class SyncPermissions extends Command
                 'ver-estudiantes',
                 'editar-estudiantes',
                 'importar-estudiantes',
-                'crear-requerimientos',
-                'aprobar-requerimientos',
-                'ver-requerimientos-general',
                 'ver-prestamos-propios',
                 'ver-prestamos-general',
                 'gestionar-funcionarios',
@@ -141,7 +140,11 @@ class SyncPermissions extends Command
 
             foreach ($rolePermissionsMap as $roleName => $perms) {
                 $role = Role::findOrCreate($roleName, 'web');
-                $role->syncPermissions($perms);
+
+                // Preserve custom database permissions if role already has permissions, unless --force is passed
+                if ($force || $role->permissions()->count() === 0) {
+                    $role->syncPermissions($perms);
+                }
             }
         }
 

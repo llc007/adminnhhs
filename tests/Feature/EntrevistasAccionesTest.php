@@ -201,3 +201,25 @@ test('receptionist can add a new attention place successfully', function () {
         'activo' => true,
     ]);
 });
+
+test('receptionist can update attention place directly or set it to PENDIENTE', function () {
+    [$user, $entrevista] = setupTestEnvironment();
+
+    $this->actingAs($user);
+
+    // 1. Update place to PENDIENTE
+    Livewire::test('pages::entrevistas.recepcion')
+        ->call('actualizarLugarDirecto', $entrevista->id, 'PENDIENTE')
+        ->assertHasNoErrors();
+
+    $entrevista->refresh();
+    expect($entrevista->lugar)->toBe('PENDIENTE');
+
+    // 2. Update place to a specific box
+    Livewire::test('pages::entrevistas.recepcion')
+        ->call('actualizarLugarDirecto', $entrevista->id, 'SALA DE REUNIONES')
+        ->assertHasNoErrors();
+
+    $entrevista->refresh();
+    expect($entrevista->lugar)->toBe('SALA DE REUNIONES');
+});

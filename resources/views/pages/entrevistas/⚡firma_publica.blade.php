@@ -77,7 +77,7 @@ new #[Layout('layouts.blank')] #[Title('Firma Digital de Entrevista')] class ext
             'firmante_nombre' => mb_strtoupper($this->firmanteNombre, 'UTF-8'),
             'firmante_rut' => $rutCompleto,
             'firma_svg' => $this->firmaSvg ?: null,
-            'firmado_at' => now(),
+            'firmado_at' => now('America/Santiago'),
         ]);
 
         $this->yaFirmada = true;
@@ -118,7 +118,7 @@ new #[Layout('layouts.blank')] #[Title('Firma Digital de Entrevista')] class ext
                     Firmado por: <strong>{{ $bitacora->firmante_nombre }}</strong> (RUT: {{ $bitacora->firmante_rut }})
                 </p>
                 <p class="text-xs text-zinc-500">
-                    Fecha y Hora: {{ $bitacora->firmado_at ? $bitacora->firmado_at->format('d/m/Y H:i hrs') : 'Registrado' }}
+                    Fecha y Hora: {{ $bitacora->firmado_at ? $bitacora->firmado_at->setTimezone('America/Santiago')->format('d/m/Y H:i \h\r\s') : 'Registrado' }}
                 </p>
             </div>
 

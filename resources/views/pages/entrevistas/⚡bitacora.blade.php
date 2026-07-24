@@ -298,7 +298,7 @@ new class extends Component {
             'firmante_nombre' => mb_strtoupper($this->firmanteNombre, 'UTF-8'),
             'firmante_rut' => $rutCompleto,
             'firma_svg' => $this->firmaSvg ?: null,
-            'firmado_at' => now(),
+            'firmado_at' => now('America/Santiago'),
         ]);
 
         $this->modalFirmaPresencial = false;
@@ -635,7 +635,7 @@ new class extends Component {
                         <div class="mt-2.5 p-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl space-y-1.5 text-center">
                             <div class="flex items-center justify-between text-[10px] uppercase font-bold text-zinc-400">
                                 <span>Firma Registrada</span>
-                                <span>{{ $bitacora->firmado_at ? $bitacora->firmado_at->format('d/m/Y H:i') : '' }}</span>
+                                <span>{{ $bitacora->firmado_at ? $bitacora->firmado_at->setTimezone('America/Santiago')->format('d/m/Y H:i') : '' }}</span>
                             </div>
                             <div class="p-1 bg-zinc-50 dark:bg-zinc-900 rounded-lg flex justify-center border border-zinc-100 dark:border-zinc-800">
                                 <img src="{{ $bitacora->firma_svg }}" alt="Firma Digital" class="max-h-20 object-contain" />

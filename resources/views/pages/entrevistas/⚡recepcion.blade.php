@@ -226,6 +226,24 @@ new class extends Component {
         }
     }
 
+    public function actualizarLugarDirecto($id, $nuevoLugar)
+    {
+        $entrevista = Entrevista::find($id);
+
+        if ($entrevista) {
+            $nuevoLugarClean = mb_strtoupper(trim($nuevoLugar), 'UTF-8');
+            $entrevista->update([
+                'lugar' => $nuevoLugarClean,
+            ]);
+
+            $mensaje = $nuevoLugarClean === 'PENDIENTE'
+                ? 'Lugar de atención marcado como Pendiente.'
+                : "Lugar de atención asignado a {$nuevoLugarClean}.";
+
+            Flux::toast($mensaje, variant: 'success');
+        }
+    }
+
     public function abrirNuevoLugar()
     {
         $this->nuevoLugarNombre = '';
@@ -365,67 +383,99 @@ new class extends Component {
                                 </p>
                             </td>
                             <td class="px-6 py-5 text-center">
-                                @if($cita->estado === 'pendiente')
-                                    <flux:badge size="sm" color="zinc" class="w-24 justify-center">Pendiente</flux:badge>
-                                @elseif($cita->estado === 'ingresada')
-                                    @if(str_contains($cita->mensaje_recepcion ?? '', '[SALIDA]'))
-                                        <flux:badge size="sm" color="amber" class="w-24 justify-center">Se Retiró</flux:badge>
-                                        <p class="text-[10px] text-zinc-500 mt-1">(Bitácora Abierta)</p>
+                                <div class="flex flex-col items-center gap-1.5">
+                                    @if($cita->estado === 'pendiente')
+                                        <flux:badge size="sm" color="zinc" class="w-24 justify-center">Pendiente</flux:badge>
+                                    @elseif($cita->estado === 'ingresada')
+                                        @if(str_contains($cita->mensaje_recepcion ?? '', '[SALIDA]'))
+                                            <flux:badge size="sm" color="amber" class="w-24 justify-center">Se Retiró</flux:badge>
+                                            <p class="text-[10px] text-zinc-500 mt-0.5">(Bitácora Abierta)</p>
+                                        @else
+                                            <flux:badge size="sm" color="emerald" class="w-24 justify-center">Ingresó</flux:badge>
+                                            <p class="text-[10px] text-zinc-500 mt-0.5">({{ \Carbon\Carbon::parse($cita->hora_llegada)->format('H:i') }})</p>
+                                        @endif
+                                    @elseif($cita->estado === 'realizada')
+                                        <flux:badge size="sm" color="blue" class="w-24 justify-center">Realizada</flux:badge>
+                                        @if(str_contains($cita->mensaje_recepcion ?? '', '[SALIDA]'))
+                                            <p class="text-[10px] text-zinc-500 mt-0.5">(Se retiró)</p>
+                                        @else
+                                            <p class="text-[10px] text-emerald-600 font-bold mt-0.5">(En Recinto)</p>
+                                        @endif
                                     @else
-                                        <flux:badge size="sm" color="emerald" class="w-24 justify-center">Ingresó</flux:badge>
-                                        <p class="text-[10px] text-zinc-500 mt-1">({{ \Carbon\Carbon::parse($cita->hora_llegada)->format('H:i') }})</p>
+                                        <flux:badge size="sm" color="red" class="w-24 justify-center">{{ ucfirst($cita->estado) }}</flux:badge>
                                     @endif
-                                @elseif($cita->estado === 'realizada')
-                                    <flux:badge size="sm" color="blue" class="w-24 justify-center">Realizada</flux:badge>
-                                    @if(str_contains($cita->mensaje_recepcion ?? '', '[SALIDA]'))
-                                        <p class="text-[10px] text-zinc-500 mt-1">(Se retiró)</p>
-                                    @else
-                                        <p class="text-[10px] text-emerald-600 font-bold mt-1">(En Recinto)</p>
+
+                                    {{-- Botón interactivo de Lugar de Atención --}}
+                                    @if(in_array($cita->estado, ['ingresada', 'realizada']))
+                                        <flux:dropdown position="bottom">
+                                            @if (strtoupper($cita->lugar ?? '') === 'PENDIENTE' || empty($cita->lugar))
+                                                <button type="button"
+                                                    class="inline-flex items-center gap-1 text-amber-700 dark:text-amber-300 font-bold text-[11px] uppercase tracking-wide bg-amber-50 dark:bg-amber-900/30 hover:bg-amber-100 dark:hover:bg-amber-900/50 border border-amber-300 dark:border-amber-700 px-2.5 py-1 rounded-md cursor-pointer transition-all shadow-xs mt-1"
+                                                    title="Haga clic para asignar lugar de atención">
+                                                    <flux:icon.map-pin class="size-3.5 text-amber-500 animate-pulse" />
+                                                    <span>Pendiente</span>
+                                                    <flux:icon.chevron-down class="size-3 text-amber-600 dark:text-amber-400" />
+                                                </button>
+                                            @else
+                                                <button type="button"
+                                                    class="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-300 font-bold text-[11px] uppercase tracking-wide bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-800 px-2.5 py-1 rounded-md cursor-pointer transition-all shadow-xs mt-1"
+                                                    title="Haga clic para cambiar lugar de atención">
+                                                    <flux:icon.map-pin class="size-3.5 text-emerald-500" />
+                                                    <span>{{ $cita->lugar }}</span>
+                                                    <flux:icon.chevron-down class="size-3 text-emerald-600 dark:text-emerald-400" />
+                                                </button>
+                                            @endif
+
+                                            <flux:menu class="min-w-[190px]">
+                                                <div class="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-zinc-400 border-b border-zinc-100 dark:border-zinc-800 mb-1">
+                                                    Asignar Lugar de Atención
+                                                </div>
+                                                <flux:menu.item wire:click="actualizarLugarDirecto({{ $cita->id }}, 'PENDIENTE')" icon="clock">
+                                                    <span class="text-amber-600 dark:text-amber-400 font-bold">PENDIENTE (Por asignar)</span>
+                                                </flux:menu.item>
+                                                <flux:menu.separator />
+                                                @foreach ($this->lugares as $lugar)
+                                                    <flux:menu.item wire:click="actualizarLugarDirecto({{ $cita->id }}, '{{ $lugar->nombre }}')" icon="building-office-2">
+                                                        {{ $lugar->nombre }}
+                                                    </flux:menu.item>
+                                                @endforeach
+                                            </flux:menu>
+                                        </flux:dropdown>
                                     @endif
-                                @else
-                                    <flux:badge size="sm" color="red" class="w-24 justify-center">{{ ucfirst($cita->estado) }}</flux:badge>
-                                @endif
+                                </div>
                             </td>
                             <td class="px-6 py-5 text-right">
                                 @if($cita->estado === 'pendiente')
                                     <flux:button variant="primary" wire:click="prepararIngreso({{ $cita->id }})" class="font-bold shadow-sm">
                                         {{ __('Registrar Ingreso') }}
                                     </flux:button>
-                                @else
-                                    <div class="flex flex-col items-end gap-2">
-                                        <div class="inline-flex items-center justify-end gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold text-xs uppercase tracking-wide bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 rounded-md">
-                                            <flux:icon.map-pin class="size-4" />
-                                            {{ $cita->lugar ?? 'Ingresado' }}
-                                        </div>
-                                        @if(!str_contains($cita->mensaje_recepcion ?? '', '[SALIDA]') && in_array($cita->estado, ['ingresada', 'realizada']))
-                                            <flux:modal.trigger name="confirmar-salida-{{ $cita->id }}">
-                                                <flux:button size="sm" variant="danger" class="font-bold shadow-sm">
-                                                    Marcar Salida
-                                                </flux:button>
-                                            </flux:modal.trigger>
+                                @elseif(!str_contains($cita->mensaje_recepcion ?? '', '[SALIDA]') && in_array($cita->estado, ['ingresada', 'realizada']))
+                                    <flux:modal.trigger name="confirmar-salida-{{ $cita->id }}">
+                                        <flux:button size="sm" variant="danger" class="font-bold shadow-sm">
+                                            Marcar Salida
+                                        </flux:button>
+                                    </flux:modal.trigger>
 
-                                            <flux:modal name="confirmar-salida-{{ $cita->id }}" class="min-w-[22rem]">
-                                                <div class="space-y-6 text-left">
-                                                    <div>
-                                                        <flux:heading size="lg">¿Confirmar salida del recinto?</flux:heading>
-                                                        <flux:text class="mt-2 text-sm">
-                                                            El sistema registrará la hora exacta en que el apoderado abandonó la institución.
-                                                        </flux:text>
-                                                    </div>
-                                                    <div class="flex gap-2 justify-end">
-                                                        <flux:modal.close>
-                                                            <flux:button variant="ghost">Cancelar</flux:button>
-                                                        </flux:modal.close>
-                                                        <flux:modal.close>
-                                                            <flux:button variant="primary" wire:click="registrarSalida({{ $cita->id }})">Sí, registrar salida</flux:button>
-                                                        </flux:modal.close>
-                                                    </div>
-                                                </div>
-                                            </flux:modal>
-                                        @elseif(str_contains($cita->mensaje_recepcion ?? '', '[SALIDA]'))
-                                            <span class="text-[10px] text-zinc-400 font-bold uppercase">Se retiró</span>
-                                        @endif
-                                    </div>
+                                    <flux:modal name="confirmar-salida-{{ $cita->id }}" class="min-w-[22rem]">
+                                        <div class="space-y-6 text-left">
+                                            <div>
+                                                <flux:heading size="lg">¿Confirmar salida del recinto?</flux:heading>
+                                                <flux:text class="mt-2 text-sm">
+                                                    El sistema registrará la hora exacta en que el apoderado abandonó la institución.
+                                                </flux:text>
+                                            </div>
+                                            <div class="flex gap-2 justify-end">
+                                                <flux:modal.close>
+                                                    <flux:button variant="ghost">Cancelar</flux:button>
+                                                </flux:modal.close>
+                                                <flux:modal.close>
+                                                    <flux:button variant="primary" wire:click="registrarSalida({{ $cita->id }})">Sí, registrar salida</flux:button>
+                                                </flux:modal.close>
+                                            </div>
+                                        </div>
+                                    </flux:modal>
+                                @elseif(str_contains($cita->mensaje_recepcion ?? '', '[SALIDA]'))
+                                    <span class="text-[10px] text-zinc-400 font-bold uppercase">Se retiró</span>
                                 @endif
                             </td>
                         </tr>
@@ -659,6 +709,7 @@ new class extends Component {
 
             <form wire:submit.prevent="registrarIngreso" class="space-y-4">
                 <flux:select wire:model="lugarIngreso" label="Lugar / Anexo / Box" placeholder="Seleccione un box de atención...">
+                    <flux:select.option value="PENDIENTE">⚠️ PENDIENTE (Por asignar luego)</flux:select.option>
                     @foreach($this->lugares as $lugar)
                         <flux:select.option value="{{ $lugar->nombre }}">{{ $lugar->nombre }}</flux:select.option>
                     @endforeach

@@ -193,3 +193,27 @@ test('viewing someone else\'s bitacora is allowed if ver-bitacoras is active', f
     $response = $this->actingAs($user)->get(route('entrevistas.bitacora', $otherEntrevista->id));
     $response->assertOk();
 });
+
+test('user without eliminar-entrevistas permission cannot delete interview', function () {
+    [$user, $entrevista, $schoolId] = setupSchoolAndUser(['docente'], ['ver-entrevistas-general']);
+
+    Livewire::actingAs($user)
+        ->test('pages::entrevistas.index')
+        ->call('confirmarEliminacion', $entrevista->id)
+        ->assertForbidden();
+
+    expect(Entrevista::find($entrevista->id))->not->toBeNull();
+});
+
+test('user with eliminar-entrevistas permission can delete interview', function () {
+    [$user, $entrevista, $schoolId] = setupSchoolAndUser(['docente'], ['ver-entrevistas-general', 'eliminar-entrevistas']);
+
+    Livewire::actingAs($user)
+        ->test('pages::entrevistas.index')
+        ->call('confirmarEliminacion', $entrevista->id)
+        ->assertSet('entrevistaIdAEliminar', $entrevista->id)
+        ->call('eliminarEntrevista')
+        ->assertHasNoErrors();
+
+    expect(Entrevista::find($entrevista->id))->toBeNull();
+});

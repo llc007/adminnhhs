@@ -21,6 +21,7 @@ new #[Title('Roles y Permisos')] class extends Component
             'ver-bitacoras' => 'Ver todas las bitácoras (detalles) de entrevistas',
             'crear-entrevistas' => 'Agendar y coordinar nuevas citas',
             'cancelar-entrevistas' => 'Cancelar entrevistas agendadas',
+            'eliminar-entrevistas' => 'Eliminar o borrar registros de entrevistas',
             'ingresar-apoderado' => 'Registrar ingreso/salida de portería (Acceso)',
         ],
         'Estudiantes' => [

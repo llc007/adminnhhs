@@ -69,8 +69,7 @@ class EntrevistaPolicy
      */
     public function delete(User $user, Entrevista $entrevista): bool
     {
-        // Solo superadmin o administrador pueden borrar una entrevista (y sus bitácoras)
-        return $user->hasRole('superadmin') || $user->can('gestionar-prestamos');
+        return $user->hasRole(['superadmin', 'administrador']) || $user->can('eliminar-entrevistas');
     }
 
     /**

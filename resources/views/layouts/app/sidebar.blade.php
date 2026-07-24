@@ -1,13 +1,10 @@
 @php
     $school = auth()->user()->currentSchool;
-    $modulos = $school
-        ? $school->modulos_publicados
-        : [
-            'entrevistas' => true,
-            'estudiantes' => true,
-            'adquisiciones' => true,
-            'prestamos' => true,
-        ];
+    $modulos = is_array($school?->modulos_publicados) ? $school->modulos_publicados : [];
+    $modulosEntrevistas = $modulos['entrevistas'] ?? true;
+    $modulosEstudiantes = $modulos['estudiantes'] ?? true;
+    $modulosAdquisiciones = $modulos['adquisiciones'] ?? true;
+    $modulosPrestamos = $modulos['prestamos'] ?? true;
     $isAdmin = auth()
         ->user()
         ->hasRole(['administrador', 'directivo', 'superadmin']);
@@ -30,7 +27,7 @@
         <livewire:admin.seleccionar-colegio />
 
         <flux:sidebar.nav>
-            @if ((auth()->user()->hasRole(['superadmin', 'estudiante']) || auth()->user()->canAny(['ver-entrevistas-propias', 'ver-entrevistas-general', 'crear-entrevistas', 'cancelar-entrevistas', 'ingresar-apoderado'])) && ($isAdmin || ($modulos['entrevistas'] ?? false)))
+            @if ((auth()->user()->hasRole(['superadmin', 'estudiante']) || auth()->user()->canAny(['ver-entrevistas-propias', 'ver-entrevistas-general', 'crear-entrevistas', 'cancelar-entrevistas', 'ingresar-apoderado'])) && ($isAdmin || $modulosEntrevistas))
                 <flux:sidebar.group :heading="__('Entrevistas')" class="grid">
                     @if (auth()->user()->hasRole(['superadmin', 'administrador', 'directivo']) || auth()->user()->can('ver-dashboard-entrevistas'))
                         <flux:sidebar.item icon="home" :href="route('dashboard')"
@@ -47,7 +44,7 @@
                     @endif
 
                     @if ((auth()->user()->hasRole('superadmin') || auth()->user()->can('ver-entrevistas-propias')) &&
-                            ($isAdmin || ($modulos['entrevistas'] ?? false)))
+                            ($isAdmin || $modulosEntrevistas))
                         <flux:sidebar.item icon="calendar-days" :href="route('entrevistas.agenda')"
                             :current="request()->routeIs('entrevistas.agenda')" wire:navigate>
                             {{ __('Mi Agenda') }}
@@ -55,7 +52,7 @@
                     @endif
 
                     @if ((auth()->user()->hasRole(['superadmin', 'estudiante']) || auth()->user()->canAny(['ver-entrevistas-propias', 'ver-entrevistas-general'])) &&
-                            ($isAdmin || ($modulos['entrevistas'] ?? false)))
+                            ($isAdmin || $modulosEntrevistas))
                         <flux:sidebar.item icon="table-cells" :href="route('entrevistas.index')"
                             :current="request()->routeIs('entrevistas.index')" wire:navigate>
                             {{ auth()->user()->hasRole('estudiante') ? __('Mi Historial') : __('Historial General') }}
@@ -64,9 +61,9 @@
                 </flux:sidebar.group>
             @endif
 
-            @if ((auth()->user()->hasRole('superadmin') || auth()->user()->canAny(['ver-estudiantes', 'gestionar-funcionarios'])) && ($isAdmin || ($modulos['estudiantes'] ?? false)))
+            @if ((auth()->user()->hasRole('superadmin') || auth()->user()->canAny(['ver-estudiantes', 'gestionar-funcionarios'])) && ($isAdmin || $modulosEstudiantes))
                 <flux:sidebar.group :heading="__('Gestión Académica')" class="grid mt-4">
-                    @if ((auth()->user()->hasRole('superadmin') || auth()->user()->can('ver-estudiantes')) && ($isAdmin || ($modulos['estudiantes'] ?? false)))
+                    @if ((auth()->user()->hasRole('superadmin') || auth()->user()->can('ver-estudiantes')) && ($isAdmin || $modulosEstudiantes))
                         <flux:sidebar.item icon="users" :href="route('estudiantes.index')"
                             :current="request()->routeIs('estudiantes.*')" wire:navigate>
                             {{ __('Estudiantes') }}
@@ -108,7 +105,7 @@
             @php
                 $canSeeAdquisicionesGroup = auth()->user()->hasRole(['solicitante_adquisiciones', 'administrador', 'superadmin', 'ti']) || auth()->user()->canAny(['crear-requerimientos', 'aprobar-requerimientos', 'ver-requerimientos-general']);
             @endphp
-            @if ($canSeeAdquisicionesGroup && ($isAdmin || ($modulos['adquisiciones'] ?? false)))
+            @if ($canSeeAdquisicionesGroup && ($isAdmin || $modulosAdquisiciones))
                 <flux:sidebar.group :heading="__('Adquisiciones e Inventario')" class="grid mt-4">
                     @if (auth()->user()->hasRole(['solicitante_adquisiciones', 'administrador', 'superadmin']) || auth()->user()->can('crear-requerimientos'))
                         <flux:sidebar.item icon="document-text" :href="route('adquisiciones.crear')"
@@ -142,7 +139,7 @@
                 $isTI = auth()
                     ->user()
                     ->hasRole(['ti', 'administrador', 'superadmin']) || auth()->user()->can('gestionar-prestamos');
-                $canSeePrestamosGroup = ($isTI || auth()->user()->can('ver-prestamos-propios')) && ($isAdmin || ($modulos['prestamos'] ?? false));
+                $canSeePrestamosGroup = ($isTI || auth()->user()->can('ver-prestamos-propios')) && ($isAdmin || $modulosPrestamos);
             @endphp
             @if ($canSeePrestamosGroup)
                 <flux:sidebar.group :heading="__('Informática')" class="grid mt-4">

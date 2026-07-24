@@ -42,6 +42,7 @@ class SyncPermissions extends Command
             'ver-bitacoras',
             'crear-entrevistas',
             'cancelar-entrevistas',
+            'eliminar-entrevistas',
             'ingresar-apoderado',
             // Estudiantes
             'ver-estudiantes',

@@ -29,6 +29,9 @@ new class extends Component {
     #[Url]
     public $filtroTemporal = ''; // dia, semana, mes
 
+    public ?int $entrevistaIdAEliminar = null;
+    public bool $modalEliminar = false;
+
     public function mount()
     {
         $user = auth()->user();
@@ -62,6 +65,41 @@ new class extends Component {
     {
         $this->reset(['search', 'profesor_id', 'curso_id', 'fecha', 'estado', 'filtroTemporal']);
         $this->resetPage();
+    }
+
+    public function confirmarEliminacion(int $id): void
+    {
+        $entrevista = Entrevista::findOrFail($id);
+        if (auth()->user()->cannot('delete', $entrevista)) {
+            abort(403, 'No tienes permiso para eliminar esta entrevista.');
+        }
+
+        $this->entrevistaIdAEliminar = $id;
+        $this->modalEliminar = true;
+    }
+
+    public function eliminarEntrevista(): void
+    {
+        if (! $this->entrevistaIdAEliminar) {
+            return;
+        }
+
+        $entrevista = Entrevista::findOrFail($this->entrevistaIdAEliminar);
+
+        if (auth()->user()->cannot('delete', $entrevista)) {
+            abort(403, 'No tienes permiso para eliminar esta entrevista.');
+        }
+
+        $entrevista->delete();
+
+        $this->entrevistaIdAEliminar = null;
+        $this->modalEliminar = false;
+
+        Flux::toast(
+            heading: 'Entrevista Eliminada',
+            text: 'El registro de la entrevista ha sido eliminado correctamente.',
+            variant: 'success'
+        );
     }
 
     private function getFilteredQuery()
@@ -365,10 +403,17 @@ new class extends Component {
                         </flux:table.cell>
 
                         <flux:table.cell class="text-right">
-                            @can('view', $entrevista)
-                                <flux:button size="sm" variant="subtle"
-                                    href="{{ route('entrevistas.bitacora', $entrevista->id) }}">Ver Bitácora</flux:button>
-                            @endcan
+                            <div class="flex items-center justify-end gap-2">
+                                @can('view', $entrevista)
+                                    <flux:button size="sm" variant="subtle"
+                                        href="{{ route('entrevistas.bitacora', $entrevista->id) }}">Ver Bitácora</flux:button>
+                                @endcan
+
+                                @can('delete', $entrevista)
+                                    <flux:button size="sm" variant="danger" icon="trash"
+                                        wire:click="confirmarEliminacion({{ $entrevista->id }})" title="Eliminar entrevista"></flux:button>
+                                @endcan
+                            </div>
                         </flux:table.cell>
                     </flux:table.row>
                 @empty
@@ -424,4 +469,21 @@ new class extends Component {
             </div>
         </flux:card>
     </div>
+
+    <!-- Modal Confirmar Eliminación -->
+    <flux:modal wire:model="modalEliminar" class="md:w-96">
+        <div class="space-y-6">
+            <div>
+                <flux:heading size="lg">Eliminar Entrevista</flux:heading>
+                <flux:subheading class="mt-2">
+                    ¿Estás seguro de que deseas eliminar este registro de entrevista? Esta acción es permanente y borrará la cita y su bitácora asociada.
+                </flux:subheading>
+            </div>
+
+            <div class="flex justify-end gap-3">
+                <flux:button variant="ghost" wire:click="$set('modalEliminar', false)">Cancelar</flux:button>
+                <flux:button variant="danger" wire:click="eliminarEntrevista">Sí, Eliminar</flux:button>
+            </div>
+        </div>
+    </flux:modal>
 </div>

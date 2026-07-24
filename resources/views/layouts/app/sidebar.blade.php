@@ -1,13 +1,12 @@
 @php
-    $school = auth()->user()->currentSchool;
+    $user = auth()->user();
+    $school = $user?->currentSchool;
     $modulos = is_array($school?->modulos_publicados) ? $school->modulos_publicados : [];
     $modulosEntrevistas = $modulos['entrevistas'] ?? true;
     $modulosEstudiantes = $modulos['estudiantes'] ?? true;
     $modulosAdquisiciones = $modulos['adquisiciones'] ?? true;
     $modulosPrestamos = $modulos['prestamos'] ?? true;
-    $isAdmin = auth()
-        ->user()
-        ->hasRole(['administrador', 'directivo', 'superadmin']);
+    $isAdmin = $user ? $user->hasRole(['administrador', 'directivo', 'superadmin']) : false;
 @endphp
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
@@ -19,7 +18,7 @@
 <body class="min-h-screen bg-white dark:bg-zinc-800">
     <flux:sidebar sticky collapsible class="border-e border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900">
         <flux:sidebar.header>
-            <x-app-logo :sidebar="true" :href="auth()->user()->hasRole(['superadmin', 'administrador', 'directivo']) || auth()->user()->can('ver-dashboard-entrevistas') ? route('dashboard') : (auth()->user()->can('ver-entrevistas-propias') ? route('entrevistas.agenda') : route('entrevistas.index'))" wire:navigate />
+            <x-app-logo :sidebar="true" :href="$user ? ($user->hasRole(['superadmin', 'administrador', 'directivo']) || $user->can('ver-dashboard-entrevistas') ? route('dashboard') : ($user->can('ver-entrevistas-propias') ? route('entrevistas.agenda') : route('entrevistas.index'))) : route('login')" wire:navigate />
             <flux:sidebar.collapse
                 class="in-data-flux-sidebar-on-desktop:not-in-data-flux-sidebar-collapsed-desktop:-mr-2" />
         </flux:sidebar.header>

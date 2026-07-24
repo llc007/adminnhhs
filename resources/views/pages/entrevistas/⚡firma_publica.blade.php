@@ -1,10 +1,12 @@
 <?php
 
 use Livewire\Component;
+use Livewire\Attributes\Layout;
+use Livewire\Attributes\Title;
 use App\Models\Bitacora;
 use Flux\Flux;
 
-new class extends Component {
+new #[Layout('layouts.blank')] #[Title('Firma Digital de Entrevista')] class extends Component {
     public string $token = '';
     public ?Bitacora $bitacora = null;
     public bool $tokenValido = false;

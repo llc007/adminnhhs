@@ -30,6 +30,35 @@ test('profile information can be updated', function () {
     expect($user->apellido_pat)->toEqual('NAME');
 });
 
+test('profile information can be updated with empty optional fields without database error', function () {
+    $user = User::factory()->create([
+        'nombres' => 'ROBERTO',
+        'apellido_pat' => 'MONDACA',
+        'apellido_mat' => 'CASTRO',
+    ]);
+
+    $this->actingAs($user);
+
+    $response = Livewire::test('pages::settings.profile')
+        ->set('nombres', 'ROBERTO')
+        ->set('apellido_pat', 'MONDACA')
+        ->set('apellido_mat', 'CASTRO')
+        ->set('rut_numero', '')
+        ->set('fecha_nacimiento', '')
+        ->set('telefono', '')
+        ->set('direccion', '')
+        ->call('updateProfileInformation');
+
+    $response->assertHasNoErrors();
+
+    $user->refresh();
+
+    expect($user->fecha_nacimiento)->toBeNull();
+    expect($user->rut_numero)->toBeNull();
+    expect($user->telefono)->toBeNull();
+    expect($user->direccion)->toBeNull();
+});
+
 test('user can delete their account', function () {
     $user = User::factory()->create();
 

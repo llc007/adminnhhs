@@ -36,6 +36,7 @@ class SyncPermissions extends Command
         // All system permissions
         $allPermissions = [
             // Entrevistas
+            'ver-dashboard-entrevistas',
             'ver-entrevistas-propias',
             'ver-entrevistas-general',
             'ver-bitacoras',
@@ -77,6 +78,7 @@ class SyncPermissions extends Command
             'superadmin' => $allPermissions,
             'administrador' => $allPermissions,
             'directivo' => [
+                'ver-dashboard-entrevistas',
                 'ver-entrevistas-general',
                 'ver-entrevistas-propias',
                 'ver-bitacoras',

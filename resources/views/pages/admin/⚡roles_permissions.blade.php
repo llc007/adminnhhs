@@ -15,6 +15,7 @@ new #[Title('Roles y Permisos')] class extends Component
     // Grouped standard permissions
     public array $groupedPermissions = [
         'Entrevistas' => [
+            'ver-dashboard-entrevistas' => 'Ver Dashboard analítico y métricas globales',
             'ver-entrevistas-propias' => 'Ver entrevistas asignadas a mí',
             'ver-entrevistas-general' => 'Ver todas las entrevistas del colegio',
             'ver-bitacoras' => 'Ver todas las bitácoras (detalles) de entrevistas',

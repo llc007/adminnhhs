@@ -54,6 +54,12 @@ new #[Title('Profile settings')] class extends Component {
 
         $validated = $this->validate($this->profileRules($user->id));
 
+        foreach (['fecha_nacimiento', 'rut_numero', 'rut_dv', 'telefono', 'direccion', 'apellido_mat'] as $field) {
+            if (array_key_exists($field, $validated) && trim((string) $validated[$field]) === '') {
+                $validated[$field] = null;
+            }
+        }
+
         $user->fill($validated);
 
         if ($user->isDirty('email')) {
@@ -139,7 +145,6 @@ new #[Title('Profile settings')] class extends Component {
                     Docente / Funcionario
                 </p>
                 <div class="flex gap-2 mt-4 justify-center md:justify-start">
-                    <span class="px-3 py-1 bg-secondary-container text-on-secondary-container text-xs font-bold rounded-full">PLANTA</span>
                     <span class="px-3 py-1 bg-surface-container-high text-secondary text-xs font-bold rounded-full">CUENTA VERIFICADA</span>
                 </div>
             </div>
@@ -231,21 +236,29 @@ new #[Title('Profile settings')] class extends Component {
             </form>
         </div>
 
-        <!-- Contextual Information (Editorial Side Note) -->
+        <!-- Contextual Information & Appearance Control -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div class="p-6 bg-blue-50/50 dark:bg-blue-900/20 rounded-xl flex items-start gap-4 border border-blue-100 dark:border-blue-800">
-                <flux:icon.information-circle class="size-6 text-primary" />
+                <flux:icon.information-circle class="size-6 text-primary shrink-0 mt-0.5" />
                 <div>
-                    <h5 class="font-bold text-primary text-sm">Privacidad de Datos</h5>
-                    <p class="text-xs text-secondary leading-relaxed mt-1">Su información personal está protegida bajo la Ley 19.628 de Protección de la Vida Privada. Estos datos son de uso exclusivo institucional.</p>
+                    <h5 class="font-bold text-primary dark:text-blue-400 text-sm">Privacidad de Datos</h5>
+                    <p class="text-xs text-secondary dark:text-zinc-400 leading-relaxed mt-1">Su información personal está protegida bajo la Ley 19.628 de Protección de la Vida Privada. Estos datos son de uso exclusivo institucional.</p>
                 </div>
             </div>
-            <div class="p-6 bg-orange-50/50 dark:bg-orange-900/20 rounded-xl flex items-start gap-4 border border-orange-100 dark:border-orange-800">
-                <flux:icon.shield-check class="size-6 text-orange-600 dark:text-orange-400" />
-                <div>
-                    <h5 class="font-bold text-orange-600 dark:text-orange-400 text-sm">Verificación de Identidad</h5>
-                    <p class="text-xs text-secondary leading-relaxed mt-1">Los cambios en RUT o Nombres legales requieren presentar el documento de identidad original en secretaría administrativa.</p>
+            
+            <div class="p-6 bg-white dark:bg-zinc-900 rounded-xl shadow-sm border border-slate-100 dark:border-zinc-800 flex flex-col justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <flux:icon.swatch class="size-6 text-indigo-500 shrink-0" />
+                    <div>
+                        <h5 class="font-bold text-primary dark:text-zinc-100 text-sm">Apariencia del Sistema</h5>
+                        <p class="text-xs text-secondary dark:text-zinc-400 mt-0.5">Seleccione la apariencia visual de la plataforma.</p>
+                    </div>
                 </div>
+                <flux:radio.group x-data variant="segmented" x-model="$flux.appearance" size="sm" class="w-full">
+                    <flux:radio value="light" icon="sun">{{ __('Claro') }}</flux:radio>
+                    <flux:radio value="dark" icon="moon">{{ __('Oscuro') }}</flux:radio>
+                    <flux:radio value="system" icon="computer-desktop">{{ __('Sistema') }}</flux:radio>
+                </flux:radio.group>
             </div>
         </div>
 

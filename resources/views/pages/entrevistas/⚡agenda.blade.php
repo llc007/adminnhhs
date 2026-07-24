@@ -194,7 +194,7 @@ new class extends Component {
                                 <p class="text-xs text-zinc-500 flex items-center gap-2">
                                     <flux:icon.user class="size-3" />
                                     Apod: {{ $cita->estudiante->apoderado_nombres ?? 'Desconocido' }} • Curso:
-                                    {{ $cita->estudiante->curso->nombre_corto ?? '' }}
+                                    {{ $cita->estudiante?->curso?->nombreCompleto() ?? 'Sin Curso' }}
                                 </p>
                             </div>
 

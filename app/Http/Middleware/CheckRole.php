@@ -33,6 +33,11 @@ class CheckRole
 
         // If the user does not have ANY of the allowed roles, check for landing redirects or throw 403
         if (! $request->user()->hasRole($roles)) {
+            // If they are attempting to visit the dashboard and have explicit ver-dashboard-entrevistas permission, allow it
+            if (($request->routeIs('dashboard') || $request->routeIs('entrevistas.dashboard')) && $request->user()->can('ver-dashboard-entrevistas')) {
+                return $next($request);
+            }
+
             // If they are attempting to visit the dashboard but are an inspector or receptionist,
             // redirect them to their respective functional home route instead of throwing a 403.
             if ($request->routeIs('dashboard') || $request->routeIs('entrevistas.dashboard')) {

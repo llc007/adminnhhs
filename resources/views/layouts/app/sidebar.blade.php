@@ -22,7 +22,7 @@
 <body class="min-h-screen bg-white dark:bg-zinc-800">
     <flux:sidebar sticky collapsible class="border-e border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900">
         <flux:sidebar.header>
-            <x-app-logo :sidebar="true" href="{{ route('dashboard') }}" wire:navigate />
+            <x-app-logo :sidebar="true" :href="auth()->user()->hasRole(['superadmin', 'administrador', 'directivo']) || auth()->user()->can('ver-dashboard-entrevistas') ? route('dashboard') : (auth()->user()->can('ver-entrevistas-propias') ? route('entrevistas.agenda') : route('entrevistas.index'))" wire:navigate />
             <flux:sidebar.collapse
                 class="in-data-flux-sidebar-on-desktop:not-in-data-flux-sidebar-collapsed-desktop:-mr-2" />
         </flux:sidebar.header>
@@ -32,7 +32,7 @@
         <flux:sidebar.nav>
             @if ((auth()->user()->hasRole(['superadmin', 'estudiante']) || auth()->user()->canAny(['ver-entrevistas-propias', 'ver-entrevistas-general', 'crear-entrevistas', 'cancelar-entrevistas', 'ingresar-apoderado'])) && ($isAdmin || ($modulos['entrevistas'] ?? false)))
                 <flux:sidebar.group :heading="__('Entrevistas')" class="grid">
-                    @if (auth()->user()->hasRole('superadmin') || auth()->user()->can('ver-entrevistas-general'))
+                    @if (auth()->user()->hasRole(['superadmin', 'administrador', 'directivo']) || auth()->user()->can('ver-dashboard-entrevistas'))
                         <flux:sidebar.item icon="home" :href="route('dashboard')"
                             :current="request()->routeIs('dashboard')" wire:navigate>
                             {{ 'Dashboard' }}
@@ -224,15 +224,17 @@
     <flux:toast position="top right" />
 
     {{-- Indicador de tamaño de pantalla para depuración --}}
-    <div class="fixed bottom-4 right-4 z-50 flex items-center gap-1.5 rounded-full bg-zinc-900/90 dark:bg-zinc-100/90 px-3 py-1 font-mono text-[10px] font-bold text-zinc-100 dark:text-zinc-900 shadow-lg border border-zinc-700/50 dark:border-zinc-300/50 pointer-events-none">
-        <span>Pantalla:</span>
-        <span class="sm:hidden">XS (&lt; 640px)</span>
-        <span class="hidden sm:inline md:hidden">SM (&gt;= 640px)</span>
-        <span class="hidden md:inline lg:hidden">MD (&gt;= 768px)</span>
-        <span class="hidden lg:inline xl:hidden">LG (&gt;= 1024px)</span>
-        <span class="hidden xl:inline 2xl:hidden">XL (&gt;= 1280px)</span>
-        <span class="hidden 2xl:inline">2XL (&gt;= 1536px)</span>
-    </div>
+    @if (app()->isLocal())
+        <div class="fixed bottom-4 right-4 z-50 flex items-center gap-1.5 rounded-full bg-zinc-900/90 dark:bg-zinc-100/90 px-3 py-1 font-mono text-[10px] font-bold text-zinc-100 dark:text-zinc-900 shadow-lg border border-zinc-700/50 dark:border-zinc-300/50 pointer-events-none">
+            <span>Pantalla:</span>
+            <span class="sm:hidden">XS (&lt; 640px)</span>
+            <span class="hidden sm:inline md:hidden">SM (&gt;= 640px)</span>
+            <span class="hidden md:inline lg:hidden">MD (&gt;= 768px)</span>
+            <span class="hidden lg:inline xl:hidden">LG (&gt;= 1024px)</span>
+            <span class="hidden xl:inline 2xl:hidden">XL (&gt;= 1280px)</span>
+            <span class="hidden 2xl:inline">2XL (&gt;= 1536px)</span>
+        </div>
+    @endif
 
     @if (app()->isLocal())
         <livewire:layout.role-switcher />

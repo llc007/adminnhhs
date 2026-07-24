@@ -55,7 +55,7 @@
 
             <flux:sidebar.nav>
                 <flux:sidebar.group :heading="__('Entrevistas')" class="grid">
-                    @if(auth()->user()->hasRole(['administrador', 'directivo', 'superadmin']))
+                    @if(auth()->user()->hasRole(['administrador', 'directivo', 'superadmin']) || auth()->user()->can('ver-dashboard-entrevistas'))
                     <flux:sidebar.item icon="home" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>
                         {{ "Dashboard" }}
                     </flux:sidebar.item>

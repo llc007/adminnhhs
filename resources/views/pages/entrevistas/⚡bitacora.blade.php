@@ -57,7 +57,7 @@ new class extends Component {
 
     public function mount(Entrevista $entrevista)
     {
-        $this->entrevista = $entrevista->load(['estudiante.curso', 'user', 'bitacora']);
+        $this->entrevista = $entrevista->load(['estudiante.curso', 'user', 'bitacora.updatedByUser']);
 
         if ($this->entrevista->bitacora) {
             $this->bitacora = $this->entrevista->bitacora;
@@ -140,18 +140,6 @@ new class extends Component {
         $this->authorize('update', $this->entrevista);
         $this->guardarColeccion('finalizado');
         
-        // Si la entrevista estaba 'ingresada' y no se había marcado salida manual, el cierre asume la salida.
-        if ($this->entrevista->estado === 'ingresada' && !str_contains($this->entrevista->mensaje_recepcion ?? '', '[SALIDA]')) {
-            $hora = now('America/Santiago')->format('H:i');
-            $notaSalida = "[SALIDA] El apoderado se retiró del recinto a las {$hora}.";
-            
-            $nuevoMensaje = $this->entrevista->mensaje_recepcion 
-                ? $this->entrevista->mensaje_recepcion . "\n\n" . $notaSalida 
-                : $notaSalida;
-
-            $this->entrevista->update(['mensaje_recepcion' => $nuevoMensaje]);
-        }
-
         // Cerrar el ciclo de vida de la entrevista
         $this->entrevista->update(['estado' => 'realizada']);
         
@@ -418,33 +406,27 @@ new class extends Component {
         $this->bitacora->acuerdos = $this->acuerdos;
         $this->bitacora->adjuntos_drive = $this->adjuntosDrive;
         $this->bitacora->estado_formulario = $estado;
+        if (auth()->check()) {
+            $this->bitacora->updated_by_user_id = auth()->id();
+        }
         
         $this->bitacora->save();
     }
 };
 ?>
 <div class="max-w-7xl mx-auto w-full pb-12">
-    <!-- Header Rápido -->
-    <div class="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-            <nav class="flex items-center gap-2 text-xs text-zinc-500 mb-2 uppercase tracking-widest font-semibold">
-                <span>Calendario de Entrevistas</span>
-                <flux:icon.chevron-right class="size-3" />
-                <span>Bitácora Oficial</span>
-            </nav>
-            <flux:heading size="xl" class="text-[#00376e] dark:text-blue-400 font-extrabold">{{ __('Registro de Sesión') }}</flux:heading>
-            <p class="text-zinc-500 text-sm mt-1 flex items-center gap-2">
-                <flux:icon.document-text class="size-4" />
-                Completando bitácora para la entrevista de protocolo #{{ $entrevista->id }}
-            </p>
-        </div>
-        
-        @php
-            $isCerrada = in_array($entrevista->estado, ['realizada', 'ausente', 'cancelada']);
-        @endphp
+    @php
+        $isCerrada = in_array($entrevista->estado, ['realizada', 'ausente', 'cancelada']);
+    @endphp
 
-        <div class="flex items-center gap-3 w-full md:w-auto">
-            @if ($isCerrada)
+    <!-- Header Oficial con Notificaciones y Usuario -->
+    <x-entrevistas.header 
+        titulo="Registro de Sesión" 
+        subtitulo="Completando bitácora para la entrevista de protocolo #{{ $entrevista->id }}" 
+        icono="document-text" 
+    >
+        @if ($isCerrada)
+            <div class="flex items-center gap-2">
                 @if($entrevista->estado === 'realizada')
                     <flux:badge color="emerald" icon="check-circle" class="p-2 text-xs font-bold">
                         {{ __('Entrevista Realizada') }}
@@ -457,35 +439,37 @@ new class extends Component {
 
                 @if (auth()->user()->hasRole('superadmin'))
                     <flux:modal.trigger name="reabrir-bitacora">
-                        <flux:button variant="ghost" icon="arrow-path" class="cursor-pointer">
+                        <flux:button variant="ghost" icon="arrow-path" size="sm" class="cursor-pointer">
                             {{ __('Reabrir Bitácora') }}
                         </flux:button>
                     </flux:modal.trigger>
-
-                    <flux:modal name="reabrir-bitacora" class="min-w-[22rem]">
-                        <div class="space-y-6">
-                            <div>
-                                <flux:heading size="lg">¿Reabrir bitácora?</flux:heading>
-                                <flux:text class="mt-2">
-                                    Estás a punto de reabrir esta bitácora y devolverla al estado "pendiente".<br>
-                                    Esto permitirá que el docente vuelva a editar su contenido.
-                                </flux:text>
-                            </div>
-                            <div class="flex gap-2">
-                                <flux:spacer />
-                                <flux:modal.close>
-                                    <flux:button variant="ghost">Cancelar</flux:button>
-                                </flux:modal.close>
-                                <flux:modal.close>
-                                    <flux:button variant="primary" wire:click="reabrirBitacora">Sí, reabrir</flux:button>
-                                </flux:modal.close>
-                            </div>
-                        </div>
-                    </flux:modal>
                 @endif
-            @endif
-        </div>
-    </div>
+            </div>
+        @endif
+    </x-entrevistas.header>
+
+    @if ($isCerrada && auth()->user()->hasRole('superadmin'))
+        <flux:modal name="reabrir-bitacora" class="min-w-[22rem]">
+            <div class="space-y-6">
+                <div>
+                    <flux:heading size="lg">¿Reabrir bitácora?</flux:heading>
+                    <flux:text class="mt-2">
+                        Estás a punto de reabrir esta bitácora y devolverla al estado "pendiente".<br>
+                        Esto permitirá que el docente vuelva a editar su contenido.
+                    </flux:text>
+                </div>
+                <div class="flex gap-2">
+                    <flux:spacer />
+                    <flux:modal.close>
+                        <flux:button variant="ghost">Cancelar</flux:button>
+                    </flux:modal.close>
+                    <flux:modal.close>
+                        <flux:button variant="primary" wire:click="reabrirBitacora">Sí, reabrir</flux:button>
+                    </flux:modal.close>
+                </div>
+            </div>
+        </flux:modal>
+    @endif
 
     <div class="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
         
@@ -784,6 +768,13 @@ new class extends Component {
                     <div class="flex justify-between items-center text-xs">
                         <span class="text-zinc-500 font-medium tracking-wide">Último Guardado</span>
                         <span class="text-zinc-700 dark:text-zinc-300 font-semibold">{{ $bitacora?->updated_at ? $bitacora->updated_at->diffForHumans() : 'No guardado aún' }}</span>
+                    </div>
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="text-zinc-500 font-medium tracking-wide">Modificado Por</span>
+                        <span class="text-zinc-700 dark:text-zinc-300 font-semibold flex items-center gap-1">
+                            <flux:icon.user class="size-3 text-zinc-400" />
+                            {{ $bitacora?->updatedByUser?->nombreCompleto() ?? ($bitacora?->entrevista?->user?->nombreCompleto() ?? 'No registrado') }}
+                        </span>
                     </div>
                 </div>
             </flux:card>

@@ -46,7 +46,7 @@ new class extends Component {
         return [
             'total_hoy' => (clone $baseQuery)->count(),
             'pendientes' => (clone $baseQuery)->where('estado', 'pendiente')->count(),
-            'registrados' => (clone $baseQuery)->where('estado', 'ingresada')
+            'registrados' => (clone $baseQuery)->whereIn('estado', ['ingresada', 'realizada'])
                                ->where(function($q) {
                                    $q->whereNull('mensaje_recepcion')
                                      ->orWhere('mensaje_recepcion', 'not like', '%[SALIDA]%');
@@ -377,6 +377,11 @@ new class extends Component {
                                     @endif
                                 @elseif($cita->estado === 'realizada')
                                     <flux:badge size="sm" color="blue" class="w-24 justify-center">Realizada</flux:badge>
+                                    @if(str_contains($cita->mensaje_recepcion ?? '', '[SALIDA]'))
+                                        <p class="text-[10px] text-zinc-500 mt-1">(Se retiró)</p>
+                                    @else
+                                        <p class="text-[10px] text-emerald-600 font-bold mt-1">(En Recinto)</p>
+                                    @endif
                                 @else
                                     <flux:badge size="sm" color="red" class="w-24 justify-center">{{ ucfirst($cita->estado) }}</flux:badge>
                                 @endif
@@ -392,7 +397,7 @@ new class extends Component {
                                             <flux:icon.map-pin class="size-4" />
                                             {{ $cita->lugar ?? 'Ingresado' }}
                                         </div>
-                                        @if(!str_contains($cita->mensaje_recepcion ?? '', '[SALIDA]') && $cita->estado !== 'realizada' && $cita->estado !== 'cancelada' && $cita->estado !== 'ausente')
+                                        @if(!str_contains($cita->mensaje_recepcion ?? '', '[SALIDA]') && in_array($cita->estado, ['ingresada', 'realizada']))
                                             <flux:modal.trigger name="confirmar-salida-{{ $cita->id }}">
                                                 <flux:button size="sm" variant="danger" class="font-bold shadow-sm">
                                                     Marcar Salida

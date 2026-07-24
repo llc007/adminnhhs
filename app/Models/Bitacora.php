@@ -11,6 +11,7 @@ class Bitacora extends Model
 
     protected $fillable = [
         'entrevista_id',
+        'updated_by_user_id',
         'resumen',
         'observaciones',
         'acuerdos',
@@ -39,5 +40,13 @@ class Bitacora extends Model
     public function entrevista(): BelongsTo
     {
         return $this->belongsTo(Entrevista::class);
+    }
+
+    /**
+     * El usuario que realizó la última modificación en la bitácora
+     */
+    public function updatedByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'updated_by_user_id');
     }
 }

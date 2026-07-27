@@ -49,21 +49,19 @@ class EntrevistaAgendadaApoderado extends Notification implements ShouldQueue
         $mail = (new MailMessage)
             ->subject('Citación a Entrevista - Liceo New Heaven High School');
 
-        if ($this->destinatario === 'estudiante') {
-            $mail->greeting('Estimado/a estudiante,')
-                ->line('Te informamos que has sido citado/a a una entrevista por el/la docente **'.$docente->nombreCompleto().'**.');
-        } else {
-            $mail->greeting('Estimado/a apoderado/a,')
-                ->line('Le informamos que ha sido citado a una entrevista respecto al estudiante **'.$estudiante->nombreCompleto().'**, por el/la docente **'.$docente->nombreCompleto().'**.');
-        }
+        $confirmUrl = route('entrevistas.confirmacion_publica', ['token' => $this->entrevista->confirmacion_token]);
 
-        return $mail
+        return (new MailMessage)
+            ->subject('Citación a Entrevista - Liceo New Heaven High School')
+            ->greeting('Estimado/a apoderado/a,')
+            ->line('Le informamos que ha sido citado a una entrevista respecto al estudiante **'.$estudiante->nombreCompleto().'**, por el/la docente **'.$docente->nombreCompleto().'**.')
             ->line('**Fecha de la entrevista:** '.$fecha)
             ->line('**Hora:** '.$hora)
-            ->line('**Modalidad:** '.$this->entrevista->lugar)
+            ->line('**Modalidad/Lugar:** '.$this->entrevista->lugar)
             ->line('Le solicitamos puntualidad. Si la entrevista es presencial, por favor anuncie su llegada en recepción.')
-            ->line('Si no puede asistir, le rogamos comunicarse con el establecimiento a la brevedad para reagendar.')
-            ->salutation("Atentamente,\nDirección Académica\nLiceo New Heaven High School");
+            ->action('Confirmar o Rechazar Asistencia', $confirmUrl)
+            ->line('Haga clic en el botón superior para confirmar su asistencia o informarnos si no podrá asistir.')
+            ->salutation("Atentamente,\nSistema de Entrevistas NHHS");
     }
 
     /**

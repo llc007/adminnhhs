@@ -3,6 +3,7 @@
 use App\Models\Entrevista;
 use App\Models\User;
 use App\Notifications\EntrevistaCancelada;
+use App\Notifications\IngresoApoderado;
 use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
@@ -222,4 +223,31 @@ test('receptionist can update attention place directly or set it to PENDIENTE', 
 
     $entrevista->refresh();
     expect($entrevista->lugar)->toBe('SALA DE REUNIONES');
+});
+
+test('registering arrival in reception sends mail and database notification to docente', function () {
+    [$user, $entrevista] = setupTestEnvironment();
+    Notification::fake();
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::entrevistas.recepcion')
+        ->set('entrevistaSeleccionadaId', $entrevista->id)
+        ->set('lugarIngreso', 'BOX 1')
+        ->set('mensajeRecepcion', 'Apoderado llegó con su documentación completa')
+        ->call('registrarIngreso')
+        ->assertHasNoErrors();
+
+    $entrevista->refresh();
+    expect($entrevista->estado)->toBe('ingresada');
+    expect($entrevista->lugar)->toBe('BOX 1');
+
+    Notification::assertSentTo(
+        $user,
+        IngresoApoderado::class,
+        function ($notification) use ($entrevista) {
+            return $notification->entrevista->id === $entrevista->id &&
+                   in_array('mail', $notification->via($entrevista->user));
+        }
+    );
 });

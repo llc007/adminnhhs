@@ -75,7 +75,7 @@ new class extends Component {
 ?>
 <div class="max-w-7xl mx-auto w-full pb-12">
     <x-entrevistas.header 
-        titulo="Panel del Docente" 
+        titulo="Mi Agenda" 
         subtitulo="Resumen de agenda diaria y accesos rápidos" 
         icono="calendar" 
     />

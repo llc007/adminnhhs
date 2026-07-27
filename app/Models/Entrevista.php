@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Str;
 
 class Entrevista extends Model
 {
@@ -23,7 +25,30 @@ class Entrevista extends Model
         'estado',
         'lugar',
         'mensaje_recepcion',
+        'confirmacion_token',
+        'estado_asistencia',
+        'confirmado_at',
+        'confirmado_desde_email',
+        'motivo_rechazo_asistencia',
+        'correo_citacion_enviado',
     ];
+
+    protected $casts = [
+        'confirmado_at' => 'datetime',
+    ];
+
+    protected $attributes = [
+        'estado_asistencia' => 'pendiente',
+    ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (Entrevista $entrevista) {
+            if (empty($entrevista->confirmacion_token)) {
+                $entrevista->confirmacion_token = Str::random(40);
+            }
+        });
+    }
 
     /**
      * El colegio al que pertenece la entrevista
@@ -52,7 +77,7 @@ class Entrevista extends Model
     /**
      * La bitácora (acta) generada para esta entrevista
      */
-    public function bitacora(): \Illuminate\Database\Eloquent\Relations\HasOne
+    public function bitacora(): HasOne
     {
         return $this->hasOne(Bitacora::class);
     }

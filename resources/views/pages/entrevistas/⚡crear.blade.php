@@ -211,7 +211,7 @@ new class extends Component {
 <div class="flex flex-col gap-8 max-w-7xl mx-auto w-full pb-10">
     <div>
         <x-entrevistas.header 
-            titulo="Nueva Cita" 
+            titulo="Nueva Entrevista" 
             subtitulo="Coordina una nueva reunión con un apoderado y agenda el box correspondiente." 
             icono="calendar-days" 
         >

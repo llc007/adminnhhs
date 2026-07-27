@@ -55,6 +55,14 @@ new class extends Component {
     public string $emailOtro = '';
     public string $nombreOtro = '';
 
+    public bool $modalReenviarConfirmacion = false;
+    public string $emailReenvioConfirmacion = '';
+
+    public bool $notificarReagendamientoApoderado = true;
+    public string $emailReagendarApoderado = '';
+    public bool $notificarReagendamientoEstudiante = false;
+    public string $emailReagendarEstudiante = '';
+
     public function mount(Entrevista $entrevista)
     {
         $this->entrevista = $entrevista->load(['estudiante.curso', 'user', 'bitacora.updatedByUser']);
@@ -156,6 +164,14 @@ new class extends Component {
     {
         $this->nuevaFecha = $this->entrevista->fecha;
         $this->nuevaHora = \Carbon\Carbon::parse($this->entrevista->hora)->format('H:i');
+
+        $estudiante = $this->entrevista->estudiante;
+        $this->emailReagendarApoderado = $this->entrevista->correo_citacion_enviado 
+            ?: ($estudiante ? ($estudiante->apoderado_email ?? '') : '');
+        $this->emailReagendarEstudiante = $estudiante ? ($estudiante->email ?? '') : '';
+        $this->notificarReagendamientoApoderado = true;
+        $this->notificarReagendamientoEstudiante = false;
+
         $this->modalReagendar = true;
     }
 
@@ -169,9 +185,34 @@ new class extends Component {
         $this->entrevista->update([
             'fecha' => $this->nuevaFecha,
             'hora' => $this->nuevaHora,
+            'estado_asistencia' => 'pendiente',
+            'confirmado_at' => null,
+            'motivo_rechazo_asistencia' => null,
         ]);
 
-        \Flux::toast('La entrevista ha sido reagendada.', variant: 'success');
+        $notificadosCount = 0;
+
+        if ($this->notificarReagendamientoApoderado && !empty($this->emailReagendarApoderado)) {
+            $destEmail = trim($this->emailReagendarApoderado);
+            $this->entrevista->update(['correo_citacion_enviado' => $destEmail]);
+
+            \Illuminate\Support\Facades\Notification::route('mail', $destEmail)
+                ->notify(new \App\Notifications\EntrevistaAgendadaApoderado($this->entrevista, 'apoderado'));
+            $notificadosCount++;
+        }
+
+        if ($this->notificarReagendamientoEstudiante && !empty($this->emailReagendarEstudiante)) {
+            $destEmailEst = trim($this->emailReagendarEstudiante);
+            \Illuminate\Support\Facades\Notification::route('mail', $destEmailEst)
+                ->notify(new \App\Notifications\EntrevistaAgendadaApoderado($this->entrevista, 'estudiante'));
+            $notificadosCount++;
+        }
+
+        $msg = $notificadosCount > 0 
+            ? 'La entrevista ha sido reagendada y se notificó el cambio por correo.'
+            : 'La entrevista ha sido reagendada correctamente.';
+
+        \Flux::toast($msg, variant: 'success');
         $this->modalReagendar = false;
         
         $this->entrevista->refresh();
@@ -357,6 +398,36 @@ new class extends Component {
         $this->modalEnviarResumen = true;
     }
 
+    public function abrirModalReenviarConfirmacion()
+    {
+        $estudiante = $this->entrevista->estudiante;
+        $this->emailReenvioConfirmacion = $this->entrevista->correo_citacion_enviado 
+            ?: ($estudiante ? ($estudiante->apoderado_email ?? '') : '');
+        $this->modalReenviarConfirmacion = true;
+    }
+
+    public function reenviarConfirmacionAsistencia()
+    {
+        $this->validate([
+            'emailReenvioConfirmacion' => 'required|email',
+        ], [
+            'emailReenvioConfirmacion.required' => 'Ingrese el correo electrónico.',
+            'emailReenvioConfirmacion.email' => 'Ingrese un correo electrónico válido.',
+        ]);
+
+        $destEmail = trim($this->emailReenvioConfirmacion);
+
+        $this->entrevista->update([
+            'correo_citacion_enviado' => $destEmail,
+        ]);
+
+        \Illuminate\Support\Facades\Notification::route('mail', $destEmail)
+            ->notify(new \App\Notifications\EntrevistaAgendadaApoderado($this->entrevista, 'apoderado'));
+
+        $this->modalReenviarConfirmacion = false;
+        \Flux::toast("Citación y solicitud de confirmación enviadas a {$destEmail}.", variant: 'success');
+    }
+
     public function enviarResumenCorreos()
     {
         $this->guardarColeccion('finalizado');
@@ -421,7 +492,7 @@ new class extends Component {
 
     <!-- Header Oficial con Notificaciones y Usuario -->
     <x-entrevistas.header 
-        titulo="Registro de Sesión" 
+        titulo="Bitácora de Entrevista" 
         subtitulo="Completando bitácora para la entrevista de protocolo #{{ $entrevista->id }}" 
         icono="document-text" 
     >
@@ -780,9 +851,49 @@ new class extends Component {
             </flux:card>
 
             <!-- Detalles Originales de la Cita -->
-            <flux:card class="bg-blue-50 dark:bg-blue-900/10 p-6 shadow-sm border border-blue-100 dark:border-blue-800/30">
-                <h3 class="text-xs font-bold text-[#00376e] dark:text-blue-400 uppercase tracking-wider mb-4 border-b border-blue-200 dark:border-blue-800/50 pb-3">Detalles de Agendamiento</h3>
-                <div class="space-y-4">
+            <flux:card class="bg-blue-50 dark:bg-blue-900/10 p-6 shadow-sm border border-blue-100 dark:border-blue-800/30 space-y-4">
+                <h3 class="text-xs font-bold text-[#00376e] dark:text-blue-400 uppercase tracking-wider border-b border-blue-200 dark:border-blue-800/50 pb-3">Detalles de Agendamiento</h3>
+
+                {{-- Confirmación de Asistencia --}}
+                <div class="p-3 bg-white dark:bg-zinc-900 rounded-xl border border-blue-100 dark:border-zinc-800 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Asistencia Apoderado:</span>
+                        @if ($entrevista->estado_asistencia === 'confirmada')
+                            <flux:badge color="emerald" size="sm" icon="check-circle">Confirmada</flux:badge>
+                        @elseif ($entrevista->estado_asistencia === 'rechazada')
+                            <flux:badge color="amber" size="sm" icon="x-circle">Inasistencia Informada</flux:badge>
+                        @else
+                            <flux:badge color="zinc" size="sm" icon="clock">Pendiente</flux:badge>
+                        @endif
+                    </div>
+
+                    @if ($entrevista->estado_asistencia === 'confirmada')
+                        <div class="text-xs text-emerald-800 dark:text-emerald-300">
+                            <strong>Confirmó desde:</strong> {{ $entrevista->confirmado_desde_email }}
+                            <div class="text-[10px] text-zinc-400 mt-0.5">{{ $entrevista->confirmado_at ? $entrevista->confirmado_at->setTimezone('America/Santiago')->format('d/m/Y H:i hrs') : '' }}</div>
+                        </div>
+                    @elseif ($entrevista->estado_asistencia === 'rechazada')
+                        <div class="text-xs text-amber-800 dark:text-amber-300 space-y-1">
+                            <div><strong>Respondió desde:</strong> {{ $entrevista->confirmado_desde_email }}</div>
+                            @if (!empty($entrevista->motivo_rechazo_asistencia))
+                                <div class="bg-amber-50 dark:bg-amber-950/40 p-2 rounded border border-amber-200 dark:border-amber-800/60 text-[11px] italic text-zinc-700 dark:text-zinc-300">
+                                    "{{ $entrevista->motivo_rechazo_asistencia }}"
+                                </div>
+                            @endif
+                        </div>
+                    @endif
+
+                    <div class="pt-2 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between text-[11px]">
+                        <span class="text-zinc-500">Última citación enviada a:</span>
+                        <span class="font-semibold text-zinc-700 dark:text-zinc-300 truncate max-w-[140px]">{{ $entrevista->correo_citacion_enviado ?? ($entrevista->estudiante?->apoderado_email ?? 'No enviado') }}</span>
+                    </div>
+
+                    <flux:button size="xs" variant="subtle" icon="paper-airplane" wire:click="abrirModalReenviarConfirmacion" class="w-full mt-2 font-bold text-blue-700 dark:text-blue-300">
+                        Reenviar / Enviar a otro Correo
+                    </flux:button>
+                </div>
+
+                <div class="space-y-3 pt-2">
                     <div>
                         <p class="text-[10px] font-bold text-[#00376e]/70 dark:text-blue-300/70 uppercase tracking-widest mb-1">Motivo Principal</p>
                         <p class="text-sm font-semibold text-zinc-800 dark:text-zinc-200">{{ ucfirst($entrevista->motivo ?? 'No especificado') }}</p>
@@ -951,14 +1062,14 @@ new class extends Component {
     </flux:modal>
 
     <!-- Modal Reagendar -->
-    <flux:modal wire:model="modalReagendar" class="md:w-[28rem]">
+    <flux:modal wire:model="modalReagendar" class="md:w-[32rem]">
         <div class="space-y-6">
             <div>
                 <flux:heading size="lg" class="flex items-center gap-2">
                     <flux:icon.calendar-days class="size-5 text-blue-500" />
                     Reagendar Entrevista
                 </flux:heading>
-                <flux:text class="mt-1">Cambia la fecha o la hora de la cita. Esto actualizará el registro inmediatamente.</flux:text>
+                <flux:text class="mt-1">Cambia la fecha o la hora de la cita y notifica el nuevo horario por correo.</flux:text>
             </div>
 
             <form wire:submit.prevent="confirmarReagendamiento" class="space-y-5">
@@ -967,9 +1078,32 @@ new class extends Component {
                     <flux:time-picker wire:model="nuevaHora" label="Nueva Hora" min="08:00" max="18:30" interval="15" time-format="24-hour" required />
                 </div>
 
-                <div class="flex justify-end gap-3 pt-4">
+                {{-- Notificación por Correo --}}
+                <div class="p-3 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl space-y-3">
+                    <div class="text-xs font-bold text-[#00376e] dark:text-blue-300 uppercase tracking-wider">
+                        Notificar reagendamiento por correo:
+                    </div>
+
+                    {{-- Opción Apoderado --}}
+                    <div class="space-y-1.5">
+                        <flux:checkbox wire:model.live="notificarReagendamientoApoderado" label="Enviar citación a Apoderado/a" />
+                        @if($notificarReagendamientoApoderado)
+                            <flux:input wire:model="emailReagendarApoderado" type="email" placeholder="correo.apoderado@gmail.com" class="text-xs" />
+                        @endif
+                    </div>
+
+                    {{-- Opción Estudiante --}}
+                    <div class="space-y-1.5 pt-1 border-t border-zinc-100 dark:border-zinc-800">
+                        <flux:checkbox wire:model.live="notificarReagendamientoEstudiante" label="Enviar citación a Estudiante" />
+                        @if($notificarReagendamientoEstudiante)
+                            <flux:input wire:model="emailReagendarEstudiante" type="email" placeholder="estudiante@colegio.cl" class="text-xs" />
+                        @endif
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-3 pt-4 border-t border-zinc-100 dark:border-zinc-800">
                     <flux:button wire:click="$set('modalReagendar', false)" variant="ghost">Cancelar</flux:button>
-                    <flux:button type="submit" variant="primary">Confirmar Cambio</flux:button>
+                    <flux:button type="submit" variant="primary" icon="calendar-days">Reagendar y Notificar</flux:button>
                 </div>
             </form>
         </div>
@@ -1197,6 +1331,35 @@ new class extends Component {
                 <div class="flex justify-end gap-3 pt-3 border-t border-zinc-100 dark:border-zinc-800">
                     <flux:button wire:click="$set('modalEnviarResumen', false)" variant="ghost">Cancelar</flux:button>
                     <flux:button type="submit" variant="primary" icon="check-circle" class="bg-gradient-to-r from-[#00376e] to-blue-800 hover:from-blue-800 hover:to-blue-900 text-white font-bold">Enviar Correo(s) y finalizar entrevista</flux:button>
+                </div>
+            </form>
+        </div>
+    </flux:modal>
+
+    <!-- Modal Reenviar Confirmación a Correo -->
+    <flux:modal wire:model="modalReenviarConfirmacion" class="md:w-md">
+        <div class="space-y-6">
+            <div>
+                <flux:heading size="lg" class="flex items-center gap-2">
+                    <flux:icon.paper-airplane class="size-5 text-[#00376e]" />
+                    Reenviar Citación y Confirmación de Asistencia
+                </flux:heading>
+                <flux:text class="mt-1 text-xs">Ingrese la dirección de correo electrónico del apoderado o destinatario para enviar la citación con su enlace de confirmación.</flux:text>
+            </div>
+
+            <form wire:submit.prevent="reenviarConfirmacionAsistencia" class="space-y-4">
+                <flux:input 
+                    wire:model="emailReenvioConfirmacion" 
+                    label="Correo Electrónico Destinatario" 
+                    type="email" 
+                    placeholder="apoderado@correo.com" 
+                    required 
+                />
+                <flux:error name="emailReenvioConfirmacion" />
+
+                <div class="flex justify-end gap-2 pt-3">
+                    <flux:button wire:click="$set('modalReenviarConfirmacion', false)" variant="ghost">Cancelar</flux:button>
+                    <flux:button type="submit" variant="primary" icon="paper-airplane">Enviar Citación</flux:button>
                 </div>
             </form>
         </div>

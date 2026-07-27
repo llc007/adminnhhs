@@ -53,9 +53,9 @@ class EntrevistaAgendadaDocente extends Notification implements ShouldQueue
             ->line('**Modalidad/Lugar:** '.$this->entrevista->lugar)
             ->line('**Motivo:** '.ucfirst($this->entrevista->motivo))
             ->line('**Urgencia:** '.ucfirst($this->entrevista->urgencia))
-            ->action('Ver Entrevista', url('/entrevistas'))
+            ->action('Ver Bitácora', route('entrevistas.bitacora', ['entrevista' => $this->entrevista->id]))
             ->line('Gracias por utilizar nuestro sistema de gestión.')
-            ->salutation("Saludos cordiales,\nEquipo TI NHHS");
+            ->salutation("Saludos cordiales,\nSistema de Entrevistas NHHS");
     }
 
     /**

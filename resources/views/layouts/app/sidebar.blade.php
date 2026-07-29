@@ -64,7 +64,7 @@
                 <flux:sidebar.group :heading="__('Gestión Académica')" class="grid mt-4">
                     @if ((auth()->user()->hasRole('superadmin') || auth()->user()->can('ver-estudiantes')) && ($isAdmin || $modulosEstudiantes))
                         <flux:sidebar.item icon="users" :href="route('estudiantes.index')"
-                            :current="request()->routeIs('estudiantes.*')" wire:navigate>
+                            :current="request()->routeIs('estudiantes.index') || request()->routeIs('estudiantes.ficha')" wire:navigate>
                             {{ __('Estudiantes') }}
                         </flux:sidebar.item>
                     @endif
@@ -79,24 +79,30 @@
                 </flux:sidebar.group>
             @endif
 
-            @if (auth()->user()->hasRole('superadmin'))
+            @if (auth()->user()->hasRole(['administrador', 'superadmin']))
                 <flux:sidebar.group :heading="__('Administración')" class="grid mt-4">
-                    <flux:sidebar.item icon="adjustments-horizontal" :href="route('admin.modules')"
-                        :current="request()->routeIs('admin.modules')" wire:navigate>
-                        {{ __('Módulos') }}
+                    <flux:sidebar.item icon="arrow-path-rounded-square" :href="route('estudiantes.sincronizar_correos')"
+                        :current="request()->routeIs('estudiantes.sincronizar_correos')" wire:navigate>
+                        {{ __('Sincronizar Correos') }}
                     </flux:sidebar.item>
-                    <flux:sidebar.item icon="clock" :href="route('funcionarios.calculadora_horas')"
-                        :current="request()->routeIs('funcionarios.calculadora_horas')" wire:navigate>
-                        {{ __('Calculadora 42 Hrs') }}
-                    </flux:sidebar.item>
-                    <flux:sidebar.item icon="envelope" :href="route('admin.mail_logs')"
-                        :current="request()->routeIs('admin.mail_logs')" wire:navigate>
-                        {{ __('Historial de Correos') }}
-                    </flux:sidebar.item>
-                    <flux:sidebar.item icon="key" :href="route('admin.roles_permissions')"
-                        :current="request()->routeIs('admin.roles_permissions')" wire:navigate>
-                        {{ __('Roles y Permisos') }}
-                    </flux:sidebar.item>
+                    @if (auth()->user()->hasRole('superadmin'))
+                        <flux:sidebar.item icon="adjustments-horizontal" :href="route('admin.modules')"
+                            :current="request()->routeIs('admin.modules')" wire:navigate>
+                            {{ __('Módulos') }}
+                        </flux:sidebar.item>
+                        <flux:sidebar.item icon="clock" :href="route('funcionarios.calculadora_horas')"
+                            :current="request()->routeIs('funcionarios.calculadora_horas')" wire:navigate>
+                            {{ __('Calculadora 42 Hrs') }}
+                        </flux:sidebar.item>
+                        <flux:sidebar.item icon="envelope" :href="route('admin.mail_logs')"
+                            :current="request()->routeIs('admin.mail_logs')" wire:navigate>
+                            {{ __('Historial de Correos') }}
+                        </flux:sidebar.item>
+                        <flux:sidebar.item icon="key" :href="route('admin.roles_permissions')"
+                            :current="request()->routeIs('admin.roles_permissions')" wire:navigate>
+                            {{ __('Roles y Permisos') }}
+                        </flux:sidebar.item>
+                    @endif
                 </flux:sidebar.group>
             @endif
 

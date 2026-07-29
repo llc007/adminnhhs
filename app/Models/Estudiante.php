@@ -10,7 +10,7 @@ use Illuminate\Support\Str;
 
 #[Fillable([
     'user_id', 'school_id', 'curso_id',
-    'nombres_csv', 'rut_numero', 'rut_dv', 'email',
+    'nombres_csv', 'rut_numero', 'rut_dv', 'email', 'estado', 'fecha_retiro',
     'fecha_nacimiento', 'genero',
     'apoderado_nombres', 'apoderado_apellido_pat', 'apoderado_apellido_mat',
     'apoderado_rut_numero', 'apoderado_rut_dv',
@@ -133,5 +133,16 @@ class Estudiante extends Model
         $numero = number_format((int) $this->apoderado_rut_numero, 0, ',', '.');
 
         return $numero.'-'.($this->apoderado_rut_dv ?? '');
+    }
+
+    /**
+     * Scope a query to only include active students.
+     */
+    public function scopeActivos($query)
+    {
+        return $query->where(function ($q) {
+            $q->where('estado', 'activo')
+                ->orWhereNull('estado');
+        });
     }
 }

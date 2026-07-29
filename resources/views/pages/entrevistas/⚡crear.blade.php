@@ -27,17 +27,35 @@ new class extends Component {
 
     public function updatedSearchEstudiante()
     {
-        if (strlen($this->searchEstudiante) >= 3) {
+        $term = trim($this->searchEstudiante);
+        if (strlen($term) >= 2) {
+            $words = array_filter(explode(' ', $term));
+
             $this->resultadosBusqueda = \App\Models\Estudiante::query()
                 ->with(['curso'])
+                ->activos()
                 ->where('school_id', auth()->user()->current_school_id)
-                ->where(function ($q) {
-                    $q->where('nombres_csv', 'like', '%' . $this->searchEstudiante . '%')->orWhere('rut_numero', 'like', '%' . $this->searchEstudiante . '%');
+                ->where(function ($q) use ($words) {
+                    foreach ($words as $word) {
+                        $w = trim($word);
+                        if ($w === '') {
+                            continue;
+                        }
+                        $q->where(function ($sub) use ($w) {
+                            $sub->where('nombres_csv', 'like', '%' . $w . '%')
+                                ->orWhere('rut_numero', 'like', '%' . $w . '%')
+                                ->orWhereHas('user', function ($userQ) use ($w) {
+                                    $userQ->where('nombres', 'like', '%' . $w . '%')
+                                        ->orWhere('apellido_pat', 'like', '%' . $w . '%')
+                                        ->orWhere('apellido_mat', 'like', '%' . $w . '%')
+                                        ->orWhere('email', 'like', '%' . $w . '%');
+                                });
+                        });
+                    }
                 })
-                ->take(5)
+                ->take(8)
                 ->get();
 
-            // Si el texto ya no coincide, limpiamos el estudiante seleccionado previamente
             $this->estudianteId = null;
         } else {
             $this->resultadosBusqueda = [];
@@ -98,6 +116,7 @@ new class extends Component {
         return \App\Models\Estudiante::query()
             ->where('curso_id', $this->filtroCursoId)
             ->where('school_id', auth()->user()->current_school_id)
+            ->activos()
             ->orderBy('nombres_csv', 'asc')
             ->get();
     }

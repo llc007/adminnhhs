@@ -122,13 +122,24 @@ new class extends Component {
         }
 
         if (!empty($this->search)) {
-            $query->where(function ($q) {
-                $q->whereHas('estudiante', function ($sq) {
-                    $sq->where('nombres_csv', 'like', '%' . $this->search . '%')
-                        ->orWhere('rut_numero', 'like', '%' . $this->search . '%');
-                })->orWhereHas('user', function ($sq) {
-                    $sq->where('nombres', 'like', '%' . $this->search . '%')->orWhere('apellido_pat', 'like', '%' . $this->search . '%');
-                });
+            $words = array_filter(explode(' ', trim($this->search)));
+            $query->where(function ($q) use ($words) {
+                foreach ($words as $word) {
+                    $w = trim($word);
+                    if ($w === '') {
+                        continue;
+                    }
+                    $q->where(function ($sub) use ($w) {
+                        $sub->whereHas('estudiante', function ($sq) use ($w) {
+                            $sq->where('nombres_csv', 'like', '%' . $w . '%')
+                                ->orWhere('rut_numero', 'like', '%' . $w . '%');
+                        })->orWhereHas('user', function ($sq) use ($w) {
+                            $sq->where('nombres', 'like', '%' . $w . '%')
+                                ->orWhere('apellido_pat', 'like', '%' . $w . '%')
+                                ->orWhere('apellido_mat', 'like', '%' . $w . '%');
+                        });
+                    });
+                }
             });
         }
 

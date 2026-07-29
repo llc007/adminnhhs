@@ -112,12 +112,21 @@ new class extends Component {
         }
 
         if (trim($this->searchTexto) !== '') {
-            $term = trim($this->searchTexto);
-            $query->whereHas('estudiante', function($q) use ($term) {
-                $q->where('nombres_csv', 'like', "%{$term}%")
-                  ->orWhere('rut_numero', 'like', "%{$term}%")
-                  ->orWhere('apoderado_nombres', 'like', "%{$term}%")
-                  ->orWhere('apoderado_apellido_pat', 'like', "%{$term}%");
+            $words = array_filter(explode(' ', trim($this->searchTexto)));
+            $query->whereHas('estudiante', function ($q) use ($words) {
+                foreach ($words as $word) {
+                    $w = trim($word);
+                    if ($w === '') {
+                        continue;
+                    }
+                    $q->where(function ($sub) use ($w) {
+                        $sub->where('nombres_csv', 'like', "%{$w}%")
+                            ->orWhere('rut_numero', 'like', "%{$w}%")
+                            ->orWhere('apoderado_nombres', 'like', "%{$w}%")
+                            ->orWhere('apoderado_apellido_pat', 'like', "%{$w}%")
+                            ->orWhere('apoderado_apellido_mat', 'like', "%{$w}%");
+                    });
+                }
             });
         }
 

@@ -66,6 +66,7 @@ Route::middleware(['auth', 'verified', 'role:superadmin'])->group(function () {
     Route::livewire('/funcionarios/carga-masiva', 'pages::usuarios.funcionarios.carga_masiva')->name('funcionarios.carga_masiva');
     Route::livewire('/estudiantes/carga-masiva', 'pages::usuarios.estudiantes.carga_masiva')->name('estudiantes.carga_masiva');
     Route::livewire('/estudiantes/match', 'pages::usuarios.estudiantes.match')->name('estudiantes.match');
+    Route::livewire('/estudiantes/sincronizar-correos', 'pages::usuarios.estudiantes.sincronizar_correos')->name('estudiantes.sincronizar_correos');
     Route::livewire('/estudiantes/agregar-rut', 'pages::usuarios.estudiantes.agregar-rut')->name('estudiantes.agregar_rut');
     Route::livewire('/admin/historial-correos', 'pages::admin.mail_logs')->name('admin.mail_logs');
     Route::livewire('/admin/modulos', 'pages::admin.modules')->name('admin.modules');

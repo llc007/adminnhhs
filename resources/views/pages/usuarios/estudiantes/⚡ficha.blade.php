@@ -17,6 +17,8 @@ new class extends Component {
     public string $rutDv = '';
     public string $fechaNacimiento = '';
     public string $genero = '';
+    public string $estado = 'activo';
+    public ?string $fechaRetiro = null;
     public ?int $cursoId = null;
 
     // Apoderado
@@ -36,7 +38,6 @@ new class extends Component {
 
         $estudiante = \App\Models\Estudiante::with(['user', 'curso'])->findOrFail($id);
 
-        // Si el estudiante no es del colegio seleccionado, abortar
         if ($estudiante->school_id !== auth()->user()->current_school_id) {
             abort(403);
         }
@@ -49,6 +50,8 @@ new class extends Component {
         $this->rutDv = $estudiante->rut_dv ?? '';
         $this->fechaNacimiento = $estudiante->fecha_nacimiento ?? '';
         $this->genero = $estudiante->genero ?? '';
+        $this->estado = $estudiante->estado ?? 'activo';
+        $this->fechaRetiro = $estudiante->fecha_retiro ? $estudiante->fecha_retiro->format('Y-m-d') : null;
         $this->cursoId = $estudiante->curso_id;
 
         $this->apoderadoNombres = $estudiante->apoderado_nombres ?? '';
@@ -58,6 +61,7 @@ new class extends Component {
         $this->apoderadoRutDv = $estudiante->apoderado_rut_dv ?? '';
         $this->apoderadoEmail = $estudiante->apoderado_email ?? '';
         $this->apoderadoTelefono = $estudiante->apoderado_telefono ?? '';
+        $this->apoderadoParentesco = $estudiante->apoderado_parentesco ?? '';
         $this->apoderadoDomicilio = $estudiante->apoderado_domicilio ?? '';
     }
 
@@ -77,6 +81,31 @@ new class extends Component {
             ->get();
     }
 
+    public function cambiarEstado(string $nuevoEstado): void
+    {
+        if (!auth()->user()->can('editar-estudiantes') && !auth()->user()->hasRole('superadmin')) {
+            abort(403, 'No tienes permiso para realizar esta acción.');
+        }
+
+        $this->estado = $nuevoEstado;
+        if ($nuevoEstado === 'retirado') {
+            $this->fechaRetiro = date('Y-m-d');
+        } else {
+            $this->fechaRetiro = null;
+        }
+
+        \App\Models\Estudiante::findOrFail($this->id)->update([
+            'estado' => $this->estado,
+            'fecha_retiro' => $this->fechaRetiro,
+        ]);
+
+        $mensaje = $nuevoEstado === 'retirado' 
+            ? 'El estudiante fue marcado como RETIRADO. Su historial se conserva intacto.'
+            : 'El estudiante fue REACTIVADO como alumno regular.';
+            
+        Flux::toast($mensaje, variant: $nuevoEstado === 'retirado' ? 'warning' : 'success');
+    }
+
     public function guardar(): void
     {
         if (!auth()->user()->can('editar-estudiantes') && !auth()->user()->hasRole('superadmin')) {
@@ -89,6 +118,8 @@ new class extends Component {
             'emailInstitucional'  => ['nullable', 'email', 'max:255', Rule::unique('estudiantes', 'email')->ignore($this->id)],
             'fechaNacimiento'     => ['nullable', 'date'],
             'genero'              => ['nullable', 'string', 'max:20'],
+            'estado'              => ['required', 'string', 'in:activo,retirado'],
+            'fechaRetiro'         => ['nullable', 'date'],
             'cursoId'             => ['nullable', 'exists:cursos,id'],
 
             'apoderadoNombres'    => ['nullable', 'string', 'max:255'],
@@ -118,6 +149,8 @@ new class extends Component {
             'vinculado_en'           => $user ? now() : null,
             'fecha_nacimiento'       => $this->fechaNacimiento ?: null,
             'genero'                 => $this->genero ?: null,
+            'estado'                 => $this->estado,
+            'fecha_retiro'           => $this->estado === 'retirado' ? ($this->fechaRetiro ?: now()) : null,
             'curso_id'               => $this->cursoId,
 
             'apoderado_nombres'      => $this->apoderadoNombres,
@@ -139,20 +172,69 @@ new class extends Component {
 
 <div class="flex flex-col gap-8 max-w-5xl mx-auto w-full">
 
-    {{-- Breadcrumbs + Título --}}
+    {{-- Breadcrumbs + Título + Botones de Acción --}}
     <div>
         <x-header 
             :titulo="__('Ficha Escolar')" 
             :subtitulo="__('Registro institucional del estudiante y su grupo familiar.')" 
             icono="user"
         >
-            <flux:button href="{{ route('estudiantes.index') }}" variant="ghost" icon="arrow-left">
-                {{ __('Volver al listado') }}
-            </flux:button>
+            <div class="flex items-center gap-2">
+                <flux:button href="{{ route('estudiantes.index') }}" variant="ghost" icon="arrow-left">
+                    {{ __('Volver al listado') }}
+                </flux:button>
+
+                @if ($estado === 'retirado')
+                    <flux:badge color="rose" class="font-bold text-xs">
+                        ⚠️ Retirado ({{ $fechaRetiro ? \Carbon\Carbon::parse($fechaRetiro)->format('d/m/Y') : 'Sin fecha' }})
+                    </flux:badge>
+                    @if (auth()->user()->can('editar-estudiantes') || auth()->user()->hasRole('superadmin'))
+                        <flux:button wire:click="cambiarEstado('activo')" variant="filled" class="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300" icon="arrow-path">
+                            {{ __('Reactivar Estudiante') }}
+                        </flux:button>
+                    @endif
+                @else
+                    @if (auth()->user()->can('editar-estudiantes') || auth()->user()->hasRole('superadmin'))
+                        <flux:button 
+                            wire:click="cambiarEstado('retirado')" 
+                            wire:confirm="¿Estás seguro de marcar a este estudiante como RETIRADO? Su historial de entrevistas y datos permanecerá intacto."
+                            variant="ghost" 
+                            class="text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30" 
+                            icon="user-minus"
+                        >
+                            {{ __('Marcar como Retirado') }}
+                        </flux:button>
+                    @endif
+                @endif
+            </div>
         </x-header>
     </div>
 
-    @if(!$userId)
+    @if($estado === 'retirado')
+    <flux:card class="bg-rose-50 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/20">
+        <div class="flex gap-4 items-center justify-between">
+            <div class="flex gap-4 items-center">
+                <div class="text-rose-600 dark:text-rose-400">
+                    <flux:icon.user-minus class="size-6" />
+                </div>
+                <div>
+                    <flux:heading class="text-rose-800 dark:text-rose-300">{{ __('Estudiante Retirado / Desvinculado') }}</flux:heading>
+                    <flux:text class="text-rose-700 dark:text-rose-400/80 mt-0.5 text-xs">
+                        {{ __('Este estudiante se encuentra marcado como retirado de la institución desde el ') }} 
+                        <span class="font-bold">{{ $fechaRetiro ? \Carbon\Carbon::parse($fechaRetiro)->format('d/m/Y') : 'Recientemente' }}</span>.
+                        {{ __('Todo su historial de entrevistas y registros se conserva de forma permanente.') }}
+                    </flux:text>
+                </div>
+            </div>
+
+            @if (auth()->user()->can('editar-estudiantes') || auth()->user()->hasRole('superadmin'))
+                <flux:button wire:click="cambiarEstado('activo')" variant="filled" size="sm" class="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 whitespace-nowrap">
+                    {{ __('Reactivar Alumno') }}
+                </flux:button>
+            @endif
+        </div>
+    </flux:card>
+    @elseif(!$userId)
     <flux:card class="bg-orange-50 dark:bg-orange-500/10 border-orange-200 dark:border-orange-500/20">
         <div class="flex gap-4">
             <div class="text-orange-500 dark:text-orange-400 mt-1">
@@ -218,7 +300,7 @@ new class extends Component {
             <flux:heading size="lg">{{ __('Historial Académico - Año Actual') }}</flux:heading>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <flux:select wire:model="cursoId" :label="__('Curso Asignado')">
                 <flux:select.option value="">{{ __('Sin curso asignado') }}</flux:select.option>
                 @foreach ($this->cursos as $curso)
@@ -226,7 +308,14 @@ new class extends Component {
                 @endforeach
             </flux:select>
 
-            <flux:input :label="__('Estado Académico')" value="Alumno Regular" disabled />
+            <flux:select wire:model.live="estado" :label="__('Estado Académico')">
+                <flux:select.option value="activo">{{ __('Activo / Alumno Regular') }}</flux:select.option>
+                <flux:select.option value="retirado">{{ __('Retirado / Desvinculado') }}</flux:select.option>
+            </flux:select>
+
+            @if ($estado === 'retirado')
+                <flux:input wire:model="fechaRetiro" :label="__('Fecha de Retiro')" type="date" />
+            @endif
         </div>
     </flux:card>
 

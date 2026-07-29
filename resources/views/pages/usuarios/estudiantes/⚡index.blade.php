@@ -14,6 +14,8 @@ new class extends Component {
     // Filtros y orden
     public string $cursoId = ''; // Vacío por defecto para obligar a seleccionar
 
+    public string $filtroEstado = 'activos'; // 'activos' por defecto (oculta retirados)
+
     public string $search = '';
 
     public string $sortBy = 'nombres_csv';
@@ -127,6 +129,7 @@ new class extends Component {
             'apoderado_domicilio' => $this->apoderadoDomicilio ?: null,
             'user_id' => $user ? $user->id : null,
             'vinculado_en' => $user ? now() : null,
+            'estado' => 'activo',
         ];
 
         if ($this->estudianteId) {
@@ -151,6 +154,11 @@ new class extends Component {
     }
 
     public function updatedCursoId()
+    {
+        $this->resetPage();
+    }
+
+    public function updatedFiltroEstado()
     {
         $this->resetPage();
     }
@@ -192,6 +200,14 @@ new class extends Component {
     }
 
     #[Computed]
+    public function totalRetiradosCount(): int
+    {
+        return Estudiante::where('school_id', auth()->user()->current_school_id)
+            ->where('estado', 'retirado')
+            ->count();
+    }
+
+    #[Computed]
     public function getEstudiantesQueryProperty()
     {
         if ($this->cursoId === '') {
@@ -201,19 +217,37 @@ new class extends Component {
         return Estudiante::query()
             ->with(['curso', 'user'])
             ->where('estudiantes.school_id', auth()->user()->current_school_id)
+            ->when($this->filtroEstado === 'activos', function ($query) {
+                $query->where(function ($q) {
+                    $q->where('estudiantes.estado', 'activo')
+                        ->orWhereNull('estudiantes.estado');
+                });
+            })
+            ->when($this->filtroEstado === 'retirados', function ($query) {
+                $query->where('estudiantes.estado', 'retirado');
+            })
             ->when($this->cursoId !== 'todos', function ($query) {
                 $query->where('estudiantes.curso_id', $this->cursoId);
             })
             ->when(trim($this->search) !== '', function ($query) {
-                $search = trim($this->search);
-                $query->where(function ($q) use ($search) {
-                    $q->where('estudiantes.nombres_csv', 'like', "%{$search}%")
-                        ->orWhere('estudiantes.rut_numero', 'like', "%{$search}%")
-                        ->orWhereHas('user', function ($uq) use ($search) {
-                            $uq->where('nombres', 'like', "%{$search}%")
-                                ->orWhere('apellido_pat', 'like', "%{$search}%")
-                                ->orWhere('email', 'like', "%{$search}%");
+                $words = array_filter(explode(' ', trim($this->search)));
+                $query->where(function ($q) use ($words) {
+                    foreach ($words as $word) {
+                        $w = trim($word);
+                        if ($w === '') {
+                            continue;
+                        }
+                        $q->where(function ($sub) use ($w) {
+                            $sub->where('estudiantes.nombres_csv', 'like', "%{$w}%")
+                                ->orWhere('estudiantes.rut_numero', 'like', "%{$w}%")
+                                ->orWhereHas('user', function ($uq) use ($w) {
+                                    $uq->where('nombres', 'like', "%{$w}%")
+                                        ->orWhere('apellido_pat', 'like', "%{$w}%")
+                                        ->orWhere('apellido_mat', 'like', "%{$w}%")
+                                        ->orWhere('email', 'like', "%{$w}%");
+                                });
                         });
+                    }
                 });
             })
             ->when($this->sortBy === 'nombres_csv', function ($query) {
@@ -247,21 +281,20 @@ new class extends Component {
 
         $estudiantes = $this->getEstudiantesQueryProperty->get();
 
-        $csvData = "Nombre del estudiante;RUT;Correo;Curso;Nombre apoderado;Telefono apoderado\n";
+        $csvData = "Nombre del estudiante;RUT;Correo;Curso;Estado;Nombre apoderado;Telefono apoderado\n";
 
         foreach ($estudiantes as $estudiante) {
             $nombre = $estudiante->nombreCompleto() ?? '';
             $rut = $estudiante->rutCompleto() ?? '';
             $correo = $estudiante->email ?? ($estudiante->user_id ? $estudiante->user->email : '');
             $curso = $estudiante->curso ? $estudiante->curso->nombreCompleto() : '';
+            $estado = $estudiante->estado === 'retirado' ? 'RETIRADO' : 'ACTIVO';
             $apoderado = $estudiante->apoderado_nombres ?? '';
             $telefono = $estudiante->apoderado_telefono ?? '';
 
-            // Encerramos en comillas por si hay punto y coma en los nombres
-            $csvData .= sprintf('"%s";"%s";"%s";"%s";"%s";"%s"' . "\n", $nombre, $rut, $correo, $curso, $apoderado, $telefono);
+            $csvData .= sprintf('"%s";"%s";"%s";"%s";"%s";"%s";"%s"' . "\n", $nombre, $rut, $correo, $curso, $estado, $apoderado, $telefono);
         }
 
-        // Fix encoding to UTF-8 with BOM for Excel
         $csvData = "\xEF\xBB\xBF" . $csvData;
 
         $fileName = 'Estudiantes_Export_' . now()->format('Ymd_His') . '.csv';
@@ -284,9 +317,27 @@ new class extends Component {
     <div class="flex flex-col gap-8 w-full max-w-7xl mx-auto">
         <!-- Quick Action Header -->
         <div>
-
-
             <x-header :titulo="__('Listado de Estudiantes')" :subtitulo="__('Administración centralizada de alumnos del establecimiento.')" icono="users">
+                @if ($filtroEstado === 'activos')
+                    <flux:button 
+                        variant="ghost" 
+                        icon="user-minus" 
+                        class="text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30" 
+                        wire:click="$set('filtroEstado', 'retirados')"
+                    >
+                        {{ __('Ver Retirados') }} ({{ $this->totalRetiradosCount }})
+                    </flux:button>
+                @else
+                    <flux:button 
+                        variant="filled" 
+                        icon="users" 
+                        class="bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300" 
+                        wire:click="$set('filtroEstado', 'activos')"
+                    >
+                        {{ __('Ver Alumnos Activos') }}
+                    </flux:button>
+                @endif
+
                 <flux:button variant="ghost" icon="document-arrow-down" wire:click="exportarExcel">
                     {{ __('Exportar') }}
                 </flux:button>
@@ -303,24 +354,52 @@ new class extends Component {
             </x-header>
         </div>
 
+        @if ($filtroEstado === 'retirados')
+            <flux:card class="bg-rose-50 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/20">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2 bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400 rounded-lg">
+                            <flux:icon.user-minus class="size-6" />
+                        </div>
+                        <div>
+                            <flux:heading class="text-rose-800 dark:text-rose-300">Viendo únicamente Alumnos Retirados ({{ $this->totalRetiradosCount }})</flux:heading>
+                            <flux:text class="text-rose-700 dark:text-rose-400/80 text-xs">
+                                Los alumnos desvinculados no aparecen en las listas regulares. Su historial permanece intacto en el sistema.
+                            </flux:text>
+                        </div>
+                    </div>
+                    <flux:button wire:click="$set('filtroEstado', 'activos')" size="sm" variant="filled" class="bg-white text-rose-700 hover:bg-rose-100 border border-rose-200">
+                        Volver a Alumnos Activos
+                    </flux:button>
+                </div>
+            </flux:card>
+        @endif
+
         <!-- Filters Bento Grid -->
         <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
             <div class="md:col-span-8">
                 <flux:card class="h-full flex items-center">
                     <div class="flex flex-col md:flex-row items-start md:items-center gap-6 w-full">
-                        <flux:field class="w-full md:w-64">
-                            <flux:label
-                                class="mb-2 uppercase tracking-widest text-[10px] font-bold text-zinc-500 dark:text-zinc-400">
+                        <flux:field class="w-full md:w-56">
+                            <flux:label class="mb-2 uppercase tracking-widest text-[10px] font-bold text-zinc-500 dark:text-zinc-400">
                                 {{ __('Curso') }}
                             </flux:label>
                             <flux:select wire:model.live="cursoId">
-                                <flux:select.option value="" disabled>{{ __('Selecciona un Curso') }}
-                                </flux:select.option>
+                                <flux:select.option value="" disabled>{{ __('Selecciona un Curso') }}</flux:select.option>
                                 <flux:select.option value="todos">{{ __('Listar Todos') }}</flux:select.option>
                                 @foreach ($this->cursos as $curso)
-                                    <flux:select.option value="{{ $curso->id }}">{{ $curso->nombreCompleto() }}
-                                    </flux:select.option>
+                                    <flux:select.option value="{{ $curso->id }}">{{ $curso->nombreCompleto() }}</flux:select.option>
                                 @endforeach
+                            </flux:select>
+                        </flux:field>
+
+                        <flux:field class="w-full md:w-44">
+                            <flux:label class="mb-2 uppercase tracking-widest text-[10px] font-bold text-zinc-500 dark:text-zinc-400">
+                                {{ __('Filtro de Estado') }}
+                            </flux:label>
+                            <flux:select wire:model.live="filtroEstado">
+                                <flux:select.option value="activos">Activos</flux:select.option>
+                                <flux:select.option value="retirados">⚠️ Retirados</flux:select.option>
                             </flux:select>
                         </flux:field>
 
@@ -328,12 +407,10 @@ new class extends Component {
                             <div class="h-12 w-px bg-zinc-200 dark:bg-zinc-700 hidden md:block"></div>
 
                             <flux:field class="flex-1 w-full overflow-hidden">
-                                <flux:label
-                                    class="mb-2 uppercase tracking-widest text-[10px] font-bold text-zinc-500 dark:text-zinc-400">
+                                <flux:label class="mb-2 uppercase tracking-widest text-[10px] font-bold text-zinc-500 dark:text-zinc-400">
                                     {{ __('Buscar Estudiante') }}
                                 </flux:label>
-                                <flux:input wire:model.live.debounce.300ms="search" icon="magnifying-glass"
-                                    :placeholder="__('Buscar por nombre o RUT...')" class="w-full" />
+                                <flux:input wire:model.live.debounce.300ms="search" icon="magnifying-glass" :placeholder="__('Buscar por nombre o RUT...')" class="w-full" />
                             </flux:field>
                         @endif
                     </div>
@@ -341,15 +418,14 @@ new class extends Component {
             </div>
 
             <div class="md:col-span-4">
-                <flux:card
-                    class="h-full flex items-center justify-between bg-zinc-900 border-none !text-white dark:bg-zinc-800">
+                <flux:card class="h-full flex items-center justify-between bg-zinc-900 border-none !text-white dark:bg-zinc-800">
                     <div>
                         <div class="text-[10px] uppercase tracking-widest font-bold opacity-70">
                             {{ $cursoId === '' ? __('Total Estudiantes') : __('Estudiantes Filtrados') }}
                         </div>
                         <div class="text-4xl font-bold mt-1">
                             {{ $cursoId === '' 
-                                ? \App\Models\Estudiante::where('school_id', auth()->user()->current_school_id)->count() 
+                                ? \App\Models\Estudiante::where('school_id', auth()->user()->current_school_id)->where(fn($q) => $q->where('estado', 'activo')->orWhereNull('estado'))->count() 
                                 : $this->getEstudiantesQueryProperty->count() }}
                         </div>
                     </div>
@@ -363,7 +439,7 @@ new class extends Component {
         <!-- Table UI -->
         <flux:card class="relative">
             {{-- Loader overlay --}}
-            <div wire:loading.flex wire:target="cursoId, search, sort, gotoPage, nextPage, previousPage" class="absolute inset-0 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-[1px] z-10 flex items-center justify-center rounded-xl">
+            <div wire:loading.flex wire:target="cursoId, filtroEstado, search, sort, gotoPage, nextPage, previousPage" class="absolute inset-0 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-[1px] z-10 flex items-center justify-center rounded-xl">
                 <div class="flex flex-col items-center gap-3">
                     <flux:icon.arrow-path class="size-8 animate-spin text-[#00376e] dark:text-blue-400" />
                     <span class="text-sm font-medium text-zinc-600 dark:text-zinc-300">{{ __('Cargando nómina de estudiantes...') }}</span>
@@ -377,22 +453,19 @@ new class extends Component {
                     </div>
                     <flux:heading size="lg">{{ __('Selecciona un curso') }}</flux:heading>
                     <flux:text class="mt-2 max-w-sm">
-                        {{ __('Utiliza los filtros de arriba para seleccionar un nivel y un curso para ver su nómina de estudiantes.') }}
+                        {{ __('Utiliza los filtros de arriba para seleccionar un nivel y un curso (o "Listar Todos") para ver su nómina.') }}
                     </flux:text>
                 </div>
             @else
                 <flux:table :paginate="$this->estudiantes">
                     <flux:table.columns>
-                        <flux:table.column sortable :sorted="$sortBy === 'nombres_csv'" :direction="$sortDirection"
-                            wire:click="sort('nombres_csv')">
+                        <flux:table.column sortable :sorted="$sortBy === 'nombres_csv'" :direction="$sortDirection" wire:click="sort('nombres_csv')">
                             {{ __('Nombre del Estudiante') }}
                         </flux:table.column>
-                        <flux:table.column sortable :sorted="$sortBy === 'rut_numero'" :direction="$sortDirection"
-                            wire:click="sort('rut_numero')">
+                        <flux:table.column sortable :sorted="$sortBy === 'rut_numero'" :direction="$sortDirection" wire:click="sort('rut_numero')">
                             {{ __('RUT') }}
                         </flux:table.column>
-                        <flux:table.column sortable :sorted="$sortBy === 'curso_id'" :direction="$sortDirection"
-                            wire:click="sort('curso_id')">
+                        <flux:table.column sortable :sorted="$sortBy === 'curso_id'" :direction="$sortDirection" wire:click="sort('curso_id')">
                             {{ __('Curso') }}
                         </flux:table.column>
                         <flux:table.column>{{ __('Apoderado') }}</flux:table.column>
@@ -437,7 +510,9 @@ new class extends Component {
                                     @endif
                                 </flux:table.cell>
                                 <flux:table.cell>
-                                    @if ($estudiante->email || $estudiante->user_id)
+                                    @if ($estudiante->estado === 'retirado')
+                                        <flux:badge size="sm" color="red" icon="user-minus">Retirado</flux:badge>
+                                    @elseif ($estudiante->email || $estudiante->user_id)
                                         <flux:badge size="sm" color="green" icon="check-circle">Vinculado</flux:badge>
                                     @else
                                         <flux:badge size="sm" color="orange" icon="clock">Inactivo</flux:badge>
@@ -445,23 +520,20 @@ new class extends Component {
                                 </flux:table.cell>
                                 <flux:table.cell class="text-right">
                                     <div class="flex items-center justify-end gap-1">
-                                        <flux:button variant="ghost" size="sm" icon="eye"
-                                            :tooltip="__('Ver Ficha')"
-                                            href="{{ route('estudiantes.ficha', $estudiante->id) }}" />
+                                        <flux:button variant="ghost" size="sm" icon="eye" :tooltip="__('Ver Ficha')" href="{{ route('estudiantes.ficha', $estudiante->id) }}" />
                                         @if (auth()->user()->can('editar-estudiantes') || auth()->user()->hasRole('superadmin'))
-                                            <flux:button variant="ghost" size="sm" icon="pencil-square"
-                                                :tooltip="__('Editar')" wire:click="abrirEditar({{ $estudiante->id }})" />
-                                            <flux:button variant="ghost" size="sm" icon="trash"
-                                                :tooltip="__('Eliminar')"
-                                                wire:click="confirmarEliminar({{ $estudiante->id }})" />
+                                            <flux:button variant="ghost" size="sm" icon="pencil-square" :tooltip="__('Editar')" wire:click="abrirEditar({{ $estudiante->id }})" />
+                                        @endif
+                                        @if (auth()->user()->can('eliminar-estudiantes') || auth()->user()->hasRole('superadmin'))
+                                            <flux:button variant="ghost" size="sm" icon="trash" class="text-red-500 hover:text-red-700" :tooltip="__('Eliminar')" wire:click="confirmarEliminar({{ $estudiante->id }})" />
                                         @endif
                                     </div>
                                 </flux:table.cell>
                             </flux:table.row>
                         @empty
                             <flux:table.row>
-                                <flux:table.cell colspan="6" class="text-center py-6 text-zinc-500">
-                                    {{ __('No hay estudiantes inscritos en este curso.') }}
+                                <flux:table.cell colspan="6" class="text-center py-8 text-zinc-500">
+                                    {{ $filtroEstado === 'retirados' ? __('No se encontraron estudiantes retirados en esta selección.') : __('No se encontraron estudiantes activos.') }}
                                 </flux:table.cell>
                             </flux:table.row>
                         @endforelse
@@ -469,103 +541,66 @@ new class extends Component {
                 </flux:table>
             @endif
         </flux:card>
-
-        <!-- Footer Meta Info -->
-        <div class="flex flex-col sm:flex-row justify-between items-center text-zinc-500 dark:text-zinc-400 gap-4">
-            <div class="flex space-x-10">
-                <div>
-                    <div class="text-[10px] uppercase font-bold tracking-widest mb-1">{{ __('Última Actualización') }}
-                    </div>
-                    <div class="text-xs font-medium">{{ __('Hoy, 09:45 AM - Control Central') }}</div>
-                </div>
-            </div>
-            <div class="text-right">
-                <div class="text-xs italic">"Compromiso con la excelencia y seguridad institucional"</div>
-            </div>
-        </div>
     </div>
 
-    {{-- Modal Confirmar Eliminar --}}
-    <flux:modal wire:model="modalEliminar" class="md:w-80">
+    <!-- Modal Crear/Editar -->
+    <flux:modal wire:model="modalAbierto" class="md:w-1/2">
         <div class="space-y-6">
             <div>
-                <flux:heading size="lg">{{ __('Eliminar estudiante') }}</flux:heading>
-                <flux:text class="mt-2">
-                    {{ __('El estudiante y sus datos asociados serán eliminados de los registros. Esta acción no puede deshacerse.') }}
-                </flux:text>
+                <flux:heading size="lg">{{ $estudianteId ? __('Editar Estudiante') : __('Nuevo Estudiante') }}</flux:heading>
+                <flux:subheading>{{ __('Completa los datos del estudiante para guardar el registro.') }}</flux:subheading>
             </div>
 
-            <div class="flex">
-                <flux:spacer />
-                <flux:button wire:click="$set('modalEliminar', false)" variant="ghost">{{ __('Cancelar') }}
-                </flux:button>
-                <flux:button wire:click="eliminar" variant="danger" class="ml-2">{{ __('Eliminar') }}</flux:button>
+            <div class="space-y-4">
+                <flux:input wire:model="nombres" :label="__('Nombre Completo')" placeholder="EJ: MARCELA PAZ RODRÍGUEZ LÓPEZ" class="uppercase" />
+
+                <div class="flex gap-2 items-end">
+                    <flux:input wire:model="rutNumero" :label="__('RUT')" placeholder="12345678" class="flex-1" />
+                    <flux:input wire:model="rutDv" :label="__('DV')" placeholder="K" class="w-20" maxlength="1" />
+                </div>
+
+                <flux:input wire:model="email" :label="__('Correo Institucional')" type="email" placeholder="estudiante@newheavenhs.cl" />
+
+                <flux:select wire:model="formCursoId" :label="__('Curso')">
+                    <flux:select.option value="" disabled>{{ __('Selecciona un Curso') }}</flux:select.option>
+                    @foreach ($this->cursos as $curso)
+                        <flux:select.option value="{{ $curso->id }}">{{ $curso->nombreCompleto() }}</flux:select.option>
+                    @endforeach
+                </flux:select>
+
+                <div class="border-t border-zinc-200 dark:border-zinc-700 pt-4 mt-4">
+                    <flux:heading size="sm" class="mb-3">{{ __('Datos del Apoderado') }}</flux:heading>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <flux:input wire:model="apoderadoNombres" :label="__('Nombre Apoderado')" placeholder="MARÍA PAZ LÓPEZ" class="uppercase" />
+                        <flux:input wire:model="apoderadoTelefono" :label="__('Teléfono Apoderado')" placeholder="+56 9 1234 5678" />
+                        <flux:input wire:model="apoderadoEmail" :label="__('Correo Apoderado')" type="email" placeholder="apoderado@gmail.com" />
+                        <flux:input wire:model="apoderadoDomicilio" :label="__('Domicilio Apoderado')" placeholder="LOS PINOS 123" class="uppercase" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-3">
+                <flux:modal.close>
+                    <flux:button variant="ghost">{{ __('Cancelar') }}</flux:button>
+                </flux:modal.close>
+                <flux:button variant="primary" wire:click="guardar">{{ __('Guardar') }}</flux:button>
             </div>
         </div>
     </flux:modal>
 
-    {{-- Modal Crear / Editar --}}
-    <flux:modal wire:model="modalAbierto" class="md:w-xl">
+    <!-- Modal Eliminar -->
+    <flux:modal wire:model="modalEliminar" class="md:w-96">
         <div class="space-y-6">
             <div>
-                <flux:heading size="lg">{{ $estudianteId ? __('Editar Estudiante') : __('Nuevo Estudiante') }}
-                </flux:heading>
-                <flux:text class="mt-2">
-                    {{ $estudianteId ? __('Modifica los datos del estudiante.') : __('Ingresa los datos del nuevo estudiante.') }}
-                </flux:text>
+                <flux:heading size="lg">{{ __('Eliminar Estudiante') }}</flux:heading>
+                <flux:subheading>{{ __('¿Estás seguro de que deseas eliminar este estudiante de la base de datos? Esta acción no se puede deshacer.') }}</flux:subheading>
             </div>
 
-            <flux:input wire:model="nombres" :label="__('Nombre Completo')" placeholder="EJ: JUAN PÉREZ LÓPEZ"
-                x-on:input="$event.target.value = $event.target.value.toLocaleUpperCase(); $wire.set('nombres', $event.target.value)" />
-            <flux:error name="nombres" />
-
-            <div class="grid grid-cols-2 gap-3">
-                <div class="flex gap-2">
-                    <flux:input wire:model="rutNumero" :label="__('RUT sin puntos')" placeholder="12345678"
-                        class="flex-1" />
-                    <flux:input wire:model="rutDv" :label="__('DV')" placeholder="K" class="w-20"
-                        maxlength="1" />
-                </div>
-                <flux:select wire:model="formCursoId" :label="__('Curso')">
-                    <flux:select.option value="" disabled>{{ __('Selecciona un Curso') }}</flux:select.option>
-                    @foreach ($this->cursos as $curso)
-                        <flux:select.option value="{{ $curso->id }}">{{ $curso->nombreCompleto() }}
-                        </flux:select.option>
-                    @endforeach
-                </flux:select>
-            </div>
-            <flux:error name="rutNumero" />
-            <flux:error name="rutDv" />
-            <flux:error name="formCursoId" />
-
-            <flux:input wire:model="email" type="email" :label="__('Correo Institucional (@newheavenhs.cl)')" placeholder="ejemplo@newheavenhs.cl" />
-            <flux:error name="email" />
-
-            <flux:separator text="Datos del Apoderado (Opcional)" />
-
-            <flux:input wire:model="apoderadoNombres" :label="__('Nombre del Apoderado')"
-                placeholder="EJ: MARÍA LÓPEZ"
-                x-on:input="$event.target.value = $event.target.value.toLocaleUpperCase(); $wire.set('apoderadoNombres', $event.target.value)" />
-            <flux:error name="apoderadoNombres" />
-
-            <div class="grid grid-cols-2 gap-3">
-                <flux:input wire:model="apoderadoTelefono" :label="__('Teléfono')" placeholder="+56912345678" />
-                <flux:input wire:model="apoderadoEmail" type="email" :label="__('Correo Electrónico')"
-                    placeholder="maria@correo.cl" />
-            </div>
-            <flux:error name="apoderadoTelefono" />
-            <flux:error name="apoderadoEmail" />
-
-            <flux:input wire:model="apoderadoDomicilio" :label="__('Domicilio')"
-                placeholder="EJ: AV. LOS LEONES 1234"
-                x-on:input="$event.target.value = $event.target.value.toLocaleUpperCase(); $wire.set('apoderadoDomicilio', $event.target.value)" />
-            <flux:error name="apoderadoDomicilio" />
-
-            <div class="flex">
-                <flux:spacer />
-                <flux:button wire:click="$set('modalAbierto', false)" variant="ghost">{{ __('Cancelar') }}
-                </flux:button>
-                <flux:button wire:click="guardar" variant="primary" class="ml-2">{{ __('Guardar') }}</flux:button>
+            <div class="flex justify-end gap-3">
+                <flux:modal.close>
+                    <flux:button variant="ghost">{{ __('Cancelar') }}</flux:button>
+                </flux:modal.close>
+                <flux:button variant="danger" wire:click="eliminar">{{ __('Eliminar') }}</flux:button>
             </div>
         </div>
     </flux:modal>

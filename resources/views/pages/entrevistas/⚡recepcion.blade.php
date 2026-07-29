@@ -318,7 +318,7 @@ new class extends Component {
             <table class="w-full text-left border-collapse min-w-[800px]">
                 <thead>
                     <tr class="bg-zinc-100/50 dark:bg-zinc-950/60 text-zinc-600 dark:text-zinc-400 uppercase text-[11px] font-bold tracking-wider border-b border-zinc-200 dark:border-zinc-800/80">
-                        <th class="px-6 py-4 w-32">Hora</th>
+                        <th class="px-6 py-4 w-36">Fecha / Hora</th>
                         <th class="px-6 py-4">Alumno / Curso</th>
                         <th class="px-6 py-4">Apoderado</th>
                         <th class="px-6 py-4">Profesor Cita</th>
@@ -357,9 +357,7 @@ new class extends Component {
                         @endphp
                         <tr class="{{ $rowClass }}">
                             <td class="{{ $firstCellClass }}">
-                                @if($filtroTemporalidad !== 'dia')
-                                    <p class="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{{ \Carbon\Carbon::parse($cita->fecha)->translatedFormat('d M') }}</p>
-                                @endif
+                                <p class="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{{ \Carbon\Carbon::parse($cita->fecha)->translatedFormat('d M') }}</p>
                                 <span class="text-2xl font-black {{ $hourClass }}">
                                     {{ \Carbon\Carbon::parse($cita->hora)->format('H:i') }}
                                 </span>

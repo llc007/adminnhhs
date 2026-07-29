@@ -22,6 +22,10 @@ new class extends Component {
         }
         // Al entrar ver el día actual
         $this->fechaSeleccionada = now()->toDateString();
+
+        if (session()->has('success')) {
+            \Flux\Flux::toast(session('success'), variant: 'success');
+        }
     }
 
     public function with(): array
@@ -81,6 +85,18 @@ new class extends Component {
     />
 
     <div class="space-y-10">
+
+        @if (session()->has('success'))
+            <flux:card class="bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200">
+                <div class="flex items-center gap-3">
+                    <flux:icon.check-circle class="size-6 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <div>
+                        <p class="font-bold text-sm">{{ session('success') }}</p>
+                        <p class="text-xs opacity-90">La cita ha sido registrada exitosamente en tu agenda.</p>
+                    </div>
+                </div>
+            </flux:card>
+        @endif
 
         <!-- Próxima Entrevista (Hero Banner) -->
         @if ($proxima)

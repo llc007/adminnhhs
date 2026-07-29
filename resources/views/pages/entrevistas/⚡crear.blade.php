@@ -204,12 +204,14 @@ new class extends Component {
                 ->notify(new \App\Notifications\EntrevistaAgendadaApoderado($entrevista, 'estudiante'));
         }
 
-        // Feedback al usuario local e interfaz
-        \Flux::toast('Entrevista agendada con éxito.', variant: 'success');
+        // Feedback al usuario y redirección a Mi Agenda
+        session()->flash('success', "Entrevista con el apoderado de {$entrevista->estudiante->nombreCompleto()} agendada con éxito.");
 
-        // Reset del form
-        $this->reset(['estudianteId', 'searchEstudiante', 'filtroCursoId', 'urgencia', 'lugar', 'motivo', 'notas', 'confirmarTope', 'notificarApoderado', 'notificarEstudiante']);
-        $this->mount(); // Vuelve a resetear la hora a 09:00 y la fecha a hoy
+        $targetRoute = (auth()->user()->can('ver-entrevistas-propias') || auth()->user()->hasRole('superadmin'))
+            ? route('entrevistas.agenda')
+            : route('entrevistas.index');
+
+        return $this->redirect($targetRoute, navigate: true);
     }
 
     public function mount()

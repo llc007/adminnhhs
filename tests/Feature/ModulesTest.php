@@ -80,6 +80,8 @@ test('modules configuration can be updated by superadmin', function () {
         'adquisiciones' => false,
         'prestamos' => true,
         'envio_correos' => false,
+        'modo_mantenimiento' => false,
+        'mensaje_mantenimiento' => 'El sistema se encuentra en mantenimiento programado. Volveremos en breve.',
     ]);
 });
 

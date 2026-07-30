@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\CheckMaintenanceMode;
 use App\Http\Middleware\CheckRole;
 use App\Http\Middleware\RestrictGmailUsers;
 use App\Http\Middleware\SetPermissionsTeamId;
@@ -22,6 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
             RestrictGmailUsers::class,
             UpdateLastActivity::class,
             SetPermissionsTeamId::class,
+            CheckMaintenanceMode::class,
         ]);
 
         $middleware->alias([

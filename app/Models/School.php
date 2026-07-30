@@ -26,6 +26,8 @@ class School extends Model
             'adquisiciones' => true,
             'prestamos' => true,
             'envio_correos' => true,
+            'modo_mantenimiento' => false,
+            'mensaje_mantenimiento' => 'El sistema se encuentra en mantenimiento programado. Volveremos en breve.',
         ];
 
         if (is_null($value)) {

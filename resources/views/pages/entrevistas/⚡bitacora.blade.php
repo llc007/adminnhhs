@@ -885,7 +885,7 @@ new class extends Component {
 
                     <div class="pt-2 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between text-[11px]">
                         <span class="text-zinc-500">Última citación enviada a:</span>
-                        <span class="font-semibold text-zinc-700 dark:text-zinc-300 truncate max-w-[140px]">{{ $entrevista->correo_citacion_enviado ?? ($entrevista->estudiante?->apoderado_email ?? 'No enviado') }}</span>
+                        <span class="font-semibold text-zinc-700 dark:text-zinc-300 truncate max-w-[140px]">{{ $entrevista->correo_citacion_enviado ?: 'No enviado' }}</span>
                     </div>
 
                     <flux:button size="xs" variant="subtle" icon="paper-airplane" wire:click="abrirModalReenviarConfirmacion" class="w-full mt-2 font-bold text-blue-700 dark:text-blue-300">

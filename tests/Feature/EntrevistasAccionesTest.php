@@ -251,3 +251,37 @@ test('registering arrival in reception sends mail and database notification to d
         }
     );
 });
+
+test('interviews with exit recorded move to the bottom of the reception list', function () {
+    [$user, $entrevista1] = setupTestEnvironment();
+
+    $entrevista2 = Entrevista::create([
+        'school_id' => $entrevista1->school_id,
+        'user_id' => $user->id,
+        'estudiante_id' => $entrevista1->estudiante_id,
+        'fecha' => now('America/Santiago')->format('Y-m-d'),
+        'hora' => '10:00:00',
+        'motivo' => 'Reunión General',
+        'urgencia' => 'normal',
+        'estado' => 'ingresada',
+        'lugar' => 'BOX 1',
+    ]);
+
+    // Mark exit for entrevista1
+    $entrevista1->update([
+        'hora' => '09:00:00',
+        'mensaje_recepcion' => '[SALIDA] El apoderado se retiró del recinto a las 09:30.',
+    ]);
+
+    $this->actingAs($user);
+
+    $component = Livewire::test('pages::entrevistas.recepcion');
+    $items = $component->get('proximasEntrevistas')->items();
+
+    // entrevista2 (active/pending without exit) must come before entrevista1 (which has exited)
+    $ids = array_map(fn ($e) => $e->id, $items);
+    $pos1 = array_search($entrevista1->id, $ids);
+    $pos2 = array_search($entrevista2->id, $ids);
+
+    expect($pos2)->toBeLessThan($pos1);
+});

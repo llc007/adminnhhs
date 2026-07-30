@@ -105,8 +105,7 @@ new class extends Component {
     private function getFilteredQuery()
     {
         $query = Entrevista::with(['estudiante.curso', 'user'])
-            ->orderBy('fecha', 'desc')
-            ->orderBy('hora', 'desc');
+            ->where('school_id', auth()->user()->current_school_id);
 
         if (auth()->user()->hasRole('estudiante')) {
             $estudiante = \App\Models\Estudiante::where('user_id', auth()->id())->first();
@@ -115,13 +114,13 @@ new class extends Component {
             } else {
                 $query->whereRaw('1 = 0');
             }
-        } elseif (!auth()->user()->hasRole('superadmin')) {
-            if (!auth()->user()->can('ver-entrevistas-general') && auth()->user()->can('ver-entrevistas-propias')) {
+        } elseif (! auth()->user()->hasRole('superadmin')) {
+            if (! auth()->user()->can('ver-entrevistas-general') && auth()->user()->can('ver-entrevistas-propias')) {
                 $query->where('user_id', auth()->id());
             }
         }
 
-        if (!empty($this->search)) {
+        if (! empty($this->search)) {
             $words = array_filter(explode(' ', trim($this->search)));
             $query->where(function ($q) use ($words) {
                 foreach ($words as $word) {
@@ -131,31 +130,31 @@ new class extends Component {
                     }
                     $q->where(function ($sub) use ($w) {
                         $sub->whereHas('estudiante', function ($sq) use ($w) {
-                            $sq->where('nombres_csv', 'like', '%' . $w . '%')
-                                ->orWhere('rut_numero', 'like', '%' . $w . '%');
+                            $sq->where('nombres_csv', 'like', '%'.$w.'%')
+                                ->orWhere('rut_numero', 'like', '%'.$w.'%');
                         })->orWhereHas('user', function ($sq) use ($w) {
-                            $sq->where('nombres', 'like', '%' . $w . '%')
-                                ->orWhere('apellido_pat', 'like', '%' . $w . '%')
-                                ->orWhere('apellido_mat', 'like', '%' . $w . '%');
+                            $sq->where('nombres', 'like', '%'.$w.'%')
+                                ->orWhere('apellido_pat', 'like', '%'.$w.'%')
+                                ->orWhere('apellido_mat', 'like', '%'.$w.'%');
                         });
                     });
                 }
             });
         }
 
-        if (!empty($this->profesor_id)) {
+        if (! empty($this->profesor_id)) {
             $query->where('user_id', $this->profesor_id);
         }
 
-        if (!empty($this->curso_id)) {
+        if (! empty($this->curso_id)) {
             $query->whereHas('estudiante', function ($q) {
                 $q->where('curso_id', $this->curso_id);
             });
         }
 
-        $anchor = !empty($this->fecha) ? \Carbon\Carbon::parse($this->fecha) : now();
+        $anchor = ! empty($this->fecha) ? \Carbon\Carbon::parse($this->fecha) : now();
 
-        if (!empty($this->filtroTemporal)) {
+        if (! empty($this->filtroTemporal)) {
             if ($this->filtroTemporal === 'dia') {
                 $query->whereDate('fecha', $anchor->toDateString());
             } elseif ($this->filtroTemporal === 'semana') {
@@ -163,11 +162,11 @@ new class extends Component {
             } elseif ($this->filtroTemporal === 'mes') {
                 $query->whereMonth('fecha', $anchor->month)->whereYear('fecha', $anchor->year);
             }
-        } elseif (!empty($this->fecha)) {
+        } elseif (! empty($this->fecha)) {
             $query->whereDate('fecha', $anchor->toDateString());
         }
 
-        if (!empty($this->estado)) {
+        if (! empty($this->estado)) {
             if ($this->estado === 'cancelada') {
                 $query->whereIn('estado', ['cancelada', 'ausente']);
             } else {
@@ -175,7 +174,9 @@ new class extends Component {
             }
         }
 
-        return $query;
+        return $query
+            ->orderBy('fecha', 'desc')
+            ->orderBy('hora', 'desc');
     }
 
     public function export()

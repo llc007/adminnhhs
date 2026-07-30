@@ -124,3 +124,29 @@ test('webhook endpoint successfully updates mail log status on bounce', function
     expect($log->status)->toBe('bounced');
     expect($log->error_message)->toBe('Mailbox not found.');
 });
+
+test('superadmin can send a test email from mail logs component', function () {
+    $user = User::factory()->create(['email' => 'superadmin@test.com']);
+    $schoolId = DB::table('schools')->insertGetId([
+        'name' => 'Test School',
+        'domain' => 'test.com',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    $user->update(['current_school_id' => $schoolId]);
+    $user->syncRolesForSchool($schoolId, ['superadmin']);
+    $this->actingAs($user);
+
+    Livewire::test('pages::admin.mail_logs')
+        ->call('abrirModalPrueba')
+        ->assertSet('emailPrueba', 'superadmin@test.com')
+        ->set('emailPrueba', 'superadmin@test.com')
+        ->call('enviarCorreoPrueba')
+        ->assertHasNoErrors();
+
+    $this->assertDatabaseHas('mail_logs', [
+        'to' => 'superadmin@test.com',
+        'subject' => '🟢 Prueba de Servidor de Correo - Plataforma NHHS',
+        'status' => 'sent',
+    ]);
+});

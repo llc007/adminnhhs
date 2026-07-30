@@ -191,10 +191,13 @@ new class extends Component {
         // Enviar notificación al Docente (usamos auth()->user() o el owner de la cita)
         auth()->user()->notify(new \App\Notifications\EntrevistaAgendadaDocente($entrevista));
 
+        $emailEnviado = null;
+
         // Enviar notificación al Apoderado (si está activo y tiene email válido)
         if ($this->notificarApoderado && !empty($entrevista->estudiante->apoderado_email)) {
             \Illuminate\Support\Facades\Notification::route('mail', $entrevista->estudiante->apoderado_email)
                 ->notify(new \App\Notifications\EntrevistaAgendadaApoderado($entrevista, 'apoderado'));
+            $emailEnviado = $entrevista->estudiante->apoderado_email;
         }
 
         // Enviar notificación al Estudiante (si está activo y tiene email válido)
@@ -202,6 +205,13 @@ new class extends Component {
         if ($this->notificarEstudiante && !empty($emailEstudiante)) {
             \Illuminate\Support\Facades\Notification::route('mail', $emailEstudiante)
                 ->notify(new \App\Notifications\EntrevistaAgendadaApoderado($entrevista, 'estudiante'));
+            if (! $emailEnviado) {
+                $emailEnviado = $emailEstudiante;
+            }
+        }
+
+        if ($emailEnviado) {
+            $entrevista->update(['correo_citacion_enviado' => $emailEnviado]);
         }
 
         // Feedback al usuario y redirección a Mi Agenda

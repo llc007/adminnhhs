@@ -23,6 +23,7 @@ new #[Title('Roles y Permisos')] class extends Component
             'cancelar-entrevistas' => 'Cancelar entrevistas agendadas',
             'eliminar-entrevistas' => 'Eliminar o borrar registros de entrevistas',
             'ingresar-apoderado' => 'Registrar ingreso/salida de portería (Acceso)',
+            'escribir-mensajes-agenda' => 'Escribir mensajes y publicar en la sección Anuncios de la Agenda',
         ],
         'Estudiantes' => [
             'ver-estudiantes' => 'Ver lista e información de estudiantes',
@@ -121,6 +122,7 @@ new #[Title('Roles y Permisos')] class extends Component
         $role = Role::where('team_id', $schoolId)->findOrFail($this->selectedRoleId);
 
         $role->syncPermissions($this->permisosSeleccionados);
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
 
         Flux::toast(
             heading: __('Permisos Guardados'),

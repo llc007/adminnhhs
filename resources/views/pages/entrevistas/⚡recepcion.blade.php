@@ -130,7 +130,11 @@ new class extends Component {
             });
         }
 
-        return $query->orderBy('fecha', 'asc')->orderBy('hora', 'asc')->paginate(50);
+        return $query
+            ->orderByRaw("CASE WHEN mensaje_recepcion LIKE '%[SALIDA]%' THEN 1 ELSE 0 END ASC")
+            ->orderBy('fecha', 'asc')
+            ->orderBy('hora', 'asc')
+            ->paginate(50);
     }
 
     #[\Livewire\Attributes\Computed]

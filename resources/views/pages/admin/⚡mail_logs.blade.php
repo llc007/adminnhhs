@@ -4,6 +4,7 @@ use Livewire\Component;
 use Livewire\WithPagination;
 use Livewire\Attributes\Title;
 use App\Models\MailLog;
+use Flux\Flux;
 
 new #[Title('Auditoría de Correos')] class extends Component
 {
@@ -16,6 +17,10 @@ new #[Title('Auditoría de Correos')] class extends Component
     // Modal de Detalle
     public bool $modalDetalle = false;
     public ?int $selectedLogId = null;
+
+    // Modal Correo de Prueba
+    public bool $modalPrueba = false;
+    public string $emailPrueba = '';
 
     public function mount(): void
     {
@@ -40,6 +45,81 @@ new #[Title('Auditoría de Correos')] class extends Component
                     ? __('El envío de correos y notificaciones automáticas ha sido activado.') 
                     : __('El envío de correos ha sido desactivado temporalmente.'),
                 variant: $value ? 'success' : 'warning'
+            );
+        }
+    }
+
+    public function abrirModalPrueba(): void
+    {
+        $this->emailPrueba = auth()->user()->email ?? '';
+        $this->modalPrueba = true;
+    }
+
+    public function enviarCorreoPrueba(): void
+    {
+        $this->validate([
+            'emailPrueba' => ['required', 'email'],
+        ], [
+            'emailPrueba.required' => 'Ingrese una dirección de correo.',
+            'emailPrueba.email' => 'Ingrese un correo electrónico válido.',
+        ]);
+
+        try {
+            $user = auth()->user();
+            $fechaActual = now()->setTimezone('America/Santiago')->format('d/m/Y H:i:s');
+            $colegio = $user->currentSchool?->name ?? 'Sistema NHHS';
+            $userName = $user->nombreCompleto();
+
+            $bodyHtml = "
+                <div style='font-family: Arial, sans-serif; padding: 24px; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;'>
+                    <h2 style='color: #00376e; margin-top: 0;'>🟢 Prueba de Servidor de Correo</h2>
+                    <p style='color: #4a5568; font-size: 14px; line-height: 1.5;'>Este es un mensaje automático de comprobación enviado desde el sistema para verificar que el servicio SMTP / envío de correos de <strong>{$colegio}</strong> está operativo y funcionando correctamente.</p>
+                    <div style='background-color: #f7fafc; border-left: 4px solid #3182ce; padding: 12px 16px; margin: 16px 0; border-radius: 4px;'>
+                        <ul style='margin: 0; padding-left: 16px; color: #4a5568; font-size: 13px; line-height: 1.8;'>
+                            <li><strong>Solicitado por:</strong> {$userName} ({$this->emailPrueba})</li>
+                            <li><strong>Fecha y Hora:</strong> {$fechaActual} hrs</li>
+                            <li><strong>Estado del Servidor:</strong> Envíos Habilitados 🟢</li>
+                        </ul>
+                    </div>
+                    <p style='color: #a0aec0; font-size: 12px; margin-bottom: 0;'>No es necesario responder a este mensaje.</p>
+                </div>
+            ";
+
+            \Illuminate\Support\Facades\Mail::html($bodyHtml, function ($message) {
+                $message->to($this->emailPrueba)
+                    ->subject('🟢 Prueba de Servidor de Correo - Plataforma NHHS');
+            });
+
+            MailLog::create([
+                'school_id' => auth()->user()->current_school_id,
+                'to' => $this->emailPrueba,
+                'subject' => '🟢 Prueba de Servidor de Correo - Plataforma NHHS',
+                'body' => $bodyHtml,
+                'status' => 'sent',
+                'sent_at' => now(),
+            ]);
+
+            $this->modalPrueba = false;
+
+            Flux::toast(
+                heading: __('Prueba Exitosa'),
+                text: __('El correo de prueba ha sido enviado exitosamente a ') . $this->emailPrueba,
+                variant: 'success'
+            );
+        } catch (\Throwable $e) {
+            MailLog::create([
+                'school_id' => auth()->user()->current_school_id,
+                'to' => $this->emailPrueba,
+                'subject' => '🟢 Prueba de Servidor de Correo - Plataforma NHHS (FALLIDO)',
+                'body' => 'Falló el envío del correo de prueba. Error: ' . $e->getMessage(),
+                'status' => 'failed',
+                'error_message' => $e->getMessage(),
+            ]);
+
+            Flux::toast(
+                heading: __('Error al Enviar Prueba'),
+                text: $e->getMessage(),
+                variant: 'danger'
             );
         }
     }
@@ -128,7 +208,11 @@ new #[Title('Auditoría de Correos')] class extends Component
         :titulo="__('Auditoría de Correos Enviados')"
         :subtitulo="__('Monitorea y diagnostica los correos electrónicos emitidos por la plataforma, incluyendo rebotes y fallos.')"
         icono="envelope"
-    />
+    >
+        <flux:button variant="primary" icon="paper-airplane" wire:click="abrirModalPrueba" class="bg-[#00376e] hover:bg-blue-800 text-white font-bold shadow-sm">
+            {{ __('Enviar Correo de Prueba') }}
+        </flux:button>
+    </x-header>
 
     {{-- Filtros y Buscador --}}
     <flux:card>
@@ -167,6 +251,12 @@ new #[Title('Auditoría de Correos')] class extends Component
                     <flux:select.option value="failed">{{ __('Fallido (Failed)') }}</flux:select.option>
                 </flux:select>
             </flux:field>
+
+            <div class="w-full md:w-auto md:hidden">
+                <flux:button variant="primary" icon="paper-airplane" wire:click="abrirModalPrueba" class="w-full bg-[#00376e] text-white font-bold">
+                    {{ __('Enviar Correo de Prueba') }}
+                </flux:button>
+            </div>
         </div>
     </flux:card>
 
@@ -240,6 +330,49 @@ new #[Title('Auditoría de Correos')] class extends Component
             </flux:table.rows>
         </flux:table>
     </flux:card>
+
+    {{-- Modal de Correo de Prueba --}}
+    <flux:modal wire:model="modalPrueba" class="md:w-md">
+        <div class="space-y-5">
+            <div>
+                <flux:heading size="lg" class="flex items-center gap-2">
+                    <flux:icon.paper-airplane class="size-5 text-[#00376e]" />
+                    {{ __('Enviar Correo de Prueba') }}
+                </flux:heading>
+                <flux:subheading size="sm" class="mt-1">
+                    {{ __('Verifica si el servidor SMTP y el envío de mensajes funcionan correctamente.') }}
+                </flux:subheading>
+            </div>
+
+            <form wire:submit.prevent="enviarCorreoPrueba" class="space-y-4">
+                <flux:input 
+                    wire:model="emailPrueba" 
+                    type="email" 
+                    :label="__('Correo Destinatario')" 
+                    :placeholder="__('ejemplo@colegio.cl')" 
+                    required 
+                />
+                <flux:error name="emailPrueba" />
+
+                <div class="p-3 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-xs text-blue-900 dark:text-blue-200 flex items-start gap-2">
+                    <flux:icon.information-circle class="size-4 shrink-0 text-blue-600 dark:text-blue-400 mt-0.5" />
+                    <div>
+                        <span class="font-bold block mb-0.5">Comprobación de Servidor:</span>
+                        Se enviará un correo de diagnóstico. Por defecto se carga tu correo personal, pero puedes confirmarlo o cambiarlo antes de presionar Enviar.
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-3 border-t dark:border-zinc-700">
+                    <flux:button wire:click="$set('modalPrueba', false)" variant="ghost">
+                        {{ __('Cancelar') }}
+                    </flux:button>
+                    <flux:button type="submit" variant="primary" icon="paper-airplane" class="bg-[#00376e] hover:bg-blue-800 text-white font-bold">
+                        {{ __('Enviar Prueba') }}
+                    </flux:button>
+                </div>
+            </form>
+        </div>
+    </flux:modal>
 
     {{-- Modal de Detalle de Correo --}}
     <flux:modal wire:model="modalDetalle" class="md:w-3xl">

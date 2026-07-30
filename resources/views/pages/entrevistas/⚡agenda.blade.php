@@ -3,12 +3,22 @@
 use Livewire\Component;
 use App\Models\Entrevista;
 use App\Models\User;
+use App\Models\AnuncioAgenda;
+use App\Models\AnuncioReaccion;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 
 new class extends Component {
     public string $fechaSeleccionada;
     public string $filtroTemporal = 'semana';
+
+    // Tablón de Anuncios
+    public bool $modalAnuncio = false;
+    public ?int $anuncioIdEditando = null;
+    public string $tituloAnuncio = '';
+    public string $cuerpoAnuncio = '';
+    public string $colorAnuncio = 'blue';
+    public string $iconoAnuncio = 'megaphone';
 
     public function setFiltro($filtro)
     {
@@ -25,6 +35,135 @@ new class extends Component {
 
         if (session()->has('success')) {
             \Flux\Flux::toast(session('success'), variant: 'success');
+        }
+    }
+
+    public function puedeEscribirMensajes(): bool
+    {
+        $user = auth()->user();
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->hasRole('superadmin')) {
+            return true;
+        }
+
+        $schoolId = $user->current_school_id;
+        if ($schoolId) {
+            app(\Spatie\Permission\PermissionRegistrar::class)->setPermissionsTeamId($schoolId);
+        }
+
+        return $user->hasPermissionTo('escribir-mensajes-agenda');
+    }
+
+    public function abrirModalNuevoAnuncio(): void
+    {
+        if (! $this->puedeEscribirMensajes()) {
+            abort(403, 'No tienes permiso para publicar mensajes en la agenda.');
+        }
+
+        $this->anuncioIdEditando = null;
+        $this->tituloAnuncio = '';
+        $this->cuerpoAnuncio = '';
+        $this->colorAnuncio = 'blue';
+        $this->iconoAnuncio = 'megaphone';
+        $this->modalAnuncio = true;
+    }
+
+    public function editarAnuncio(int $id): void
+    {
+        $anuncio = AnuncioAgenda::where('school_id', auth()->user()->current_school_id)->findOrFail($id);
+
+        if (! $this->puedeEscribirMensajes() && $anuncio->user_id !== auth()->id()) {
+            abort(403, 'No tienes permiso para editar este anuncio.');
+        }
+
+        $this->anuncioIdEditando = $anuncio->id;
+        $this->tituloAnuncio = $anuncio->titulo;
+        $this->cuerpoAnuncio = $anuncio->cuerpo;
+        $this->colorAnuncio = $anuncio->color ?? 'blue';
+        $this->iconoAnuncio = $anuncio->icono ?? 'megaphone';
+        $this->modalAnuncio = true;
+    }
+
+    public function guardarAnuncio(): void
+    {
+        if (! $this->puedeEscribirMensajes()) {
+            abort(403, 'No tienes permiso para publicar mensajes.');
+        }
+
+        $this->validate([
+            'tituloAnuncio' => 'required|string|min:3|max:120',
+            'cuerpoAnuncio' => 'required|string|min:5|max:1000',
+            'colorAnuncio' => 'required|in:blue,amber,emerald,purple,rose',
+        ], [
+            'tituloAnuncio.required' => 'Ingrese el título del anuncio.',
+            'cuerpoAnuncio.required' => 'Ingrese el mensaje o cuerpo del anuncio.',
+        ]);
+
+        if ($this->anuncioIdEditando) {
+            $anuncio = AnuncioAgenda::where('school_id', auth()->user()->current_school_id)->findOrFail($this->anuncioIdEditando);
+            $anuncio->update([
+                'titulo' => $this->tituloAnuncio,
+                'cuerpo' => $this->cuerpoAnuncio,
+                'color' => $this->colorAnuncio,
+                'icono' => $this->iconoAnuncio,
+            ]);
+            \Flux\Flux::toast('Anuncio actualizado correctamente.', variant: 'success');
+        } else {
+            AnuncioAgenda::create([
+                'school_id' => auth()->user()->current_school_id,
+                'user_id' => auth()->id(),
+                'titulo' => $this->tituloAnuncio,
+                'cuerpo' => $this->cuerpoAnuncio,
+                'color' => $this->colorAnuncio,
+                'icono' => $this->iconoAnuncio,
+                'activo' => true,
+            ]);
+            \Flux\Flux::toast('Anuncio publicado en el tablón.', variant: 'success');
+        }
+
+        $this->modalAnuncio = false;
+    }
+
+    public function eliminarAnuncio(int $id): void
+    {
+        $anuncio = AnuncioAgenda::where('school_id', auth()->user()->current_school_id)->findOrFail($id);
+
+        if (! $this->puedeEscribirMensajes() && $anuncio->user_id !== auth()->id()) {
+            abort(403, 'No tienes permiso para eliminar este anuncio.');
+        }
+
+        $anuncio->delete();
+        \Flux\Flux::toast('Anuncio eliminado del tablón.', variant: 'warning');
+    }
+
+    public function reaccionarAnuncio(int $anuncioId, string $emoji): void
+    {
+        $userId = auth()->id();
+        if (! $userId) {
+            return;
+        }
+
+        $anuncio = AnuncioAgenda::where('school_id', auth()->user()->current_school_id)->find($anuncioId);
+        if (! $anuncio) {
+            return;
+        }
+
+        $existing = AnuncioReaccion::where('anuncio_agenda_id', $anuncioId)
+            ->where('user_id', $userId)
+            ->where('reaction', $emoji)
+            ->first();
+
+        if ($existing) {
+            $existing->delete();
+        } else {
+            AnuncioReaccion::create([
+                'anuncio_agenda_id' => $anuncioId,
+                'user_id' => $userId,
+                'reaction' => $emoji,
+            ]);
         }
     }
 
@@ -66,6 +205,13 @@ new class extends Component {
         $totalMes = $entrevistasMes->count();
         $realizadas = $entrevistasMes->where('estado', 'realizada')->count();
 
+        // Anuncios del Tablón
+        $anuncios = AnuncioAgenda::with(['user', 'reacciones'])
+            ->where('school_id', auth()->user()->current_school_id)
+            ->where('activo', true)
+            ->orderBy('created_at', 'desc')
+            ->get();
+
         return [
             'entrevistasLista' => $entrevistasLista,
             'tituloLista' => $tituloLista,
@@ -73,6 +219,7 @@ new class extends Component {
             'user' => $user,
             'realizadas' => $realizadas,
             'totalMes' => $totalMes,
+            'anuncios' => $anuncios,
         ];
     }
 };
@@ -250,7 +397,7 @@ new class extends Component {
                 @endif
             </div>
 
-            <!-- Stats & Mini Widgets (Columna 4/12) -->
+            <!-- Stats, Calendar & Tablón de Anuncios (Columna 4/12) -->
             <div class="xl:col-span-4 space-y-8">
 
                 <!-- Resumen Semanal -->
@@ -285,7 +432,215 @@ new class extends Component {
                     <flux:calendar wire:model.live="fechaSeleccionada" />
                 </flux:card>
 
+                <!-- Tablón de Anuncios y Mensajes de Estado (Debajo del Calendario) -->
+                <div wire:poll.10s class="space-y-4 pt-2">
+                    <style>
+                        @keyframes popNoticeEntry {
+                            0% {
+                                opacity: 0;
+                                transform: translateY(-20px) scale(0.92);
+                                filter: brightness(1.2);
+                            }
+                            60% {
+                                transform: translateY(4px) scale(1.02);
+                                filter: brightness(1);
+                            }
+                            100% {
+                                opacity: 1;
+                                transform: translateY(0) scale(1);
+                                filter: brightness(1);
+                            }
+                        }
+                        .animate-notice-card {
+                            animation: popNoticeEntry 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                        }
+                    </style>
+
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <div class="relative flex h-3 w-3">
+                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-3 w-3 bg-blue-600"></span>
+                            </div>
+                            <h4 class="font-extrabold text-[#00376e] dark:text-blue-300 text-base flex items-center gap-1.5">
+                                Anuncios
+                            </h4>
+                        </div>
+
+                        @if($this->puedeEscribirMensajes())
+                            <flux:button size="xs" variant="primary" icon="plus" wire:click="abrirModalNuevoAnuncio" class="bg-gradient-to-r from-[#00376e] to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold shadow-sm">
+                                Nuevo Aviso
+                            </flux:button>
+                        @endif
+                    </div>
+
+                    @php
+                        $colorClasses = [
+                            'blue' => 'from-blue-500/10 via-blue-500/5 to-transparent border-blue-200 dark:border-blue-800/60 text-blue-900 dark:text-blue-100',
+                            'amber' => 'from-amber-500/10 via-amber-500/5 to-transparent border-amber-200 dark:border-amber-800/60 text-amber-900 dark:text-amber-100',
+                            'emerald' => 'from-emerald-500/10 via-emerald-500/5 to-transparent border-emerald-200 dark:border-emerald-800/60 text-emerald-900 dark:text-emerald-100',
+                            'purple' => 'from-purple-500/10 via-purple-500/5 to-transparent border-purple-200 dark:border-purple-800/60 text-purple-900 dark:text-purple-100',
+                            'rose' => 'from-rose-500/10 via-rose-500/5 to-transparent border-rose-200 dark:border-rose-800/60 text-rose-900 dark:text-rose-100',
+                        ];
+                        $badgeColors = [
+                            'blue' => 'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800',
+                            'amber' => 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+                            'emerald' => 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+                            'purple' => 'bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800',
+                            'rose' => 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800',
+                        ];
+                        $stickers = ['👍', '❤️', '🚀', '👏', '💡'];
+                        $userId = auth()->id();
+                    @endphp
+
+                    <div class="space-y-3">
+                        @forelse($anuncios as $index => $anuncio)
+                            @php
+                                $esNuevo = \Carbon\Carbon::parse($anuncio->created_at)->greaterThan(now('America/Santiago')->subMinutes(30));
+                            @endphp
+                            <div 
+                                wire:key="anuncio-card-{{ $anuncio->id }}"
+                                class="animate-notice-card group relative rounded-2xl bg-gradient-to-br {{ $colorClasses[$anuncio->color] ?? $colorClasses['blue'] }} bg-white dark:bg-zinc-900 border p-4 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 overflow-hidden"
+                                style="animation-delay: {{ $index * 0.08 }}s;"
+                            >
+                                {{-- Decoración superior animada --}}
+                                <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 group-hover:h-1.5 transition-all"></div>
+
+                                <div class="flex items-start justify-between gap-2 mb-2">
+                                    <div class="flex items-center gap-2">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold border uppercase tracking-wider {{ $badgeColors[$anuncio->color] ?? $badgeColors['blue'] }}">
+                                            📢 Aviso
+                                        </span>
+                                        @if($esNuevo)
+                                            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-extrabold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 uppercase tracking-widest animate-pulse">
+                                                <span class="relative flex h-1.5 w-1.5">
+                                                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                                    <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                                                </span>
+                                                ¡Nuevo!
+                                            </span>
+                                        @endif
+                                    </div>
+
+                                    @if($this->puedeEscribirMensajes() || $anuncio->user_id === auth()->id())
+                                        <div class="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                                            <button type="button" wire:click="editarAnuncio({{ $anuncio->id }})" class="text-zinc-400 hover:text-blue-600 p-1 cursor-pointer" title="Editar aviso">
+                                                <flux:icon.pencil-square class="size-3.5" />
+                                            </button>
+                                            <button type="button" wire:confirm="¿Seguro que deseas eliminar este aviso?" wire:click="eliminarAnuncio({{ $anuncio->id }})" class="text-zinc-400 hover:text-red-600 p-1 cursor-pointer" title="Eliminar aviso">
+                                                <flux:icon.trash class="size-3.5" />
+                                            </button>
+                                        </div>
+                                    @endif
+                                </div>
+
+                                <h5 class="font-bold text-sm text-zinc-900 dark:text-zinc-100 mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                    {{ $anuncio->titulo }}
+                                </h5>
+
+                                <p class="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed whitespace-pre-line">
+                                    {{ $anuncio->cuerpo }}
+                                </p>
+
+                                {{-- Fila de Stickers / Reacciones Interactivas --}}
+                                <div class="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800/60 flex items-center gap-1.5 flex-wrap">
+                                    @foreach($stickers as $emoji)
+                                        @php
+                                            $reaccionesEmoji = $anuncio->reacciones->where('reaction', $emoji);
+                                            $count = $reaccionesEmoji->count();
+                                            $userReacted = $reaccionesEmoji->where('user_id', $userId)->count() > 0;
+                                        @endphp
+                                        <button 
+                                            type="button" 
+                                            wire:click="reaccionarAnuncio({{ $anuncio->id }}, '{{ $emoji }}')"
+                                            class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all duration-200 cursor-pointer active:scale-95 hover:scale-110 {{ $userReacted ? 'bg-blue-100 dark:bg-blue-900/60 border-blue-400 dark:border-blue-600 text-blue-900 dark:text-blue-100 font-bold shadow-sm' : 'bg-zinc-50 dark:bg-zinc-800/60 border-zinc-200 dark:border-zinc-700/80 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800' }}"
+                                            title="Reaccionar con {{ $emoji }}"
+                                        >
+                                            <span class="text-sm select-none">{{ $emoji }}</span>
+                                            @if($count > 0)
+                                                <span class="text-[11px] font-extrabold {{ $userReacted ? 'text-blue-700 dark:text-blue-300' : 'text-zinc-500 dark:text-zinc-400' }}">{{ $count }}</span>
+                                            @endif
+                                        </button>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @empty
+                            <div class="text-center p-6 bg-gradient-to-b from-zinc-50 to-white dark:from-zinc-900/50 dark:to-zinc-900 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800 space-y-2">
+                                <div class="inline-flex items-center justify-center size-10 rounded-full bg-blue-50 dark:bg-blue-950 text-blue-500 mb-1 animate-bounce">
+                                    <flux:icon.megaphone class="size-5" />
+                                </div>
+                                <h5 class="text-xs font-bold text-zinc-600 dark:text-zinc-400">Sin mensajes en el tablón</h5>
+                                <p class="text-[11px] text-zinc-400 max-w-xs mx-auto">
+                                    Aquí aparecerán las notas y anuncios de estado para la agenda institucional.
+                                </p>
+                                @if($this->puedeEscribirMensajes())
+                                    <button type="button" wire:click="abrirModalNuevoAnuncio" class="mt-2 inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 underline cursor-pointer">
+                                        <flux:icon.plus class="size-3" /> Publicar primer mensaje
+                                    </button>
+                                @endif
+                            </div>
+                        @endforelse
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>
+
+    <!-- Modal Publicar/Editar Anuncio en Tablón -->
+    <flux:modal wire:model="modalAnuncio" class="md:w-[30rem]">
+        <div class="space-y-6">
+            <div>
+                <flux:heading size="lg" class="flex items-center gap-2">
+                    <flux:icon.megaphone class="size-5 text-[#00376e]" />
+                    {{ $anuncioIdEditando ? 'Editar Mensaje de Estado' : 'Publicar Nuevo Anuncio' }}
+                </flux:heading>
+                <flux:text class="mt-1 text-xs">Escribe un aviso informativo que se mostrará destacado en la agenda del establecimiento.</flux:text>
+            </div>
+
+            <form wire:submit.prevent="guardarAnuncio" class="space-y-4">
+                <flux:input wire:model="tituloAnuncio" label="Título del Aviso" placeholder="Ej: Recordatorio Reunión de Apoderados / Box 3 no disponible" required />
+                <flux:error name="tituloAnuncio" />
+
+                <flux:textarea wire:model="cuerpoAnuncio" label="Mensaje o Cuerpo del Texto" rows="4" placeholder="Escribe el detalle del anuncio..." required />
+                <flux:error name="cuerpoAnuncio" />
+
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Color Destacado:</label>
+                    <div class="grid grid-cols-5 gap-2">
+                        <label class="flex flex-col items-center gap-1 p-2 rounded-xl border cursor-pointer {{ $colorAnuncio === 'blue' ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/40' : 'border-zinc-200 dark:border-zinc-800' }}">
+                            <input type="radio" wire:model.live="colorAnuncio" value="blue" class="sr-only" />
+                            <span class="size-4 rounded-full bg-blue-500"></span>
+                            <span class="text-[10px] font-bold text-zinc-600 dark:text-zinc-400">Azul</span>
+                        </label>
+                        <label class="flex flex-col items-center gap-1 p-2 rounded-xl border cursor-pointer {{ $colorAnuncio === 'amber' ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/40' : 'border-zinc-200 dark:border-zinc-800' }}">
+                            <input type="radio" wire:model.live="colorAnuncio" value="amber" class="sr-only" />
+                            <span class="size-4 rounded-full bg-amber-500"></span>
+                            <span class="text-[10px] font-bold text-zinc-600 dark:text-zinc-400">Ámbar</span>
+                        </label>
+                        <label class="flex flex-col items-center gap-1 p-2 rounded-xl border cursor-pointer {{ $colorAnuncio === 'emerald' ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40' : 'border-zinc-200 dark:border-zinc-800' }}">
+                            <input type="radio" wire:model.live="colorAnuncio" value="emerald" class="sr-only" />
+                            <span class="size-4 rounded-full bg-emerald-500"></span>
+                            <span class="text-[10px] font-bold text-zinc-600 dark:text-zinc-400">Verde</span>
+                        </label>
+                        <label class="flex flex-col items-center gap-1 p-2 rounded-xl border cursor-pointer {{ $colorAnuncio === 'purple' ? 'border-purple-500 bg-purple-50 dark:bg-purple-950/40' : 'border-zinc-200 dark:border-zinc-800' }}">
+                            <input type="radio" wire:model.live="colorAnuncio" value="purple" class="sr-only" />
+                            <span class="size-4 rounded-full bg-purple-500"></span>
+                            <span class="text-[10px] font-bold text-zinc-600 dark:text-zinc-400">Morado</span>
+                        </label>
+                        <label class="flex flex-col items-center gap-1 p-2 rounded-xl border cursor-pointer {{ $colorAnuncio === 'rose' ? 'border-rose-500 bg-rose-50 dark:bg-rose-950/40' : 'border-zinc-200 dark:border-zinc-800' }}">
+                            <input type="radio" wire:model.live="colorAnuncio" value="rose" class="sr-only" />
+                            <span class="size-4 rounded-full bg-rose-500"></span>
+                            <span class="text-[10px] font-bold text-zinc-600 dark:text-zinc-400">Rosa</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                    <flux:button wire:click="$set('modalAnuncio', false)" variant="ghost">Cancelar</flux:button>
+                    <flux:button type="submit" variant="primary" icon="check">{{ $anuncioIdEditando ? 'Guardar Cambios' : 'Publicar Anuncio' }}</flux:button>
+                </div>
+            </form>
+        </div>
+    </flux:modal>
 </div>

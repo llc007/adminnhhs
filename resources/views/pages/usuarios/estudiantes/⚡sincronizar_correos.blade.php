@@ -482,6 +482,12 @@ new #[Title('Sincronización de Correos')] class extends Component {
             $nomApod = $colNomApod !== null ? trim($row[$colNomApod] ?? '') : '';
             $patApod = $colPatApod !== null ? trim($row[$colPatApod] ?? '') : '';
             $matApod = $colMatApod !== null ? trim($row[$colMatApod] ?? '') : '';
+
+            $apodNombreCompleto = trim(preg_replace('/\s+/', ' ', "{$nomApod} {$patApod} {$matApod}"));
+            if (empty($apodNombreCompleto)) {
+                $apodNombreCompleto = $nomApod;
+            }
+
             $rutApodNum = $colRutApod !== null ? preg_replace('/\D/', '', $row[$colRutApod] ?? '') : '';
             $rutApodDv = $colDvApod !== null ? strtoupper(trim($row[$colDvApod] ?? '')) : '';
             $emailApod = $colEmailApod !== null ? trim($row[$colEmailApod] ?? '') : '';
@@ -503,7 +509,7 @@ new #[Title('Sincronización de Correos')] class extends Component {
                 'nombre_completo' => mb_strtoupper($nombreCompleto, 'UTF-8'),
                 'curso_raw' => $cursoRaw,
                 'auto_curso_id' => $autoCursoId,
-                'apoderado_nombres' => mb_strtoupper($nomApod, 'UTF-8'),
+                'apoderado_nombres' => mb_strtoupper($apodNombreCompleto, 'UTF-8'),
                 'apoderado_apellido_pat' => mb_strtoupper($patApod, 'UTF-8'),
                 'apoderado_apellido_mat' => mb_strtoupper($matApod, 'UTF-8'),
                 'apoderado_rut_numero' => $rutApodNum ?: null,
@@ -1217,10 +1223,10 @@ new #[Title('Sincronización de Correos')] class extends Component {
                                             <p class="font-bold text-zinc-900 dark:text-zinc-100 uppercase text-xs">
                                                 {{ $item['nombre'] }}
                                             </p>
-                                            @if (!empty($item['fc_data']['apoderado_nombres']) || !empty($item['fc_data']['apoderado_apellido_pat']))
+                                            @if (!empty($item['fc_data']['apoderado_nombres']))
                                                 <p class="text-[11px] text-zinc-500 mt-1">
                                                     <span class="font-semibold text-zinc-700 dark:text-zinc-300">Apoderado:</span> 
-                                                    {{ trim($item['fc_data']['apoderado_nombres'] . ' ' . $item['fc_data']['apoderado_apellido_pat'] . ' ' . $item['fc_data']['apoderado_apellido_mat']) }}
+                                                    {{ $item['fc_data']['apoderado_nombres'] }}
                                                     @if(!empty($item['fc_data']['apoderado_telefono']))
                                                         ({{ $item['fc_data']['apoderado_telefono'] }})
                                                     @endif

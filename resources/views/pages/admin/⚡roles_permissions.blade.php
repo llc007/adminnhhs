@@ -23,6 +23,8 @@ new #[Title('Roles y Permisos')] class extends Component
             'cancelar-entrevistas' => 'Cancelar entrevistas agendadas',
             'eliminar-entrevistas' => 'Eliminar o borrar registros de entrevistas',
             'ingresar-apoderado' => 'Registrar ingreso/salida de portería (Acceso)',
+            'ver-entrevistas-confidenciales' => 'Ver y consultar entrevistas confidenciales / privadas (Equipo Psicosocial)',
+            'crear-entrevistas-confidenciales' => 'Crear entrevistas confidenciales / privadas (Equipo Psicosocial)',
             'escribir-mensajes-agenda' => 'Escribir mensajes y publicar en la sección Anuncios de la Agenda',
         ],
         'Estudiantes' => [

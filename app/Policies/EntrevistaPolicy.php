@@ -20,17 +20,31 @@ class EntrevistaPolicy
      */
     public function view(User $user, Entrevista $entrevista): bool
     {
-        // Solo superadmin puede ver TODAS las bitácoras sin permiso explícito
+        // 1. Superadmin siempre tiene acceso ilimitado
         if ($user->hasRole('superadmin')) {
             return true;
         }
 
-        // Si tiene el permiso global para ver todas las bitácoras
+        // 2. Creador de la entrevista siempre puede verla
+        if ($user->id === $entrevista->user_id) {
+            return true;
+        }
+
+        // 3. Usuario con acceso explícitamente compartido
+        if ($entrevista->accesosCompartidos()->where('user_id', $user->id)->exists()) {
+            return true;
+        }
+
+        // 4. Si la entrevista es CONFIDENCIAL / PRIVADA (Equipo Psicosocial)
+        if ($entrevista->es_confidencial) {
+            return $user->can('ver-entrevistas-confidenciales') || $user->hasRole('psicosocial');
+        }
+
+        // 5. Entrevistas normales según permisos globales
         if ($user->can('ver-bitacoras')) {
             return true;
         }
 
-        // El creador puede ver su propia entrevista solo si tiene asignado el permiso correspondiente
         if ($user->can('ver-entrevistas-propias') && $user->id === $entrevista->user_id) {
             return true;
         }
@@ -43,25 +57,40 @@ class EntrevistaPolicy
      */
     public function create(User $user): bool
     {
-        return $user->can('crear-entrevistas') || $user->hasRole('superadmin');
+        return $user->can('crear-entrevistas') || $user->hasRole(['superadmin', 'psicosocial']);
     }
 
     /**
-     * Determine whether the user can update the model (llenar bitacora).
+     * Determine whether the user can update the model (llenar o editar bitácora).
+     * Solo el creador de la cita y superadmin tienen permiso de edición.
      */
     public function update(User $user, Entrevista $entrevista): bool
     {
-        // Solo superadmin puede editar cualquier bitácora sin permiso explícito
         if ($user->hasRole('superadmin')) {
             return true;
         }
 
-        // Solo el creador puede llenar o editar su propia bitácora si tiene el permiso asignado
-        if ($user->can('ver-entrevistas-propias') && $user->id === $entrevista->user_id) {
+        return $user->id === $entrevista->user_id;
+    }
+
+    /**
+     * Determine whether the user can share access to the entrevista.
+     */
+    public function share(User $user, Entrevista $entrevista): bool
+    {
+        if ($user->hasRole('superadmin')) {
             return true;
         }
 
-        return false;
+        if ($user->id === $entrevista->user_id) {
+            return true;
+        }
+
+        if ($entrevista->es_confidencial) {
+            return $user->can('ver-entrevistas-confidenciales') || $user->hasRole('psicosocial');
+        }
+
+        return $user->can('ver-bitacoras');
     }
 
     /**
@@ -77,7 +106,6 @@ class EntrevistaPolicy
      */
     public function export(User $user): bool
     {
-        // Solo administradores (o superadmin) pueden exportar
         return $user->hasRole('superadmin') || $user->can('ver-entrevistas-general');
     }
 }

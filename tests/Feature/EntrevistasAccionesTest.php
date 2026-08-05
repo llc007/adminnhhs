@@ -285,3 +285,25 @@ test('interviews with exit recorded move to the bottom of the reception list', f
 
     expect($pos2)->toBeLessThan($pos1);
 });
+
+test('recepcionista can revert entry and return interview to pending state', function () {
+    [$user, $entrevista] = setupTestEnvironment();
+
+    $entrevista->update([
+        'estado' => 'ingresada',
+        'lugar' => 'BOX 2',
+        'hora_llegada' => '10:15:00',
+        'mensaje_recepcion' => 'Apoderado presente',
+    ]);
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::entrevistas.recepcion')
+        ->call('revertirIngreso', $entrevista->id);
+
+    $entrevista->refresh();
+    expect($entrevista->estado)->toBe('pendiente');
+    expect($entrevista->hora_llegada)->toBeNull();
+    expect($entrevista->mensaje_recepcion)->toBeNull();
+    expect($entrevista->lugar)->toBeNull();
+});

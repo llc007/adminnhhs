@@ -172,9 +172,29 @@ new class extends Component {
         $user = Auth::user() ?? User::first();
         $dateObj = Carbon::parse($this->fechaSeleccionada);
 
-        // Buscar TODAS las entrevistas del MES (Para métricas)
+        $userId = $user->id;
+        $canGeneral = $user->can('ver-entrevistas-general') || $user->can('ver-bitacoras');
+        $canConfidenciales = $user->can('ver-entrevistas-confidenciales') || $user->hasRole('psicosocial');
+
+        // Buscar TODAS las entrevistas del MES (Para métricas y agenda)
         $entrevistasMes = Entrevista::with(['estudiante.curso'])
-            ->where('user_id', $user->id)
+            ->where('school_id', $user->current_school_id)
+            ->where(function ($q) use ($userId, $user, $canGeneral, $canConfidenciales) {
+                if (! $user->hasRole('superadmin')) {
+                    $q->where('user_id', $userId)
+                        ->orWhereHas('accesosCompartidos', function ($sub) use ($userId) {
+                            $sub->where('user_id', $userId);
+                        });
+
+                    if ($canGeneral) {
+                        $q->orWhere('es_confidencial', false);
+                    }
+
+                    if ($canConfidenciales) {
+                        $q->orWhere('es_confidencial', true);
+                    }
+                }
+            })
             ->whereMonth('fecha', $dateObj->month)
             ->whereYear('fecha', $dateObj->year)
             ->orderBy('fecha', 'asc')
@@ -340,6 +360,14 @@ new class extends Component {
                                 <div class="flex items-center gap-3 mb-1">
                                     <h4 class="font-bold text-zinc-900 dark:text-zinc-100">
                                         {{ $cita->estudiante->nombreCompleto() ?? 'Sin nombre' }}</h4>
+
+                                    @if ($cita->es_confidencial)
+                                        <flux:badge color="purple" size="sm">🔒 Confidencial</flux:badge>
+                                    @endif
+
+                                    @if ($cita->user_id !== auth()->id())
+                                        <flux:badge color="indigo" size="sm">🤝 Compartida</flux:badge>
+                                    @endif
 
                                     @if ($cita->estado === 'pendiente')
                                         <flux:badge color="amber" size="sm">Pendiente</flux:badge>

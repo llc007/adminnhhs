@@ -107,17 +107,37 @@ new class extends Component {
         $query = Entrevista::with(['estudiante.curso', 'user'])
             ->where('school_id', auth()->user()->current_school_id);
 
-        if (auth()->user()->hasRole('estudiante')) {
-            $estudiante = \App\Models\Estudiante::where('user_id', auth()->id())->first();
+        $user = auth()->user();
+
+        if ($user->hasRole('estudiante')) {
+            $estudiante = \App\Models\Estudiante::where('user_id', $user->id)->first();
             if ($estudiante) {
                 $query->where('estudiante_id', $estudiante->id);
             } else {
                 $query->whereRaw('1 = 0');
             }
-        } elseif (! auth()->user()->hasRole('superadmin')) {
-            if (! auth()->user()->can('ver-entrevistas-general') && auth()->user()->can('ver-entrevistas-propias')) {
-                $query->where('user_id', auth()->id());
-            }
+        } elseif (! $user->hasRole('superadmin')) {
+            $userId = $user->id;
+            $canGeneral = $user->can('ver-entrevistas-general') || $user->can('ver-bitacoras');
+            $canConfidenciales = $user->can('ver-entrevistas-confidenciales') || $user->hasRole('psicosocial');
+
+            $query->where(function ($q) use ($userId, $canGeneral, $canConfidenciales) {
+                // Mis entrevistas creadas o explícitamente compartidas conmigo
+                $q->where('user_id', $userId)
+                    ->orWhereHas('accesosCompartidos', function ($sub) use ($userId) {
+                        $sub->where('user_id', $userId);
+                    });
+
+                // Entrevistas públicas si tiene permiso general
+                if ($canGeneral) {
+                    $q->orWhere('es_confidencial', false);
+                }
+
+                // Entrevistas confidenciales si tiene permiso psicosocial
+                if ($canConfidenciales) {
+                    $q->orWhere('es_confidencial', true);
+                }
+            });
         }
 
         if (! empty($this->search)) {

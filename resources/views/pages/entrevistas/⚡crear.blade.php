@@ -24,6 +24,131 @@ new class extends Component {
     // Notificaciones configurables por el usuario
     public bool $notificarApoderado = true;
     public bool $notificarEstudiante = true;
+    public bool $esConfidencial = false;
+
+    // Mantenedor de categorías (Superadmin / Administrador)
+    public bool $modalCategorias = false;
+    public string $nuevaCategoriaNombre = '';
+    public string $nuevaCategoriaDesc = '';
+    public ?int $editingCategoriaId = null;
+
+    #[\Livewire\Attributes\Computed]
+    public function categorias()
+    {
+        $schoolId = auth()->user()->current_school_id;
+        $categorias = \App\Models\CategoriaEntrevista::where('school_id', $schoolId)
+            ->where('activo', true)
+            ->orderBy('nombre', 'asc')
+            ->get();
+
+        if ($categorias->isEmpty()) {
+            $defaultCategories = [
+                'Rendimiento Académico',
+                'Conducta y Convivencia',
+                'Asistencia y Puntualidad',
+                'Asunto Personal / Familiar',
+                'Evaluación Psicopedagógica',
+                'Otro',
+            ];
+            foreach ($defaultCategories as $nombre) {
+                \App\Models\CategoriaEntrevista::create([
+                    'school_id' => $schoolId,
+                    'nombre' => $nombre,
+                    'activo' => true,
+                ]);
+            }
+            $categorias = \App\Models\CategoriaEntrevista::where('school_id', $schoolId)
+                ->where('activo', true)
+                ->orderBy('nombre', 'asc')
+                ->get();
+        }
+
+        return $categorias;
+    }
+
+    #[\Livewire\Attributes\Computed]
+    public function esAdmin()
+    {
+        return auth()->user()->hasRole(['superadmin', 'administrador']);
+    }
+
+    public function abrirModalCategorias()
+    {
+        if (! $this->esAdmin) {
+            abort(403, 'No tienes permiso para gestionar categorías.');
+        }
+
+        $this->reset(['nuevaCategoriaNombre', 'nuevaCategoriaDesc', 'editingCategoriaId']);
+        $this->modalCategorias = true;
+    }
+
+    public function guardarCategoria()
+    {
+        if (! $this->esAdmin) {
+            abort(403, 'No tienes permiso para efectuar esta acción.');
+        }
+
+        $this->validate([
+            'nuevaCategoriaNombre' => 'required|string|min:2|max:100',
+        ], [
+            'nuevaCategoriaNombre.required' => 'Ingrese el nombre de la categoría.',
+            'nuevaCategoriaNombre.min' => 'El nombre debe tener al menos 2 caracteres.',
+        ]);
+
+        $schoolId = auth()->user()->current_school_id;
+
+        if ($this->editingCategoriaId) {
+            $cat = \App\Models\CategoriaEntrevista::where('school_id', $schoolId)->find($this->editingCategoriaId);
+            if ($cat) {
+                $cat->update([
+                    'nombre' => trim($this->nuevaCategoriaNombre),
+                    'descripcion' => trim($this->nuevaCategoriaDesc) ?: null,
+                ]);
+                \Flux::toast('Categoría actualizada exitosamente.', variant: 'success');
+            }
+        } else {
+            $nuevaCat = \App\Models\CategoriaEntrevista::create([
+                'school_id' => $schoolId,
+                'nombre' => trim($this->nuevaCategoriaNombre),
+                'descripcion' => trim($this->nuevaCategoriaDesc) ?: null,
+                'activo' => true,
+            ]);
+            $this->motivo = $nuevaCat->nombre;
+            \Flux::toast('Categoría agregada exitosamente.', variant: 'success');
+        }
+
+        $this->reset(['nuevaCategoriaNombre', 'nuevaCategoriaDesc', 'editingCategoriaId']);
+        unset($this->categorias);
+    }
+
+    public function editarCategoria($id)
+    {
+        if (! $this->esAdmin) {
+            abort(403, 'No tienes permiso para efectuar esta acción.');
+        }
+
+        $cat = \App\Models\CategoriaEntrevista::where('school_id', auth()->user()->current_school_id)->find($id);
+        if ($cat) {
+            $this->editingCategoriaId = $cat->id;
+            $this->nuevaCategoriaNombre = $cat->nombre;
+            $this->nuevaCategoriaDesc = $cat->descripcion ?? '';
+        }
+    }
+
+    public function eliminarCategoria($id)
+    {
+        if (! $this->esAdmin) {
+            abort(403, 'No tienes permiso para efectuar esta acción.');
+        }
+
+        $cat = \App\Models\CategoriaEntrevista::where('school_id', auth()->user()->current_school_id)->find($id);
+        if ($cat) {
+            $cat->delete();
+            \Flux::toast('Categoría eliminada.', variant: 'warning');
+        }
+
+        unset($this->categorias);
+    }
 
     public function updatedSearchEstudiante()
     {
@@ -186,6 +311,7 @@ new class extends Component {
             'motivo' => $this->motivo,
             'notas_previas' => $this->notas,
             'estado' => 'pendiente',
+            'es_confidencial' => $this->puedeCrearConfidencial ? $this->esConfidencial : false,
         ]);
 
         // Enviar notificación al Docente (usamos auth()->user() o el owner de la cita)
@@ -224,10 +350,20 @@ new class extends Component {
         return $this->redirect($targetRoute, navigate: true);
     }
 
+    #[\Livewire\Attributes\Computed]
+    public function puedeCrearConfidencial(): bool
+    {
+        return auth()->user()->hasRole(['superadmin', 'psicosocial']) || auth()->user()->can('crear-entrevistas-confidenciales');
+    }
+
     public function mount()
     {
         if (!auth()->user()->can('crear-entrevistas') && !auth()->user()->hasRole('superadmin')) {
             abort(403, 'No tienes permiso para acceder a esta página.');
+        }
+
+        if ($this->puedeCrearConfidencial) {
+            $this->esConfidencial = true;
         }
 
         // Preseleccionar fecha a hoy en zona horaria de Chile
@@ -470,28 +606,28 @@ new class extends Component {
                 </flux:card>
 
                 <flux:card>
-                    <div class="flex items-center gap-3 mb-6">
-                        <div
-                            class="p-2 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg text-emerald-600 dark:text-emerald-400">
-                            <flux:icon.chat-bubble-bottom-center-text class="size-5" />
+                    <div class="flex items-center justify-between mb-6">
+                        <div class="flex items-center gap-3">
+                            <div
+                                class="p-2 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg text-emerald-600 dark:text-emerald-400">
+                                <flux:icon.chat-bubble-bottom-center-text class="size-5" />
+                            </div>
+                            <flux:heading size="lg">{{ __('Motivo de la Entrevista') }}</flux:heading>
                         </div>
-                        <flux:heading size="lg">{{ __('Motivo de la Entrevista') }}</flux:heading>
+
+                        @if($this->esAdmin)
+                            <flux:button type="button" variant="subtle" size="xs" wire:click="abrirModalCategorias" icon="cog-6-tooth" class="font-bold text-emerald-700 dark:text-emerald-300">
+                                {{ __('Mantenedor Categorías') }}
+                            </flux:button>
+                        @endif
                     </div>
 
                     <div class="space-y-6">
                         <flux:select wire:model="motivo" :label="__('Categoría Principal')">
                             <flux:select.option value="">{{ __('Seleccione un motivo') }}</flux:select.option>
-                            <flux:select.option value="rendimiento">{{ __('Rendimiento Académico') }}
-                            </flux:select.option>
-                            <flux:select.option value="conducta">{{ __('Conducta y Convivencia') }}
-                            </flux:select.option>
-                            <flux:select.option value="asistencia">{{ __('Asistencia y Puntualidad') }}
-                            </flux:select.option>
-                            <flux:select.option value="personal">{{ __('Asunto Personal / Familiar') }}
-                            </flux:select.option>
-                            <flux:select.option value="psicopedagogico">{{ __('Evaluación Psicopedagógica') }}
-                            </flux:select.option>
-                            <flux:select.option value="otro">{{ __('Otro') }}</flux:select.option>
+                            @foreach($this->categorias as $cat)
+                                <flux:select.option value="{{ $cat->nombre }}">{{ $cat->nombre }}</flux:select.option>
+                            @endforeach
                         </flux:select>
 
                         <flux:textarea wire:model="notas" :label="__('Observaciones Adicionales (Opcional)')"
@@ -520,6 +656,22 @@ new class extends Component {
                         <flux:radio value="online" label="Online (Videollamada)" />
                     </flux:radio.group>
                 </flux:card>
+
+                @if ($this->puedeCrearConfidencial)
+                    <flux:card class="bg-purple-50/60 dark:bg-purple-950/20 border-purple-200 dark:border-purple-800">
+                        <flux:field variant="inline">
+                            <flux:switch wire:model="esConfidencial" />
+                            <div>
+                                <flux:label class="font-bold text-purple-950 dark:text-purple-300 flex items-center gap-1.5">
+                                    🔒 Entrevista Confidencial / Privada
+                                </flux:label>
+                                <flux:description class="text-xs text-purple-800 dark:text-purple-400">
+                                    {{ __('Solo tú, los miembros del Equipo Psicosocial y las personas a quienes les compartas acceso podrán consultar esta cita y su bitácora.') }}
+                                </flux:description>
+                            </div>
+                        </flux:field>
+                    </flux:card>
+                @endif
 
                 {{-- Preview de Box (Informativo, más adelante se asignará) --}}
                 <div
@@ -596,4 +748,68 @@ new class extends Component {
             </div>
         </div>
     </flux:modal>
+
+    {{-- Modal Mantenedor de Categorías --}}
+    @if($this->esAdmin)
+        <flux:modal wire:model="modalCategorias" class="md:w-[32rem]">
+            <div class="space-y-6">
+                <div>
+                    <flux:heading size="lg" class="flex items-center gap-2">
+                        <flux:icon.tag class="size-5 text-emerald-600 dark:text-emerald-400" />
+                        Mantenedor de Categorías
+                    </flux:heading>
+                    <flux:subheading>
+                        Administre las categorías de entrevistas para esta institución.
+                    </flux:subheading>
+                </div>
+
+                <!-- Formulario Agregar / Editar Categoría -->
+                <div class="bg-zinc-50 dark:bg-zinc-800/60 p-4 rounded-xl space-y-3 border border-zinc-200 dark:border-zinc-700">
+                    <flux:field>
+                        <flux:label class="text-xs">Nombre de la Categoría</flux:label>
+                        <flux:input wire:model="nuevaCategoriaNombre" placeholder="Ej: Orientación Vocacional" />
+                    </flux:field>
+
+                    <flux:field>
+                        <flux:label class="text-xs">Descripción (Opcional)</flux:label>
+                        <flux:input wire:model="nuevaCategoriaDesc" placeholder="Breve descripción..." />
+                    </flux:field>
+
+                    <div class="flex justify-end gap-2">
+                        @if($editingCategoriaId)
+                            <flux:button size="sm" variant="ghost" wire:click="$set('editingCategoriaId', null)">Cancelar edición</flux:button>
+                        @endif
+                        <flux:button size="sm" variant="primary" wire:click="guardarCategoria">
+                            {{ $editingCategoriaId ? 'Guardar Cambios' : 'Agregar Categoría' }}
+                        </flux:button>
+                    </div>
+                </div>
+
+                <!-- Listado de Categorías Existentes -->
+                <div class="space-y-2 max-h-60 overflow-y-auto pr-1">
+                    <p class="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-2">Categorías Registradas ({{ $this->categorias->count() }})</p>
+                    @foreach($this->categorias as $cat)
+                        <div class="flex items-center justify-between p-3 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 text-xs">
+                            <div>
+                                <span class="font-bold text-zinc-900 dark:text-zinc-100">{{ $cat->nombre }}</span>
+                                @if($cat->descripcion)
+                                    <p class="text-[11px] text-zinc-500 truncate max-w-[200px]">{{ $cat->descripcion }}</p>
+                                @endif
+                            </div>
+                            <div class="flex items-center gap-1">
+                                <flux:button size="xs" variant="ghost" icon="pencil-square" wire:click="editarCategoria({{ $cat->id }})" title="Editar" />
+                                <flux:button size="xs" variant="ghost" icon="trash" class="text-red-500 hover:text-red-700" wire:click="eliminarCategoria({{ $cat->id }})" title="Eliminar" />
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+
+                <div class="flex justify-end pt-2 border-t border-zinc-200 dark:border-zinc-800">
+                    <flux:modal.close>
+                        <flux:button variant="ghost">Cerrar</flux:button>
+                    </flux:modal.close>
+                </div>
+            </div>
+        </flux:modal>
+    @endif
 </div>

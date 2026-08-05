@@ -20,6 +20,10 @@ new class extends Component {
     public $totalAsistencias = 0;
     public $totalAusencias = 0;
 
+    public $realizadasHastaHoy = 0;
+    public $agendadasHastaHoy = 0;
+    public $tasaEfectividad = 0;
+
     public function mount()
     {
         $schoolId = auth()->user()->current_school_id;
@@ -34,13 +38,27 @@ new class extends Component {
             ->count();
         $this->kpiActivos = Entrevista::where('school_id', $schoolId)
             ->whereDate('fecha', $hoy)
-            ->whereIn('estado', ['ingresada', 'en_curso', 'pendiente'])
+            ->whereIn('estado', ['ingresada', 'en_curso'])
             ->count();
 
         $this->kpiCanceladas = Entrevista::where('school_id', $schoolId)
             ->whereBetween('fecha', [$mesInicio, $mesFin])
             ->whereIn('estado', ['cancelada', 'ausente'])
             ->count();
+
+        // Efectividad (1 del mes a hoy)
+        $realizadasHastaHoy = Entrevista::where('school_id', $schoolId)
+            ->whereBetween('fecha', [$mesInicio, $hoy])
+            ->where('estado', 'realizada')
+            ->count();
+
+        $agendadasHastaHoy = Entrevista::where('school_id', $schoolId)
+            ->whereBetween('fecha', [$mesInicio, $hoy])
+            ->count();
+
+        $this->realizadasHastaHoy = $realizadasHastaHoy;
+        $this->agendadasHastaHoy = $agendadasHastaHoy;
+        $this->tasaEfectividad = $agendadasHastaHoy > 0 ? round(($realizadasHastaHoy / $agendadasHastaHoy) * 100) : 0;
 
         // Top 5 Docentes
         $this->topDocentes = DB::table('entrevistas')
@@ -123,26 +141,7 @@ new class extends Component {
             </flux:card>
         </a>
 
-        <!-- KPI 2: Mensual -->
-        <a href="{{ route('entrevistas.index', ['fecha' => now('America/Santiago')->format('Y-m-d'), 'filtroTemporal' => 'mes']) }}"
-            class="block no-underline">
-            <flux:card class="border-t-4 border-t-indigo-500 hover:shadow-md transition-shadow cursor-pointer h-full">
-                <div class="flex justify-between items-start mb-4">
-                    <div
-                        class="w-10 h-10 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg flex items-center justify-center">
-                        <flux:icon.calendar class="size-5 text-indigo-600 dark:text-indigo-400" />
-                    </div>
-                    <span
-                        class="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{{ __('Este Mes') }}</span>
-                </div>
-                <p class="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase">{{ __('Agendadas Mensual') }}
-                </p>
-                <p class="text-4xl font-extrabold text-zinc-900 dark:text-white mt-1">
-                    {{ str_pad($kpiMes, 2, '0', STR_PAD_LEFT) }}</p>
-            </flux:card>
-        </a>
-
-        <!-- KPI 3: Activo -->
+        <!-- KPI 2: Activo (En Proceso / Espera) -->
         <a href="{{ route('entrevistas.index', ['estado' => 'ingresada']) }}" class="block no-underline">
             <flux:card class="border-t-4 border-t-amber-500 hover:shadow-md transition-shadow cursor-pointer h-full">
                 <div class="flex justify-between items-start mb-4">
@@ -159,20 +158,52 @@ new class extends Component {
             </flux:card>
         </a>
 
-        <!-- KPI 4: Canceladas -->
-        <a href="{{ route('entrevistas.index', ['estado' => 'cancelada']) }}" class="block no-underline">
-            <flux:card class="border-t-4 border-t-red-500 hover:shadow-md transition-shadow cursor-pointer h-full">
-                <div class="flex justify-between items-start mb-4">
-                    <div class="w-10 h-10 bg-red-50 dark:bg-red-900/30 rounded-lg flex items-center justify-center">
-                        <flux:icon.no-symbol class="size-5 text-red-600 dark:text-red-400" />
+        <!-- KPI 3: Fusionado Mensual (Agendadas / No Realizadas) -->
+        <a href="{{ route('entrevistas.index', ['fecha' => now('America/Santiago')->format('Y-m-d'), 'filtroTemporal' => 'mes']) }}"
+            class="block no-underline">
+            <flux:card class="border-t-4 border-t-indigo-500 hover:shadow-md transition-shadow cursor-pointer h-full">
+                <div class="flex justify-between items-start mb-3">
+                    <div
+                        class="w-10 h-10 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg flex items-center justify-center">
+                        <flux:icon.calendar class="size-5 text-indigo-600 dark:text-indigo-400" />
                     </div>
                     <span
-                        class="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{{ __('Mensual') }}</span>
+                        class="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{{ __('Este Mes') }}</span>
                 </div>
-                <p class="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase">
-                    {{ __('Canceladas / Fallidas') }}</p>
-                <p class="text-4xl font-extrabold text-zinc-900 dark:text-white mt-1">
-                    {{ str_pad($kpiCanceladas, 2, '0', STR_PAD_LEFT) }}</p>
+                <p class="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase">{{ __('Agendadas / No Realizadas') }}</p>
+                <div class="flex items-baseline gap-1 mt-1">
+                    <span class="text-4xl font-extrabold text-zinc-900 dark:text-white">
+                        {{ $kpiMes }}
+                    </span>
+                    <span class="text-2xl font-bold text-zinc-400 dark:text-zinc-500 mx-1">/</span>
+                    <span class="text-3xl font-extrabold text-red-600 dark:text-red-400" title="No Realizadas (Canceladas / Fallidas)">
+                        {{ $kpiCanceladas }}
+                    </span>
+                </div>
+                <p class="text-[11px] font-medium text-zinc-500 dark:text-zinc-400 mt-1">
+                    <span class="text-indigo-600 dark:text-indigo-400 font-bold">{{ $kpiMes }} Agendadas</span> • <span class="text-red-500 font-bold">{{ $kpiCanceladas }} No Realizadas</span>
+                </p>
+            </flux:card>
+        </a>
+
+        <!-- KPI 4: Efectividad del Mes a la Fecha -->
+        <a href="{{ route('entrevistas.index', ['estado' => 'realizada']) }}" class="block no-underline">
+            <flux:card class="border-t-4 border-t-emerald-500 hover:shadow-md transition-shadow cursor-pointer h-full">
+                <div class="flex justify-between items-start mb-3">
+                    <div class="w-10 h-10 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg flex items-center justify-center">
+                        <flux:icon.check-circle class="size-5 text-emerald-600 dark:text-emerald-400" />
+                    </div>
+                    <span class="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{{ __('A la Fecha') }}</span>
+                </div>
+                <p class="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase">{{ __('Efectividad') }}</p>
+                <div class="flex items-baseline gap-1 mt-1">
+                    <span class="text-4xl font-extrabold text-emerald-600 dark:text-emerald-400">
+                        {{ $tasaEfectividad }}%
+                    </span>
+                </div>
+                <p class="text-[11px] font-medium text-zinc-500 dark:text-zinc-400 mt-1">
+                    <span class="font-bold text-emerald-600 dark:text-emerald-400">{{ $realizadasHastaHoy }} realizadas</span> de <span class="font-bold text-zinc-700 dark:text-zinc-300">{{ $agendadasHastaHoy }} a la fecha</span>
+                </p>
             </flux:card>
         </a>
 

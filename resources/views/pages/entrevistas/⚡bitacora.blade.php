@@ -63,13 +63,31 @@ new class extends Component {
     public bool $notificarReagendamientoEstudiante = false;
     public string $emailReagendarEstudiante = '';
 
+    // Modal Compartir Acceso
+    public bool $modalCompartirAcceso = false;
+    public string $searchUsuarioCompartir = '';
+    public ?int $selectedUserIdCompartir = null;
+
     public function mount(Entrevista $entrevista)
     {
-        $this->entrevista = $entrevista->load(['estudiante.curso', 'user', 'bitacora.updatedByUser']);
+        $this->entrevista = $entrevista->load(['estudiante.curso', 'user', 'bitacora.updatedByUser', 'accesosCompartidos.user', 'accesosCompartidos.grantedBy']);
 
         if ($this->entrevista->bitacora) {
             $this->bitacora = $this->entrevista->bitacora;
-            $this->resumen = $this->bitacora->resumen ?? '';
+            $rawResumen = $this->bitacora->resumen ?? '';
+            if ($rawResumen !== '' && ! str_contains($rawResumen, '<p>') && ! str_contains($rawResumen, '<div')) {
+                $paragraphs = explode("\n", str_replace("\r\n", "\n", $rawResumen));
+                $html = '';
+                foreach ($paragraphs as $p) {
+                    $p = trim($p);
+                    if ($p !== '') {
+                        $html .= '<p>' . htmlspecialchars($p, ENT_QUOTES, 'UTF-8') . '</p>';
+                    }
+                }
+                $this->resumen = $html ?: '<p></p>';
+            } else {
+                $this->resumen = $rawResumen;
+            }
             $this->observaciones = $this->bitacora->observaciones ?? '';
             $this->acuerdos = $this->bitacora->acuerdos ?? [];
             $this->adjuntosDrive = $this->bitacora->adjuntos_drive ?? [];
@@ -85,8 +103,98 @@ new class extends Component {
         }
     }
 
+    public function abrirModalCompartirAcceso(): void
+    {
+        $this->authorize('share', $this->entrevista);
+        $this->searchUsuarioCompartir = '';
+        $this->selectedUserIdCompartir = null;
+        $this->modalCompartirAcceso = true;
+    }
+
+    public function concederAccesoCompartido(): void
+    {
+        $this->authorize('share', $this->entrevista);
+
+        if (! $this->selectedUserIdCompartir) {
+            $this->addError('selectedUserIdCompartir', 'Debe seleccionar un usuario.');
+            return;
+        }
+
+        $usuarioTarget = \App\Models\User::findOrFail($this->selectedUserIdCompartir);
+
+        $yaTieneAcceso = $this->entrevista->accesosCompartidos()
+            ->where('user_id', $usuarioTarget->id)
+            ->exists();
+
+        if ($yaTieneAcceso) {
+            \Flux::toast('El usuario ya tiene acceso a esta entrevista.', variant: 'warning');
+            return;
+        }
+
+        \App\Models\EntrevistaCompartida::create([
+            'entrevista_id' => $this->entrevista->id,
+            'user_id' => $usuarioTarget->id,
+            'granted_by_user_id' => auth()->id(),
+        ]);
+
+        $usuarioTarget->notify(new \App\Notifications\EntrevistaCompartidaNotification($this->entrevista, auth()->user()));
+
+        $this->selectedUserIdCompartir = null;
+        $this->entrevista->load(['accesosCompartidos.user', 'accesosCompartidos.grantedBy']);
+
+        \Flux::toast("Acceso concedido exitosamente a {$usuarioTarget->nombreCompleto()}.", variant: 'success');
+    }
+
+    public function revocarAccesoCompartido(int $accesoId): void
+    {
+        $this->authorize('share', $this->entrevista);
+
+        $acceso = \App\Models\EntrevistaCompartida::where('entrevista_id', $this->entrevista->id)->findOrFail($accesoId);
+        $nombreUsuario = $acceso->user?->nombreCompleto() ?? 'Usuario';
+        $acceso->delete();
+
+        $this->entrevista->load(['accesosCompartidos.user', 'accesosCompartidos.grantedBy']);
+        \Flux::toast("Acceso revocado para {$nombreUsuario}.", variant: 'info');
+    }
+
+    public function toggleConfidencial(): void
+    {
+        $this->authorize('share', $this->entrevista);
+
+        $this->entrevista->update([
+            'es_confidencial' => ! $this->entrevista->es_confidencial,
+        ]);
+
+        $estadoText = $this->entrevista->es_confidencial ? 'marcada como Confidencial / Privada' : 'marcada como Pública / General';
+        \Flux::toast("La entrevista ha sido {$estadoText}.", variant: 'success');
+    }
+
+    #[\Livewire\Attributes\Computed]
+    public function usuariosDisponibles()
+    {
+        $schoolId = auth()->user()->current_school_id;
+        $idsExistentes = $this->entrevista->accesosCompartidos()->pluck('user_id')->toArray();
+        $idsExistentes[] = $this->entrevista->user_id;
+
+        return \App\Models\User::query()
+            ->where('current_school_id', $schoolId)
+            ->whereNotIn('id', $idsExistentes)
+            ->when(trim($this->searchUsuarioCompartir) !== '', function ($q) {
+                $term = trim($this->searchUsuarioCompartir);
+                $q->where(function ($sub) use ($term) {
+                    $sub->where('nombres', 'like', "%{$term}%")
+                        ->orWhere('apellido_pat', 'like', "%{$term}%")
+                        ->orWhere('email', 'like', "%{$term}%");
+                });
+            })
+            ->orderBy('nombres', 'asc')
+            ->take(15)
+            ->get();
+    }
+
     public function agregarAcuerdoRapido()
     {
+        $this->authorize('update', $this->entrevista);
         if (trim($this->nuevoAcuerdoTitulo) !== '') {
             $this->acuerdos[] = [
                 'titulo' => trim($this->nuevoAcuerdoTitulo),
@@ -99,12 +207,14 @@ new class extends Component {
 
     public function borrarAcuerdo($index)
     {
+        $this->authorize('update', $this->entrevista);
         unset($this->acuerdos[$index]);
         $this->acuerdos = array_values($this->acuerdos);
     }
 
     public function abrirModalAdjunto()
     {
+        $this->authorize('update', $this->entrevista);
         $this->nuevoAdjuntoNombre = '';
         $this->nuevoAdjuntoUrl = '';
         $this->modalAdjunto = true;
@@ -112,6 +222,7 @@ new class extends Component {
 
     public function guardarEnlaceDrive()
     {
+        $this->authorize('update', $this->entrevista);
         $this->validate([
             'nuevoAdjuntoNombre' => 'required|min:3',
             'nuevoAdjuntoUrl' => 'required|url',
@@ -132,6 +243,7 @@ new class extends Component {
 
     public function quitarAdjunto($index)
     {
+        $this->authorize('update', $this->entrevista);
         unset($this->adjuntosDrive[$index]);
         $this->adjuntosDrive = array_values($this->adjuntosDrive);
     }
@@ -162,6 +274,7 @@ new class extends Component {
 
     public function abrirModalReagendar()
     {
+        $this->authorize('update', $this->entrevista);
         $this->nuevaFecha = $this->entrevista->fecha;
         $this->nuevaHora = \Carbon\Carbon::parse($this->entrevista->hora)->format('H:i');
 
@@ -177,6 +290,7 @@ new class extends Component {
 
     public function confirmarReagendamiento()
     {
+        $this->authorize('update', $this->entrevista);
         $this->validate([
             'nuevaFecha' => 'required|date',
             'nuevaHora' => 'required',
@@ -291,6 +405,7 @@ new class extends Component {
 
     public function abrirModalFirmaPresencial()
     {
+        $this->authorize('update', $this->entrevista);
         if (in_array($this->entrevista->estado, ['realizada', 'ausente', 'cancelada'])) {
             abort(403, 'No se puede modificar la firma de una entrevista finalizada.');
         }
@@ -315,6 +430,7 @@ new class extends Component {
 
     public function guardarFirmaPresencial()
     {
+        $this->authorize('update', $this->entrevista);
         if (in_array($this->entrevista->estado, ['realizada', 'ausente', 'cancelada'])) {
             abort(403, 'No se puede modificar la firma de una entrevista finalizada.');
         }
@@ -348,6 +464,7 @@ new class extends Component {
 
     public function abrirModalFirmaOnline()
     {
+        $this->authorize('update', $this->entrevista);
         if (in_array($this->entrevista->estado, ['realizada', 'ausente', 'cancelada'])) {
             abort(403, 'No se puede solicitar firma en una entrevista finalizada.');
         }
@@ -361,6 +478,7 @@ new class extends Component {
 
     public function enviarFirmaOnline()
     {
+        $this->authorize('update', $this->entrevista);
         if (in_array($this->entrevista->estado, ['realizada', 'ausente', 'cancelada'])) {
             abort(403, 'No se puede solicitar firma en una entrevista finalizada.');
         }
@@ -392,6 +510,7 @@ new class extends Component {
 
     public function abrirModalEnviarResumen()
     {
+        $this->authorize('update', $this->entrevista);
         $estudiante = $this->entrevista->estudiante;
         $this->emailApoderado = $estudiante ? ($estudiante->apoderado_email ?? '') : '';
         $this->emailEstudiante = $estudiante ? ($estudiante->email ?? '') : '';
@@ -488,6 +607,8 @@ new class extends Component {
 <div class="max-w-7xl mx-auto w-full pb-12">
     @php
         $isCerrada = in_array($entrevista->estado, ['realizada', 'ausente', 'cancelada']);
+        $canUpdate = auth()->user()->can('update', $entrevista);
+        $isReadOnly = $isCerrada || ! $canUpdate;
     @endphp
 
     <!-- Header Oficial con Notificaciones y Usuario -->
@@ -496,8 +617,20 @@ new class extends Component {
         subtitulo="Completando bitácora para la entrevista de protocolo #{{ $entrevista->id }}" 
         icono="document-text" 
     >
-        @if ($isCerrada)
-            <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2">
+            @if($entrevista->es_confidencial)
+                <flux:badge color="purple" icon="lock-closed" class="p-2 text-xs font-bold bg-purple-100 dark:bg-purple-950 text-purple-800 dark:text-purple-300 border-purple-300 dark:border-purple-800">
+                    🔒 Confidencial / Privada
+                </flux:badge>
+            @endif
+
+            @can('share', $entrevista)
+                <flux:button variant="subtle" icon="share" size="sm" wire:click="abrirModalCompartirAcceso" class="bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800 font-bold">
+                    🤝 Compartir Acceso ({{ $entrevista->accesosCompartidos->count() }})
+                </flux:button>
+            @endcan
+
+            @if ($isCerrada)
                 @if($entrevista->estado === 'realizada')
                     <flux:badge color="emerald" icon="check-circle" class="p-2 text-xs font-bold">
                         {{ __('Entrevista Realizada') }}
@@ -515,8 +648,8 @@ new class extends Component {
                         </flux:button>
                     </flux:modal.trigger>
                 @endif
-            </div>
-        @endif
+            @endif
+        </div>
     </x-entrevistas.header>
 
     @if ($isCerrada && auth()->user()->hasRole('superadmin'))
@@ -540,6 +673,15 @@ new class extends Component {
                 </div>
             </div>
         </flux:modal>
+    @endif
+
+    @if (! $canUpdate)
+        <div class="bg-indigo-50 border border-indigo-200 dark:bg-indigo-950/40 dark:border-indigo-800 p-4 rounded-xl flex items-center gap-3 text-indigo-900 dark:text-indigo-200 mb-6 shadow-sm">
+            <flux:icon.eye class="size-5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+            <div class="text-xs sm:text-sm">
+                <strong>Modo Solo Lectura:</strong> Esta entrevista y su bitácora te fueron compartidas únicamente para consulta. Solo el profesional que creó la entrevista ({{ $entrevista->user ? $entrevista->user->nombreCompleto() : 'Creador' }}) o un superadministrador pueden modificar o guardar contenido.
+            </div>
+        </div>
     @endif
 
     <div class="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
@@ -593,11 +735,12 @@ new class extends Component {
                         <h2 class="text-xl font-bold text-[#00376e] dark:text-zinc-100">Resumen de la Conversación</h2>
                     </div>
                     <div class="relative">
-                        <flux:textarea 
+                        <flux:editor 
                             wire:model.defer="resumen" 
-                            rows="6" 
+                            toolbar="heading | bold italic underline strike | bullet ordered blockquote | align | link ~ undo redo"
                             placeholder="Describa los puntos clave analizados durante la reunión. Sea objetivo y profesional..." 
-                            :disabled="$isCerrada"
+                            :disabled="$isReadOnly"
+                            class="**:data-[slot=content]:min-h-[180px]"
                         />
                     </div>
                 </section>
@@ -623,7 +766,7 @@ new class extends Component {
                                         <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-1 leading-relaxed whitespace-pre-wrap">{{ $acuerdo['descripcion'] }}</p>
                                     @endif
                                 </div>
-                                @if(!$isCerrada)
+                                 @if(!$isReadOnly)
                                 <button type="button" wire:click="borrarAcuerdo({{ $index }})" class="absolute right-4 top-4 text-zinc-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">
                                     <flux:icon.trash class="size-4" />
                                 </button>
@@ -632,7 +775,7 @@ new class extends Component {
                         @endforeach
 
                         <!-- Agregar Nuevo -->
-                        @if(!$isCerrada)
+                        @if(!$isReadOnly)
                         <div class="bg-white dark:bg-zinc-900 p-4 rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700 focus-within:border-[#00376e] transition-colors">
                             <p class="text-xs font-bold text-[#00376e] dark:text-blue-400 uppercase tracking-widest mb-3">Ingresar nuevo compromiso</p>
                             <div class="space-y-3">
@@ -662,12 +805,28 @@ new class extends Component {
                         </div>
                         <h2 class="text-xl font-bold text-[#00376e] dark:text-zinc-100">Observaciones Generales</h2>
                     </div>
-                    <flux:textarea 
-                        wire:model.defer="observaciones" 
-                        rows="4" 
-                        placeholder="Notas actitudinales, estado anímico, u observaciones que no necesariamente son acuerdos concretos..." 
-                        :disabled="$isCerrada"
-                    />
+                    <div 
+                        x-data="{
+                            resize() {
+                                let textarea = $el.querySelector('textarea');
+                                if (textarea) {
+                                    textarea.style.height = 'auto';
+                                    textarea.style.height = Math.max(120, textarea.scrollHeight + 6) + 'px';
+                                }
+                            }
+                        }"
+                        x-init="$nextTick(() => resize())"
+                        @input="resize()"
+                        class="relative"
+                    >
+                        <flux:textarea 
+                            wire:model.defer="observaciones" 
+                            rows="4" 
+                            placeholder="Notas actitudinales, estado anímico, u observaciones que no necesariamente son acuerdos concretos..." 
+                            :disabled="$isReadOnly"
+                            class="[&_textarea]:field-sizing-content [&_textarea]:min-h-[120px]"
+                        />
+                    </div>
                 </section>
             </flux:card>
         </div>
@@ -720,7 +879,7 @@ new class extends Component {
 
                 {{-- Botones de Acción Uniformes --}}
                 <div class="space-y-2">
-                    @if (!$isCerrada)
+                    @if (!$isReadOnly)
                         {{-- 1. Firmar Presencialmente --}}
                         @if ($bitacora && in_array($bitacora->estado_firma, ['firmada_presencial', 'firmada_online']))
                             <button 
@@ -757,7 +916,7 @@ new class extends Component {
                     @endif
 
                     {{-- 3. Reagendar Cita --}}
-                    @if(!$isCerrada)
+                    @if(!$isReadOnly)
                         <button 
                             type="button" 
                             wire:click="abrirModalReagendar"
@@ -770,7 +929,7 @@ new class extends Component {
                     @endif
 
                     {{-- 4. Guardar Borrador --}}
-                    @if(!$isCerrada)
+                    @if(!$isReadOnly)
                         <button 
                             type="button" 
                             wire:click="guardarBorrador"
@@ -784,7 +943,7 @@ new class extends Component {
 
                     <div class="pt-3 space-y-2 border-t border-zinc-100 dark:border-zinc-800">
                         {{-- 5. No Realizada --}}
-                        @if(!$isCerrada && (auth()->user()->can('cancelar-entrevistas') || auth()->user()->hasRole('superadmin')))
+                        @if(!$isReadOnly && (auth()->user()->can('cancelar-entrevistas') || auth()->user()->hasRole('superadmin')))
                             <button 
                                 type="button" 
                                 wire:click="abrirModalNoRealizada"
@@ -796,7 +955,7 @@ new class extends Component {
                         @endif
 
                         {{-- 6. Finalizar Entrevista --}}
-                        @if(!$isCerrada)
+                        @if(!$isReadOnly)
                             <button 
                                 type="button" 
                                 wire:click="abrirModalEnviarResumen"
@@ -1362,6 +1521,104 @@ new class extends Component {
                     <flux:button type="submit" variant="primary" icon="paper-airplane">Enviar Citación</flux:button>
                 </div>
             </form>
+        </div>
+    </flux:modal>
+
+    <!-- Modal Compartir Acceso a Entrevista -->
+    <flux:modal wire:model="modalCompartirAcceso" class="md:w-[32rem]">
+        <div class="space-y-6">
+            <div>
+                <flux:heading size="lg" class="flex items-center gap-2">
+                    <flux:icon.share class="size-5 text-[#00376e]" />
+                    {{ __('Compartir Acceso a Entrevista') }}
+                </flux:heading>
+                <flux:text class="mt-1 text-xs">
+                    Concede acceso directo para revisar y completar esta entrevista a un profesor o funcionario del establecimiento.
+                </flux:text>
+            </div>
+
+            {{-- Conceder Nuevo Acceso --}}
+            <div class="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 space-y-3">
+                <flux:field>
+                    <flux:label class="font-bold text-xs uppercase tracking-wider text-zinc-500">{{ __('Buscar Funcionario / Docente') }}</flux:label>
+                    <flux:input 
+                        wire:model.live.debounce.250ms="searchUsuarioCompartir" 
+                        icon="magnifying-glass" 
+                        placeholder="Escriba el nombre o correo del profesor..." 
+                    />
+                </flux:field>
+
+                <flux:field>
+                    <flux:label class="font-bold text-xs uppercase tracking-wider text-zinc-500">{{ __('Seleccionar Usuario') }}</flux:label>
+                    <flux:select wire:model="selectedUserIdCompartir" placeholder="-- Seleccionar usuario --">
+                        @foreach($this->usuariosDisponibles as $usr)
+                            <flux:select.option value="{{ $usr->id }}">
+                                {{ $usr->nombreCompleto() }} ({{ $usr->email }})
+                            </flux:select.option>
+                        @endforeach
+                    </flux:select>
+                    <flux:error name="selectedUserIdCompartir" />
+                </flux:field>
+
+                <div class="flex justify-end pt-2">
+                    <flux:button variant="primary" icon="plus" wire:click="concederAccesoCompartido" class="bg-[#00376e] text-white font-bold text-xs">
+                        Conceder Acceso
+                    </flux:button>
+                </div>
+            </div>
+
+            {{-- Lista de Personas con Acceso Actualmente --}}
+            <div class="space-y-3">
+                <h4 class="font-bold text-xs uppercase tracking-wider text-zinc-400">Personas con acceso a esta cita:</h4>
+
+                <div class="divide-y divide-zinc-100 dark:divide-zinc-800 border rounded-xl overflow-hidden bg-white dark:bg-zinc-900">
+                    {{-- Creador --}}
+                    <div class="p-3 flex items-center justify-between text-xs">
+                        <div class="flex items-center gap-2">
+                            <flux:icon.user-circle class="size-4 text-blue-600" />
+                            <div>
+                                <span class="font-bold text-zinc-900 dark:text-zinc-100">{{ $entrevista->user ? $entrevista->user->nombreCompleto() : 'Sistema' }}</span>
+                                <span class="text-[10px] text-zinc-400 block">Creador de la cita</span>
+                            </div>
+                        </div>
+                        <flux:badge size="xs" color="blue">Propietario</flux:badge>
+                    </div>
+
+                    {{-- Usuarios Compartidos --}}
+                    @forelse($entrevista->accesosCompartidos as $acceso)
+                        <div class="p-3 flex items-center justify-between text-xs">
+                            <div class="flex items-center gap-2">
+                                <flux:icon.user class="size-4 text-purple-600" />
+                                <div>
+                                    <span class="font-bold text-zinc-900 dark:text-zinc-100">{{ $acceso->user ? $acceso->user->nombreCompleto() : 'Usuario' }}</span>
+                                    <span class="text-[10px] text-zinc-400 block">Compartido por {{ $acceso->grantedBy ? $acceso->grantedBy->nombreCompleto() : 'Sistema' }}</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <flux:badge size="xs" color="purple">Compartido</flux:badge>
+                                @can('share', $entrevista)
+                                    <button type="button" wire:click="revocarAccesoCompartido({{ $acceso->id }})" class="text-zinc-400 hover:text-red-600 p-1" title="Revocar acceso">
+                                        <flux:icon.trash class="size-3.5" />
+                                    </button>
+                                @endcan
+                            </div>
+                        </div>
+                    @empty
+                        <div class="p-4 text-center text-xs text-zinc-400">
+                            No se ha compartido esta entrevista con otros usuarios.
+                        </div>
+                    @endforelse
+                </div>
+            </div>
+
+            <div class="flex justify-between items-center pt-3 border-t dark:border-zinc-800">
+                @can('share', $entrevista)
+                    <flux:button variant="ghost" size="xs" wire:click="toggleConfidencial" class="text-purple-700 dark:text-purple-300 font-bold">
+                        {{ $entrevista->es_confidencial ? '🔓 Cambiar a Pública' : '🔒 Cambiar a Confidencial' }}
+                    </flux:button>
+                @endcan
+                <flux:button wire:click="$set('modalCompartirAcceso', false)" variant="ghost">Cerrar</flux:button>
+            </div>
         </div>
     </flux:modal>
 </div>

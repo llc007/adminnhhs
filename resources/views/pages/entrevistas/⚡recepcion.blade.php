@@ -239,6 +239,22 @@ new class extends Component {
         }
     }
 
+    public function revertirIngreso($id)
+    {
+        $entrevista = Entrevista::where('school_id', auth()->user()->current_school_id)->find($id);
+        
+        if ($entrevista) {
+            $entrevista->update([
+                'estado' => 'pendiente',
+                'hora_llegada' => null,
+                'mensaje_recepcion' => null,
+                'lugar' => null,
+            ]);
+
+            \Flux::toast('Ingreso anulado correctamente. La cita ha vuelto a estado Pendiente.', variant: 'warning');
+        }
+    }
+
     public function actualizarLugarDirecto($id, $nuevoLugar)
     {
         $entrevista = Entrevista::find($id);
@@ -460,33 +476,64 @@ new class extends Component {
                                     <flux:button variant="primary" wire:click="prepararIngreso({{ $cita->id }})" class="font-bold shadow-sm">
                                         {{ __('Registrar Ingreso') }}
                                     </flux:button>
-                                @elseif(!str_contains($cita->mensaje_recepcion ?? '', '[SALIDA]') && in_array($cita->estado, ['ingresada', 'realizada']))
-                                    <flux:modal.trigger name="confirmar-salida-{{ $cita->id }}">
-                                        <flux:button size="sm" variant="danger" class="font-bold shadow-sm">
-                                            Marcar Salida
-                                        </flux:button>
-                                    </flux:modal.trigger>
+                                @else
+                                    <div class="flex items-center justify-end gap-2">
+                                        @if(in_array($cita->estado, ['ingresada', 'realizada']) && !str_contains($cita->mensaje_recepcion ?? '', '[SALIDA]'))
+                                            <flux:modal.trigger name="confirmar-salida-{{ $cita->id }}">
+                                                <flux:button size="sm" variant="danger" class="font-bold shadow-sm">
+                                                    Marcar Salida
+                                                </flux:button>
+                                            </flux:modal.trigger>
 
-                                    <flux:modal name="confirmar-salida-{{ $cita->id }}" class="min-w-[22rem]">
-                                        <div class="space-y-6 text-left">
-                                            <div>
-                                                <flux:heading size="lg">¿Confirmar salida del recinto?</flux:heading>
-                                                <flux:text class="mt-2 text-sm">
-                                                    El sistema registrará la hora exacta en que el apoderado abandonó la institución.
-                                                </flux:text>
+                                            <flux:modal name="confirmar-salida-{{ $cita->id }}" class="min-w-[22rem]">
+                                                <div class="space-y-6 text-left">
+                                                    <div>
+                                                        <flux:heading size="lg">¿Confirmar salida del recinto?</flux:heading>
+                                                        <flux:text class="mt-2 text-sm">
+                                                            El sistema registrará la hora exacta en que el apoderado abandonó la institución.
+                                                        </flux:text>
+                                                    </div>
+                                                    <div class="flex gap-2 justify-end">
+                                                        <flux:modal.close>
+                                                            <flux:button variant="ghost">Cancelar</flux:button>
+                                                        </flux:modal.close>
+                                                        <flux:modal.close>
+                                                            <flux:button variant="primary" wire:click="registrarSalida({{ $cita->id }})">Sí, registrar salida</flux:button>
+                                                        </flux:modal.close>
+                                                    </div>
+                                                </div>
+                                            </flux:modal>
+                                        @elseif(str_contains($cita->mensaje_recepcion ?? '', '[SALIDA]'))
+                                            <span class="text-[10px] text-zinc-400 font-bold uppercase">Se retiró</span>
+                                        @endif
+
+                                        {{-- Botón para Anular Ingreso por Error --}}
+                                        <flux:modal.trigger name="confirmar-anular-ingreso-{{ $cita->id }}">
+                                            <flux:button size="xs" variant="ghost" class="text-zinc-500 hover:text-red-600 dark:hover:text-red-400 font-medium cursor-pointer" title="Anular ingreso registrado por error">
+                                                <flux:icon.arrow-uturn-left class="size-3.5" />
+                                                <span class="hidden sm:inline">Anular Ingreso</span>
+                                            </flux:button>
+                                        </flux:modal.trigger>
+
+                                        <flux:modal name="confirmar-anular-ingreso-{{ $cita->id }}" class="min-w-[22rem]">
+                                            <div class="space-y-6 text-left">
+                                                <div>
+                                                    <flux:heading size="lg">¿Anular registro de ingreso?</flux:heading>
+                                                    <flux:text class="mt-2 text-sm">
+                                                        Esta acción revertirá el registro de llegada de esta persona, borrando la hora de ingreso y devolviendo la cita al estado <strong>Pendiente</strong> (con botón Registrar Ingreso de nuevo).
+                                                    </flux:text>
+                                                </div>
+                                                <div class="flex gap-2 justify-end">
+                                                    <flux:modal.close>
+                                                        <flux:button variant="ghost">Cancelar</flux:button>
+                                                    </flux:modal.close>
+                                                    <flux:modal.close>
+                                                        <flux:button variant="danger" wire:click="revertirIngreso({{ $cita->id }})">Sí, anular ingreso</flux:button>
+                                                    </flux:modal.close>
+                                                </div>
                                             </div>
-                                            <div class="flex gap-2 justify-end">
-                                                <flux:modal.close>
-                                                    <flux:button variant="ghost">Cancelar</flux:button>
-                                                </flux:modal.close>
-                                                <flux:modal.close>
-                                                    <flux:button variant="primary" wire:click="registrarSalida({{ $cita->id }})">Sí, registrar salida</flux:button>
-                                                </flux:modal.close>
-                                            </div>
-                                        </div>
-                                    </flux:modal>
-                                @elseif(str_contains($cita->mensaje_recepcion ?? '', '[SALIDA]'))
-                                    <span class="text-[10px] text-zinc-400 font-bold uppercase">Se retiró</span>
+                                        </flux:modal>
+                                    </div>
                                 @endif
                             </td>
                         </tr>

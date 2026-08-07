@@ -49,7 +49,7 @@ class GoogleAuthController extends Controller
                     'apellido_pat' => null,
                     'apellido_mat' => null,
                     'google_id' => $googleUser->getId(),
-                    'avatar' => $googleUser->getAvatar(),
+                    'avatar' => $googleUser->getAvatar() ? substr($googleUser->getAvatar(), 0, 2000) : null,
                     'current_school_id' => $school?->id,
                 ]
             );

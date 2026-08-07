@@ -17,8 +17,8 @@ Route::middleware(['auth', 'verified', 'role:administrador,directivo,superadmin'
     Route::livewire('/entrevistas/dashboard', 'pages::entrevistas.dashboard')->name('entrevistas.dashboard');
 });
 
-// Recepción / Portería — requiere permiso ingresar-apoderado o superadmin
-Route::middleware(['auth', 'verified', 'role_or_permission:superadmin|ingresar-apoderado'])->group(function () {
+// Recepción / Portería — requiere permiso ingresar-apoderado, ver-recepcion o superadmin
+Route::middleware(['auth', 'verified', 'role_or_permission:superadmin|ingresar-apoderado|ver-recepcion'])->group(function () {
     Route::livewire('/entrevistas/recepcion', 'pages::entrevistas.recepcion')->name('entrevistas.recepcion');
 });
 

@@ -5,6 +5,7 @@ use App\Models\InventarioCategoria;
 use App\Models\InventarioUbicacion;
 use App\Models\Requerimiento;
 use App\Models\RequerimientoItem;
+use App\Models\RevisionInventario;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
@@ -614,4 +615,64 @@ test('ti admin can add units to an active asset in details', function () {
         'codigo_patrimonial' => 'TEC-PRO-003',
         'nombre' => 'Proyector Epson',
     ]);
+});
+
+test('tracks entradas and salidas in revisiones_inventario and details view', function () {
+    [$user, $schoolId] = setupInventarioTestUser(['administrador']);
+    $this->actingAs($user);
+
+    $consumible = ArticuloInventario::create([
+        'school_id' => $schoolId,
+        'tipo' => 'consumible',
+        'codigo_patrimonial' => 'CON-PAP-001',
+        'nombre' => 'Resma Papel Carta',
+        'categoria' => 'Oficina',
+        'cantidad' => 100,
+        'estado_conservacion' => 'excelente',
+        'ubicacion' => 'Bodega 1',
+        'fecha_ingreso' => now()->subDays(5),
+    ]);
+
+    // Initial movement
+    RevisionInventario::create([
+        'articulo_inventario_id' => $consumible->id,
+        'fecha' => now()->subDays(5),
+        'detalle' => 'Alta e ingreso inicial: +100 unidades.',
+        'cantidad_entrada' => 100,
+        'realizado_por' => $user->nombreCompleto(),
+        'user_id' => $user->id,
+    ]);
+
+    // Test adding stock
+    Livewire::test('pages::inventario.detalles', ['id' => $consumible->id])
+        ->call('abrirAgregarStock', $consumible->id)
+        ->set('agregarStockCantidad', 50)
+        ->set('agregarStockMotivo', 'Recompra mensual')
+        ->call('confirmarAgregarStock')
+        ->assertHasNoErrors();
+
+    // Test consuming stock
+    Livewire::test('pages::inventario.detalles', ['id' => $consumible->id])
+        ->call('abrirDescontar', $consumible->id)
+        ->set('descontarCantidad', 15)
+        ->set('descontarMotivo', 'Consumo por Secretaria')
+        ->call('confirmarDescontar')
+        ->assertHasNoErrors();
+
+    $this->assertDatabaseHas('revisiones_inventario', [
+        'articulo_inventario_id' => $consumible->id,
+        'cantidad_entrada' => 50,
+    ]);
+
+    $this->assertDatabaseHas('revisiones_inventario', [
+        'articulo_inventario_id' => $consumible->id,
+        'cantidad_salida' => 15,
+    ]);
+
+    Livewire::test('pages::inventario.detalles', ['id' => $consumible->id])
+        ->assertSee('Movimientos del Artículo (Entradas y Salidas)')
+        ->assertSee('+50')
+        ->assertSee('-15')
+        ->assertSee('Resma Papel Carta')
+        ->assertSee('CON-PAP-001');
 });

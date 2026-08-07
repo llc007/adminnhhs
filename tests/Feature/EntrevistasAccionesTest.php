@@ -35,6 +35,8 @@ function setupTestEnvironment()
         Permission::findOrCreate('ver-entrevistas-propias', 'web'),
         Permission::findOrCreate('cancelar-entrevistas', 'web'),
         Permission::findOrCreate('crear-entrevistas', 'web'),
+        Permission::findOrCreate('ingresar-apoderado', 'web'),
+        Permission::findOrCreate('ver-recepcion', 'web'),
     ]);
     app(PermissionRegistrar::class)->forgetCachedPermissions();
     $user->refresh();
@@ -306,4 +308,29 @@ test('recepcionista can revert entry and return interview to pending state', fun
     expect($entrevista->hora_llegada)->toBeNull();
     expect($entrevista->mensaje_recepcion)->toBeNull();
     expect($entrevista->lugar)->toBeNull();
+});
+
+test('user with ver-recepcion permission can view reception page but cannot register arrival', function () {
+    [$user, $entrevista] = setupTestEnvironment();
+
+    $userReadOnly = User::factory()->create();
+    $userReadOnly->update(['current_school_id' => $entrevista->school_id]);
+
+    app(PermissionRegistrar::class)->setPermissionsTeamId($entrevista->school_id);
+    $userReadOnly->givePermissionTo([
+        Permission::findOrCreate('ver-recepcion', 'web'),
+    ]);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    $this->actingAs($userReadOnly);
+
+    // Can access route
+    $this->get(route('entrevistas.recepcion'))->assertOk();
+
+    // Cannot call registrarIngreso (aborts 403)
+    Livewire::test('pages::entrevistas.recepcion')
+        ->set('entrevistaSeleccionadaId', $entrevista->id)
+        ->set('lugarIngreso', 'BOX 1')
+        ->call('registrarIngreso')
+        ->assertStatus(403);
 });

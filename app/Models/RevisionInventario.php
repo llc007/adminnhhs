@@ -15,6 +15,8 @@ class RevisionInventario extends Model
         'articulo_inventario_id',
         'fecha',
         'detalle',
+        'cantidad_entrada',
+        'cantidad_salida',
         'realizado_por',
         'fecha_proxima_revision',
         'user_id',

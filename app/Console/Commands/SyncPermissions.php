@@ -44,6 +44,7 @@ class SyncPermissions extends Command
             'cancelar-entrevistas',
             'eliminar-entrevistas',
             'ingresar-apoderado',
+            'ver-recepcion',
             // Estudiantes
             'ver-estudiantes',
             'editar-estudiantes',

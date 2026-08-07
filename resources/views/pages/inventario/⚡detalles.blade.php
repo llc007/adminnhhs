@@ -308,6 +308,7 @@ new class extends Component
             'articulo_inventario_id' => $item->id,
             'fecha' => now(),
             'detalle' => "Ingreso de stock: +{$this->agregarStockCantidad} unidades. Motivo: {$this->agregarStockMotivo}. Nuevo stock: {$item->cantidad}.",
+            'cantidad_entrada' => $this->agregarStockCantidad,
             'realizado_por' => auth()->user()->nombreCompleto(),
             'user_id' => auth()->id(),
         ]);
@@ -586,6 +587,7 @@ new class extends Component
             'articulo_inventario_id' => $item->id,
             'fecha' => now(),
             'detalle' => "Consumo de stock: -{$this->descontarCantidad} unidades. Motivo: {$this->descontarMotivo}. Stock restante: {$item->cantidad}.",
+            'cantidad_salida' => $this->descontarCantidad,
             'realizado_por' => auth()->user()->nombreCompleto(),
             'user_id' => auth()->id(),
         ]);
@@ -628,6 +630,80 @@ new class extends Component
             ->orderBy('nombre', 'asc')
             ->get();
     }
+
+    #[\Livewire\Attributes\Computed]
+    public function fechaUltimaAdquisicion()
+    {
+        $itemIds = collect($this->editingItems)->pluck('id');
+
+        $ultimaEntrada = RevisionInventario::whereIn('articulo_inventario_id', $itemIds)
+            ->where(function ($q) {
+                $q->where('cantidad_entrada', '>', 0)
+                  ->orWhere('detalle', 'like', '%Ingreso%')
+                  ->orWhere('detalle', 'like', '%Alta%')
+                  ->orWhere('detalle', 'like', '%+%');
+            })
+            ->orderBy('fecha', 'desc')
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        if ($ultimaEntrada && $ultimaEntrada->fecha) {
+            return $ultimaEntrada->fecha->format('d/m/Y');
+        }
+
+        $latestIngreso = ArticuloInventario::whereIn('id', $itemIds)->max('fecha_ingreso');
+        if ($latestIngreso) {
+            return \Carbon\Carbon::parse($latestIngreso)->format('d/m/Y');
+        }
+
+        return $this->articuloBase->fecha_ingreso ? $this->articuloBase->fecha_ingreso->format('d/m/Y') : '-';
+    }
+
+    #[\Livewire\Attributes\Computed]
+    public function stockDisponibleTotal()
+    {
+        if ($this->articuloBase->tipo === 'consumible') {
+            return collect($this->editingItems)->sum('cantidad');
+        }
+
+        return collect($this->editingItems)->whereNull('fecha_baja')->count();
+    }
+
+    #[\Livewire\Attributes\Computed]
+    public function movimientosConsumible()
+    {
+        $itemIds = collect($this->editingItems)->pluck('id');
+
+        return RevisionInventario::with(['user', 'articulo'])
+            ->whereIn('articulo_inventario_id', $itemIds)
+            ->orderBy('created_at', 'desc')
+            ->orderBy('fecha', 'desc')
+            ->get()
+            ->map(function ($rev) {
+                $cantEntrada = $rev->cantidad_entrada;
+                $cantSalida = $rev->cantidad_salida;
+
+                if ($cantEntrada === null && $cantSalida === null) {
+                    if (preg_match('/(?:Ingreso de stock|Alta e ingreso|\+)\s*:?\s*\+?(\d+)/i', $rev->detalle, $matches)) {
+                        $cantEntrada = (int) $matches[1];
+                    } elseif (preg_match('/(?:Consumo de stock|-)\s*:?\s*-?(\d+)/i', $rev->detalle, $matches)) {
+                        $cantSalida = (int) $matches[1];
+                    } elseif (preg_match('/Ingreso inicial/i', $rev->detalle)) {
+                        $cantEntrada = $rev->articulo?->cantidad ?? 0;
+                    }
+                }
+
+                return [
+                    'id' => $rev->id,
+                    'fecha' => $rev->fecha ? $rev->fecha->format('d/m/Y') : $rev->created_at->format('d/m/Y H:i'),
+                    'created_at' => $rev->created_at,
+                    'cant_entrada' => $cantEntrada,
+                    'cant_salida' => $cantSalida,
+                    'observacion' => $rev->detalle,
+                    'realizado_por' => $rev->realizado_por ?: ($rev->user ? $rev->user->nombreCompleto() : 'Sistema'),
+                ];
+            });
+    }
 };
 ?>
 
@@ -644,44 +720,59 @@ new class extends Component
 
     {{-- Resumen del Lote --}}
     <flux:card class="bg-zinc-50/50 dark:bg-zinc-900/50 backdrop-blur-md">
-        <div class="flex justify-between items-start mb-4">
-            <h3 class="font-bold text-zinc-900 dark:text-white text-base">
+        <div class="flex justify-between items-center mb-4 pb-3 border-b border-zinc-200/80 dark:border-zinc-800">
+            <h3 class="font-bold text-zinc-900 dark:text-white text-base flex items-center gap-2">
+                <flux:icon.squares-2x2 class="size-5 text-zinc-500 dark:text-zinc-400" />
                 {{ __('Resumen del Lote') }}
             </h3>
             <flux:button wire:click="abrirEditarArticulo" size="sm" variant="outline" icon="pencil">
                 {{ __('Editar Información') }}
             </flux:button>
         </div>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-6 text-sm">
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 text-sm">
             <div>
-                <span class="text-zinc-400 text-xs uppercase font-semibold tracking-wider">{{ __('Artículo') }}</span>
-                <div class="font-bold text-lg text-zinc-900 dark:text-white mt-1">{{ $this->articuloBase->nombre }}</div>
+                <span class="text-zinc-400 text-xs uppercase font-semibold tracking-wider block mb-1">{{ __('Código') }}</span>
+                <div class="font-mono font-bold text-base text-zinc-900 dark:text-white bg-zinc-100 dark:bg-zinc-800/80 px-2 py-0.5 rounded inline-block">
+                    {{ $this->articuloBase->codigo_patrimonial ?? '-' }}
+                </div>
             </div>
             <div>
-                <span class="text-zinc-400 text-xs uppercase font-semibold tracking-wider">{{ __('Categoría') }}</span>
-                <div class="font-bold text-lg text-zinc-900 dark:text-white mt-1">
+                <span class="text-zinc-400 text-xs uppercase font-semibold tracking-wider block mb-1">{{ __('Artículo') }}</span>
+                <div class="font-bold text-base text-zinc-900 dark:text-white">{{ $this->articuloBase->nombre }}</div>
+            </div>
+            <div>
+                <span class="text-zinc-400 text-xs uppercase font-semibold tracking-wider block mb-1">{{ __('Categoría') }}</span>
+                <div class="font-semibold text-sm text-zinc-900 dark:text-white">
                     {{ $this->articuloBase->categoria }}
                     @if($this->articuloBase->subcategoriaRel)
-                        <span class="text-xs text-zinc-400 block">{{ $this->articuloBase->subcategoriaRel->nombre }}</span>
+                        <span class="text-xs text-zinc-400 block font-normal">{{ $this->articuloBase->subcategoriaRel->nombre }}</span>
                     @endif
                 </div>
             </div>
             <div>
-                <span class="text-zinc-400 text-xs uppercase font-semibold tracking-wider">{{ __('Marca / Modelo') }}</span>
-                <div class="font-bold text-lg text-zinc-900 dark:text-white mt-1">
+                <span class="text-zinc-400 text-xs uppercase font-semibold tracking-wider block mb-1">{{ __('Marca / Modelo') }}</span>
+                <div class="font-semibold text-sm text-zinc-900 dark:text-white">
                     {{ $this->articuloBase->marca ?? '-' }} {{ $this->articuloBase->modelo ?? '' }}
                 </div>
             </div>
             <div>
-                <span class="text-zinc-400 text-xs uppercase font-semibold tracking-wider">{{ __('Fecha Adquisición') }}</span>
-                <div class="font-bold text-lg text-zinc-900 dark:text-white mt-1">
-                    {{ $this->articuloBase->fecha_ingreso ? $this->articuloBase->fecha_ingreso->format('d/m/Y') : '-' }}
+                <span class="text-zinc-400 text-xs uppercase font-semibold tracking-wider block mb-1">{{ __('Stock Disponible') }}</span>
+                <div>
+                    <span class="inline-flex items-center px-3 py-0.5 rounded-full text-sm font-extrabold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                        {{ $this->stockDisponibleTotal }} {{ $this->articuloBase->tipo === 'consumible' ? __('unid.') : __('activas') }}
+                    </span>
+                </div>
+            </div>
+            <div>
+                <span class="text-zinc-400 text-xs uppercase font-semibold tracking-wider block mb-1">{{ __('Fecha de Última adquisición o alta') }}</span>
+                <div class="font-bold text-base text-zinc-900 dark:text-white">
+                    {{ $this->fechaUltimaAdquisicion }}
                 </div>
             </div>
         </div>
     </flux:card>
 
-    {{-- Tabla de Unidades --}}
+    {{-- Tabla de Unidades / Insumos --}}
     <flux:card class="bg-zinc-50/50 dark:bg-zinc-900/50 backdrop-blur-md overflow-hidden">
         <div class="flex justify-between items-center mb-4">
             <h3 class="font-bold text-zinc-900 dark:text-white text-base">
@@ -702,8 +793,8 @@ new class extends Component
                             @if($this->articuloBase->tipo === 'consumible')
                                 <th class="px-4 py-3 w-[30%]">{{ __('Código de Barras / Patrimonial') }}</th>
                                 <th class="px-4 py-3 w-[35%]">{{ __('Ubicación Física') }}</th>
-                                <th class="px-4 py-3 w-[20%] text-center">{{ __('Stock Disponible') }}</th>
-                                <th class="px-4 py-3 text-center w-[15%]"></th>
+                                <th class="px-4 py-3 w-[15%] text-center">{{ __('Stock Disponible') }}</th>
+                                <th class="px-4 py-3 text-center w-[20%]">{{ __('Acciones') }}</th>
                             @else
                                 <th class="px-4 py-3 w-[20%]">{{ __('Código Patrimonial') }}</th>
                                 <th class="px-4 py-3 w-[15%] text-center">{{ __('Última Revisión') }}</th>
@@ -721,42 +812,47 @@ new class extends Component
                             @endphp
                             <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition {{ $isBaja ? 'opacity-60 bg-zinc-100/30 dark:bg-zinc-950/20' : '' }}">
                                 @if($this->articuloBase->tipo === 'consumible')
-                                    <td class="px-4 py-2 font-mono font-bold align-middle text-zinc-950 dark:text-white">
+                                    <td class="px-4 py-3 font-mono font-bold align-middle text-zinc-950 dark:text-white">
                                         {{ $item['codigo_patrimonial'] }}
                                     </td>
-                                    <td class="px-4 py-2 text-zinc-700 dark:text-zinc-300 align-middle">
-                                        {{ $item['ubicacion'] }}
+                                    <td class="px-4 py-3 text-zinc-700 dark:text-zinc-300 align-middle">
+                                        <div class="flex items-center gap-2">
+                                            <span>{{ $item['ubicacion'] }}</span>
+                                            <button 
+                                                type="button" 
+                                                wire:click="abrirFisicos({{ $itemId }})"
+                                                class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-0.5 rounded"
+                                                title="{{ __('Editar ubicación u observaciones') }}"
+                                            >
+                                                <flux:icon.pencil class="size-3.5" />
+                                            </button>
+                                        </div>
                                     </td>
-                                    <td class="px-4 py-2 text-center font-bold text-zinc-900 dark:text-white align-middle">
-                                        {{ $item['cantidad'] }}
+                                    <td class="px-4 py-3 text-center font-bold text-zinc-900 dark:text-white align-middle">
+                                        <span class="inline-block px-2.5 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 text-sm">
+                                            {{ $item['cantidad'] }}
+                                        </span>
                                     </td>
-                                    <td class="px-4 py-2 text-center align-middle space-x-1">
+                                    <td class="px-4 py-3 text-center align-middle space-x-1">
                                         <button 
                                             type="button" 
                                             wire:click="abrirAgregarStock({{ $itemId }})" 
-                                            class="text-green-600 hover:text-green-800 p-1 hover:bg-green-50 dark:hover:bg-green-950/30 rounded"
+                                            class="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800"
                                             title="{{ __('Agregar Stock') }}"
                                         >
-                                            <flux:icon.plus-circle class="size-4" />
+                                            <flux:icon.plus-circle class="size-3.5" />
+                                            {{ __('Agregar') }}
                                         </button>
 
                                         <button 
                                             type="button" 
                                             wire:click="abrirDescontar({{ $itemId }})" 
-                                            class="text-rose-500 hover:text-rose-700 p-1 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded"
+                                            class="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded bg-rose-50 text-rose-700 hover:bg-rose-100 dark:bg-rose-950/40 dark:text-rose-300 dark:hover:bg-rose-900/50 border border-rose-200 dark:border-rose-800"
                                             title="{{ __('Descontar / Consumir Stock') }}"
                                             @disabled($item['cantidad'] <= 0)
                                         >
-                                            <flux:icon.minus-circle class="size-4" />
-                                        </button>
-
-                                        <button 
-                                            type="button" 
-                                            wire:click="abrirRevisiones({{ $itemId }})" 
-                                            class="text-indigo-500 hover:text-indigo-700 p-1 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 rounded"
-                                            title="{{ __('Ver historial de consumos y movimientos') }}"
-                                        >
-                                            <flux:icon.clock class="size-4" />
+                                            <flux:icon.minus-circle class="size-3.5" />
+                                            {{ __('Consumir') }}
                                         </button>
                                     </td>
                                 @else
@@ -837,6 +933,74 @@ new class extends Component
                                 @endif
                             </tr>
                         @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </flux:card>
+
+    {{-- Tabla Movimientos (Entradas y Salidas) --}}
+    <flux:card class="bg-zinc-50/50 dark:bg-zinc-900/50 backdrop-blur-md overflow-hidden">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="font-bold text-zinc-900 dark:text-white text-base flex items-center gap-2">
+                <flux:icon.arrows-right-left class="size-5 text-indigo-500" />
+                {{ __('Movimientos del Artículo (Entradas y Salidas)') }}
+            </h3>
+            <span class="text-xs text-zinc-500 dark:text-zinc-400 font-medium">
+                {{ count($this->movimientosConsumible) }} {{ __('registros') }}
+            </span>
+        </div>
+
+        <div class="border border-zinc-200 dark:border-zinc-700 rounded-xl overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                        <tr class="bg-zinc-100 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-300 font-semibold border-b border-zinc-200 dark:border-zinc-700">
+                            <th class="px-4 py-3 w-[15%]">{{ __('Fecha / Hora') }}</th>
+                            <th class="px-4 py-3 w-[15%] text-center">{{ __('Cant. Entrada') }}</th>
+                            <th class="px-4 py-3 w-[15%] text-center">{{ __('Cant. Salida') }}</th>
+                            <th class="px-4 py-3 w-[35%]">{{ __('Observación / Detalle') }}</th>
+                            <th class="px-4 py-3 w-[20%]">{{ __('Registrado Por') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700/50">
+                        @forelse($this->movimientosConsumible as $mov)
+                            <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition">
+                                <td class="px-4 py-3 font-mono text-zinc-700 dark:text-zinc-300 align-middle">
+                                    {{ $mov['fecha'] }}
+                                </td>
+                                <td class="px-4 py-3 text-center align-middle">
+                                    @if($mov['cant_entrada'] && $mov['cant_entrada'] > 0)
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400">
+                                            +{{ $mov['cant_entrada'] }}
+                                        </span>
+                                    @else
+                                        <span class="text-zinc-400">-</span>
+                                    @endif
+                                </td>
+                                <td class="px-4 py-3 text-center align-middle">
+                                    @if($mov['cant_salida'] && $mov['cant_salida'] > 0)
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-400">
+                                            -{{ $mov['cant_salida'] }}
+                                        </span>
+                                    @else
+                                        <span class="text-zinc-400">-</span>
+                                    @endif
+                                </td>
+                                <td class="px-4 py-3 text-zinc-800 dark:text-zinc-200 align-middle leading-relaxed">
+                                    {{ $mov['observacion'] }}
+                                </td>
+                                <td class="px-4 py-3 text-zinc-600 dark:text-zinc-400 align-middle font-medium">
+                                    {{ $mov['realizado_por'] }}
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="5" class="px-4 py-8 text-center text-zinc-500 dark:text-zinc-400 italic">
+                                    {{ __('No hay movimientos registrados para este artículo.') }}
+                                </td>
+                            </tr>
+                        @endforelse
                     </tbody>
                 </table>
             </div>

@@ -270,6 +270,14 @@ new class extends Component
                     'fecha_ingreso' => now(),
                     'observaciones' => $this->observaciones ?: null,
                 ]);
+                \App\Models\RevisionInventario::create([
+                    'articulo_inventario_id' => $articulo->id,
+                    'fecha' => now(),
+                    'detalle' => 'Alta e ingreso inicial de unidad a bodega.',
+                    'cantidad_entrada' => 1,
+                    'realizado_por' => auth()->user()->nombreCompleto(),
+                    'user_id' => auth()->id(),
+                ]);
                 $articulosCreados[] = $articulo;
             }
         } else {
@@ -302,6 +310,16 @@ new class extends Component
                 'fecha_ingreso' => now(),
                 'observaciones' => $this->observaciones ?: null,
             ]);
+
+            \App\Models\RevisionInventario::create([
+                'articulo_inventario_id' => $articulo->id,
+                'fecha' => now(),
+                'detalle' => "Alta e ingreso inicial a bodega: +{$this->consumibleCantidad} unidades.",
+                'cantidad_entrada' => $this->consumibleCantidad,
+                'realizado_por' => auth()->user()->nombreCompleto(),
+                'user_id' => auth()->id(),
+            ]);
+
             $articulosCreados = [$articulo];
         }
 

@@ -26,7 +26,7 @@
         <livewire:admin.seleccionar-colegio />
 
         <flux:sidebar.nav>
-            @if ((auth()->user()->hasRole(['superadmin', 'estudiante']) || auth()->user()->canAny(['ver-entrevistas-propias', 'ver-entrevistas-general', 'crear-entrevistas', 'cancelar-entrevistas', 'ingresar-apoderado'])) && ($isAdmin || $modulosEntrevistas))
+            @if ((auth()->user()->hasRole(['superadmin', 'estudiante']) || auth()->user()->canAny(['ver-entrevistas-propias', 'ver-entrevistas-general', 'crear-entrevistas', 'cancelar-entrevistas', 'ingresar-apoderado', 'ver-recepcion'])) && ($isAdmin || $modulosEntrevistas))
                 <flux:sidebar.group :heading="__('Entrevistas')" class="grid">
                     @if (auth()->user()->hasRole(['superadmin', 'administrador', 'directivo']) || auth()->user()->can('ver-dashboard-entrevistas'))
                         <flux:sidebar.item icon="home" :href="route('dashboard')"
@@ -35,7 +35,7 @@
                         </flux:sidebar.item>
                     @endif
 
-                    @if (auth()->user()->can('ingresar-apoderado') || auth()->user()->hasRole('superadmin'))
+                    @if (auth()->user()->canAny(['ingresar-apoderado', 'ver-recepcion']) || auth()->user()->hasRole('superadmin'))
                         <flux:sidebar.item icon="building-office-2" :href="route('entrevistas.recepcion')"
                             :current="request()->routeIs('entrevistas.recepcion')" wire:navigate>
                             {{ __('Recepción / Portería') }}

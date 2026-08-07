@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Entrevista;
+use App\Models\LugarAtencion;
 use App\Models\User;
 use App\Notifications\EntrevistaCancelada;
 use App\Notifications\IngresoApoderado;
@@ -333,4 +334,23 @@ test('user with ver-recepcion permission can view reception page but cannot regi
         ->set('lugarIngreso', 'BOX 1')
         ->call('registrarIngreso')
         ->assertStatus(403);
+});
+
+test('receptionist can delete an attention place', function () {
+    [$user, $entrevista] = setupTestEnvironment();
+
+    $lugar = LugarAtencion::create([
+        'school_id' => $entrevista->school_id,
+        'nombre' => 'LUGAR DUPLICADO',
+        'activo' => true,
+    ]);
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::entrevistas.recepcion')
+        ->call('eliminarLugar', $lugar->id);
+
+    $this->assertDatabaseMissing('lugares_atencion', [
+        'id' => $lugar->id,
+    ]);
 });

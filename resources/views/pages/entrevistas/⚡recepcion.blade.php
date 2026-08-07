@@ -333,6 +333,20 @@ new class extends Component {
         
         Flux::toast('Lugar de atención agregado con éxito.', variant: 'success');
     }
+
+    public function eliminarLugar($id)
+    {
+        abort_unless($this->canIngresar, 403);
+
+        $lugar = LugarAtencion::where('school_id', auth()->user()->current_school_id)->find($id);
+
+        if ($lugar) {
+            $nombreLugar = $lugar->nombre;
+            $lugar->delete();
+
+            Flux::toast("Lugar '{$nombreLugar}' eliminado con éxito.", variant: 'success');
+        }
+    }
 };
 ?>
 <div class="max-w-7xl mx-auto w-full pb-10">
@@ -679,6 +693,9 @@ new class extends Component {
                         <th class="px-6 py-4">Estado</th>
                         <th class="px-6 py-4">Docente a cargo</th>
                         <th class="px-6 py-4">Apoderado en interior</th>
+                        @if ($this->canIngresar)
+                            <th class="px-6 py-4 text-right">Acción</th>
+                        @endif
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-zinc-200 dark:divide-zinc-800/60">
@@ -733,10 +750,38 @@ new class extends Component {
                                     <span class="text-zinc-400 text-sm">-</span>
                                 @endif
                             </td>
+                            @if ($this->canIngresar)
+                                <td class="px-6 py-4 text-right">
+                                    <flux:modal.trigger name="confirmar-eliminar-lugar-{{ $box->id }}">
+                                        <flux:button size="xs" variant="ghost" class="text-zinc-400 hover:text-red-600 dark:hover:text-red-400 cursor-pointer" title="Eliminar lugar de atención">
+                                            <flux:icon.trash class="size-4" />
+                                        </flux:button>
+                                    </flux:modal.trigger>
+
+                                    <flux:modal name="confirmar-eliminar-lugar-{{ $box->id }}" class="min-w-[22rem]">
+                                        <div class="space-y-6 text-left">
+                                            <div>
+                                                <flux:heading size="lg">¿Eliminar lugar de atención?</flux:heading>
+                                                <flux:text class="mt-2 text-sm">
+                                                    ¿Estás seguro de eliminar el lugar <strong>{{ $box->nombre }}</strong>? Esta acción no se puede deshacer.
+                                                </flux:text>
+                                            </div>
+                                            <div class="flex gap-2 justify-end">
+                                                <flux:modal.close>
+                                                    <flux:button variant="ghost">Cancelar</flux:button>
+                                                </flux:modal.close>
+                                                <flux:modal.close>
+                                                    <flux:button variant="danger" wire:click="eliminarLugar({{ $box->id }})">Sí, eliminar</flux:button>
+                                                </flux:modal.close>
+                                            </div>
+                                        </div>
+                                    </flux:modal>
+                                </td>
+                            @endif
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="4" class="px-6 py-8 text-center text-zinc-500">
+                            <td colspan="{{ $this->canIngresar ? 5 : 4 }}" class="px-6 py-8 text-center text-zinc-500">
                                 No hay lugares configurados en el sistema.
                             </td>
                         </tr>

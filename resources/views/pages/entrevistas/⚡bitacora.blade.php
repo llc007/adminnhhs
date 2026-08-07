@@ -1061,6 +1061,20 @@ new class extends Component {
                         <p class="text-[10px] font-bold text-[#00376e]/70 dark:text-blue-300/70 uppercase tracking-widest mb-1">Nivel de Urgencia</p>
                         <flux:badge color="{{ $entrevista->urgencia === 'alta' ? 'red' : ($entrevista->urgencia === 'media' ? 'amber' : 'zinc') }}" size="sm">{{ ucfirst($entrevista->urgencia ?? 'normal') }}</flux:badge>
                     </div>
+                    <div>
+                        <p class="text-[10px] font-bold text-[#00376e]/70 dark:text-blue-300/70 uppercase tracking-widest mb-1">Lugar de Atención</p>
+                        @if (!empty($entrevista->lugar) && strtoupper($entrevista->lugar) !== 'PENDIENTE')
+                            <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
+                                <flux:icon.map-pin class="size-3.5 text-emerald-500" />
+                                <span>{{ $entrevista->lugar }}</span>
+                            </div>
+                        @else
+                            <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">
+                                <flux:icon.map-pin class="size-3.5 text-zinc-400" />
+                                <span>Sin asignar / Pendiente</span>
+                            </div>
+                        @endif
+                    </div>
                     @if($entrevista->notas_previas)
                     <div>
                         <p class="text-[10px] font-bold text-[#00376e]/70 dark:text-blue-300/70 uppercase tracking-widest mb-1">Observaciones previas</p>

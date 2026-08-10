@@ -173,26 +173,13 @@ new class extends Component {
         $dateObj = Carbon::parse($this->fechaSeleccionada);
 
         $userId = $user->id;
-        $canGeneral = $user->can('ver-entrevistas-general') || $user->can('ver-bitacoras');
-        $canConfidenciales = $user->can('ver-entrevistas-confidenciales') || $user->hasRole('psicosocial');
 
-        // Buscar TODAS las entrevistas del MES (Para métricas y agenda)
+        // Buscar TODAS las entrevistas del MES del usuario (Para métricas y agenda)
         $entrevistasMes = Entrevista::with(['estudiante.curso'])
             ->where('school_id', $user->current_school_id)
-            ->where(function ($q) use ($userId, $user, $canGeneral, $canConfidenciales) {
+            ->where(function ($q) use ($userId, $user) {
                 if (! $user->hasRole('superadmin')) {
-                    $q->where('user_id', $userId)
-                        ->orWhereHas('accesosCompartidos', function ($sub) use ($userId) {
-                            $sub->where('user_id', $userId);
-                        });
-
-                    if ($canGeneral) {
-                        $q->orWhere('es_confidencial', false);
-                    }
-
-                    if ($canConfidenciales) {
-                        $q->orWhere('es_confidencial', true);
-                    }
+                    $q->where('user_id', $userId);
                 }
             })
             ->whereMonth('fecha', $dateObj->month)

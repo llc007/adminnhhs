@@ -179,6 +179,7 @@ new class extends Component {
         return \App\Models\User::query()
             ->where('current_school_id', $schoolId)
             ->whereNotIn('id', $idsExistentes)
+            ->whereDoesntHave('estudiante')
             ->when(trim($this->searchUsuarioCompartir) !== '', function ($q) {
                 $term = trim($this->searchUsuarioCompartir);
                 $q->where(function ($sub) use ($term) {
@@ -188,7 +189,6 @@ new class extends Component {
                 });
             })
             ->orderBy('nombres', 'asc')
-            ->take(15)
             ->get();
     }
 

@@ -65,8 +65,8 @@ class SchoolSeeder extends Seeder
         $user->update(['current_school_id' => $school->id]);
 
         // Adjuntar al colegio con roles (o actualizar si ya existe)
-        $user->syncRolesForSchool($school->id, ['administrador', 'docente']);
+        $user->syncRolesForSchool($school->id, ['superadmin', 'administrador', 'docente']);
 
-        $this->command->info("👤 Usuario administrador ({$user->email}) asociado con roles: administrador, docente");
+        $this->command->info("👤 Usuario administrador ({$user->email}) asociado con roles: superadmin, administrador, docente");
     }
 }

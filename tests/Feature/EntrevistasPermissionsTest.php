@@ -217,3 +217,49 @@ test('user with eliminar-entrevistas permission can delete interview', function 
 
     expect(Entrevista::find($entrevista->id))->toBeNull();
 });
+
+test('agenda page shows only own interviews and does not show shared or other general interviews', function () {
+    [$user, $entrevista, $schoolId] = setupSchoolAndUser(['docente'], ['ver-entrevistas-propias', 'ver-entrevistas-general']);
+
+    $otherUser = User::factory()->create(['current_school_id' => $schoolId]);
+    $sharedEntrevista = Entrevista::create([
+        'school_id' => $schoolId,
+        'user_id' => $otherUser->id,
+        'estudiante_id' => $entrevista->estudiante_id,
+        'fecha' => now()->format('Y-m-d'),
+        'hora' => '11:00:00',
+        'motivo' => 'Shared Reunion',
+        'urgencia' => 'normal',
+        'estado' => 'pendiente',
+    ]);
+
+    DB::table('entrevista_compartida')->insert([
+        'entrevista_id' => $sharedEntrevista->id,
+        'user_id' => $user->id,
+        'granted_by_user_id' => $otherUser->id,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $generalEntrevista = Entrevista::create([
+        'school_id' => $schoolId,
+        'user_id' => $otherUser->id,
+        'estudiante_id' => $entrevista->estudiante_id,
+        'fecha' => now()->format('Y-m-d'),
+        'hora' => '12:00:00',
+        'motivo' => 'General Reunion',
+        'urgencia' => 'normal',
+        'estado' => 'pendiente',
+        'es_confidencial' => false,
+    ]);
+
+    $response = Livewire::actingAs($user)
+        ->test('pages::entrevistas.agenda');
+
+    $items = $response->viewData('entrevistasLista') ?? $response->get('entrevistasLista');
+    $ids = collect($items)->pluck('id')->toArray();
+
+    expect($ids)->toContain($entrevista->id);
+    expect($ids)->not->toContain($sharedEntrevista->id);
+    expect($ids)->not->toContain($generalEntrevista->id);
+});

@@ -257,7 +257,7 @@ new class extends Component {
             <section
                 class="rounded-2xl bg-gradient-to-r from-[#00376e] to-blue-800 p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 overflow-hidden relative shadow-lg">
                 <div class="relative z-10 text-white">
-                    <h2 class="text-2xl font-extrabold mb-2">Próxima Entrevista</h2>
+                    <h2 class="text-2xl font-extrabold mb-2 flex items-center gap-2">Próxima Entrevista <span class="text-xs font-mono text-blue-200 bg-white/10 px-2 py-0.5 rounded-md font-bold">#{{ $proxima->id }}</span></h2>
                     <p class="text-blue-100 font-medium flex items-center gap-2 text-sm sm:text-base">
                         @if ($proxima->estado === 'ingresada')
                             <span class="relative flex h-3 w-3">
@@ -338,8 +338,7 @@ new class extends Component {
                                 <p class="text-[10px] font-bold text-zinc-400 uppercase truncate mb-0.5">{{ \Carbon\Carbon::parse($cita->fecha)->format('d M') }}</p>
                                 <p class="text-sm font-bold {{ $estasRendido ? 'text-zinc-500' : 'text-[#00376e] dark:text-blue-400' }}">
                                     {{ \Carbon\Carbon::parse($cita->hora)->format('H:i') }}</p>
-                                <p class="text-[10px] font-bold text-zinc-400 uppercase">
-                                    {{ \Carbon\Carbon::parse($cita->hora)->format('A') }}</p>
+                                <p class="text-[10px] font-bold font-mono text-zinc-400 dark:text-zinc-500 mt-0.5">#{{ $cita->id }}</p>
                             </div>
 
                             <!-- Main Info -->

@@ -113,18 +113,24 @@ new class extends Component {
 
         if (trim($this->searchTexto) !== '') {
             $words = array_filter(explode(' ', trim($this->searchTexto)));
-            $query->whereHas('estudiante', function ($q) use ($words) {
+            $query->where(function ($q) use ($words) {
                 foreach ($words as $word) {
                     $w = trim($word);
                     if ($w === '') {
                         continue;
                     }
-                    $q->where(function ($sub) use ($w) {
-                        $sub->where('nombres_csv', 'like', "%{$w}%")
-                            ->orWhere('rut_numero', 'like', "%{$w}%")
-                            ->orWhere('apoderado_nombres', 'like', "%{$w}%")
-                            ->orWhere('apoderado_apellido_pat', 'like', "%{$w}%")
-                            ->orWhere('apoderado_apellido_mat', 'like', "%{$w}%");
+                    $cleanId = ltrim($w, '#');
+                    $q->where(function ($sub) use ($w, $cleanId) {
+                        if (is_numeric($cleanId)) {
+                            $sub->orWhere('id', (int) $cleanId);
+                        }
+                        $sub->orWhereHas('estudiante', function ($sq) use ($w) {
+                            $sq->where('nombres_csv', 'like', "%{$w}%")
+                                ->orWhere('rut_numero', 'like', "%{$w}%")
+                                ->orWhere('apoderado_nombres', 'like', "%{$w}%")
+                                ->orWhere('apoderado_apellido_pat', 'like', "%{$w}%")
+                                ->orWhere('apoderado_apellido_mat', 'like', "%{$w}%");
+                        });
                     });
                 }
             });
@@ -421,6 +427,7 @@ new class extends Component {
                                 <span class="text-2xl font-black {{ $hourClass }}">
                                     {{ \Carbon\Carbon::parse($cita->hora)->format('H:i') }}
                                 </span>
+                                <p class="text-[10px] font-bold font-mono text-zinc-400 dark:text-zinc-500 tracking-wider">#{{ $cita->id }}</p>
                             </td>
                             <td class="px-6 py-5">
                                 @if($cita->estudiante)

@@ -143,3 +143,49 @@ test('filtering tasks by frequency tab works', function () {
         ->assertSee('Mantenimiento Semestral Proyectores')
         ->assertDontSee('Tarea Diaria X');
 });
+
+test('switching between active and archived views works and reopening an archived task moves it back to active', function () {
+    $user = User::factory()->create();
+    $schoolId = DB::table('schools')->insertGetId([
+        'name' => 'Test School',
+        'domain' => 'test.com',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    $user->update(['current_school_id' => $schoolId]);
+    $user->syncRolesForSchool($schoolId, ['ti']);
+    $this->actingAs($user);
+
+    $activa = TiTask::create([
+        'titulo' => 'Tarea Activa Pendiente',
+        'frecuencia' => 'diaria',
+        'estado' => 'pendiente',
+        'fecha_programada' => now()->format('Y-m-d'),
+        'creado_por' => $user->id,
+    ]);
+
+    $completada = TiTask::create([
+        'titulo' => 'Tarea Ya Finalizada',
+        'frecuencia' => 'semanal',
+        'estado' => 'completada',
+        'fecha_completada' => now(),
+        'notas_cierre' => 'Revisión efectuada',
+        'creado_por' => $user->id,
+    ]);
+
+    Livewire::test('pages::ti.tareas.index')
+        ->assertSet('vista', 'activas')
+        ->assertSee('Tarea Activa Pendiente')
+        ->assertDontSee('Tarea Ya Finalizada')
+        ->set('vista', 'archivadas')
+        ->assertSee('Tarea Ya Finalizada')
+        ->assertSee('Revisión efectuada')
+        ->assertDontSee('Tarea Activa Pendiente')
+        ->call('reabrirTarea', $completada->id)
+        ->assertSet('vista', 'archivadas')
+        ->assertDontSee('Tarea Ya Finalizada')
+        ->set('vista', 'activas')
+        ->assertSee('Tarea Ya Finalizada');
+
+    expect($completada->refresh()->estado)->toBe('pendiente');
+});

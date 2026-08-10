@@ -148,8 +148,12 @@ new class extends Component {
                     if ($w === '') {
                         continue;
                     }
-                    $q->where(function ($sub) use ($w) {
-                        $sub->whereHas('estudiante', function ($sq) use ($w) {
+                    $cleanId = ltrim($w, '#');
+                    $q->where(function ($sub) use ($w, $cleanId) {
+                        if (is_numeric($cleanId)) {
+                            $sub->orWhere('id', (int) $cleanId);
+                        }
+                        $sub->orWhereHas('estudiante', function ($sq) use ($w) {
                             $sq->where('nombres_csv', 'like', '%'.$w.'%')
                                 ->orWhere('rut_numero', 'like', '%'.$w.'%');
                         })->orWhereHas('user', function ($sq) use ($w) {
@@ -388,8 +392,10 @@ new class extends Component {
                                 <span
                                     class="font-semibold text-zinc-800 dark:text-zinc-200">{{ \Carbon\Carbon::parse($entrevista->fecha)->translatedFormat('d M, Y') }}</span>
                             </div>
-                            <p class="text-xs text-zinc-500 ml-6">
-                                {{ \Carbon\Carbon::parse($entrevista->hora)->format('H:i') }} hrs</p>
+                            <div class="flex items-center gap-2 text-xs text-zinc-500 ml-6 mt-0.5">
+                                <span>{{ \Carbon\Carbon::parse($entrevista->hora)->format('H:i') }} hrs</span>
+                                <span class="font-mono text-[11px] font-bold text-zinc-400 dark:text-zinc-500">#{{ $entrevista->id }}</span>
+                            </div>
                         </flux:table.cell>
 
                         <flux:table.cell>

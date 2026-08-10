@@ -94,10 +94,11 @@ Route::middleware(['auth', 'verified', 'role_or_permission:ti|administrador|supe
     Route::livewire('/inventario/detalles/{id}', 'pages::inventario.detalles')->name('inventario.detalles');
 });
 
-// Módulo de Informática (TI) — Préstamos
+// Módulo de Informática (TI) — Préstamos y Tareas
 Route::middleware(['auth', 'verified', 'role_or_permission:ti|administrador|superadmin|gestionar-prestamos'])->group(function () {
     Route::livewire('/ti/prestamos', 'pages::ti.prestamos.index')->name('ti.prestamos.index');
     Route::livewire('/ti/prestamos/crear', 'pages::ti.prestamos.crear')->name('ti.prestamos.crear');
+    Route::livewire('/ti/tareas', 'pages::ti.tareas.index')->name('ti.tareas.index');
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {

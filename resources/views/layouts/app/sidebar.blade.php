@@ -153,6 +153,10 @@
                             :current="request()->routeIs('ti.prestamos.*')" wire:navigate>
                             {{ __('Préstamos') }}
                         </flux:sidebar.item>
+                        <flux:sidebar.item icon="clipboard-document-check" :href="route('ti.tareas.index')"
+                            :current="request()->routeIs('ti.tareas.*')" wire:navigate>
+                            {{ __('Tareas de TI') }}
+                        </flux:sidebar.item>
                     @else
                         <flux:sidebar.item icon="briefcase" :href="route('ti.prestamos.mis_prestamos')"
                             :current="request()->routeIs('ti.prestamos.mis_prestamos')" wire:navigate>

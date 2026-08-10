@@ -154,3 +154,92 @@ test('docente without permission cannot see or create confidential switch', func
         ->test('pages::entrevistas.crear')
         ->assertSee('🔒 Entrevista Confidencial / Privada');
 });
+
+test('usuariosDisponibles method of Bitacora page excludes students and lists all other staff members without 15 limit', function () {
+    [$school, $superadmin, $psicologo, $docenteA, $docenteB, $estudiante] = setupEntrevistaEnv();
+
+    $academicYearId = DB::table('academic_years')->insertGetId([
+        'school_id' => $school->id,
+        'name' => 'Academic Year 2026',
+        'start_date' => '2026-01-01',
+        'end_date' => '2026-12-31',
+        'is_active' => true,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $cursoId = DB::table('cursos')->insertGetId([
+        'school_id' => $school->id,
+        'academic_year_id' => $academicYearId,
+        'nivel' => 1,
+        'modalidad' => 'media',
+        'letra' => 'A',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $estudiante->curso_id = $cursoId;
+    $estudiante->save();
+    $estudiante->refresh();
+
+    // Create directivo user
+    $roleDirectivo = Role::findOrCreate('directivo', 'web');
+    $directivoUser = User::factory()->create(['current_school_id' => $school->id, 'nombres' => 'Directivo User']);
+    $directivoUser->syncRolesForSchool($school->id, ['directivo']);
+
+    // Create assistant user (should be excluded)
+    $roleAsistente = Role::findOrCreate('asistente', 'web');
+    $asistenteUser = User::factory()->create(['current_school_id' => $school->id, 'nombres' => 'Asistente User']);
+    $asistenteUser->syncRolesForSchool($school->id, ['asistente']);
+
+    // Create more than 15 teachers to make sure they are not limited to 15
+    $teachers = [];
+    for ($i = 0; $i < 20; $i++) {
+        $user = User::factory()->create(['current_school_id' => $school->id, 'nombres' => "Teacher {$i}"]);
+        $user->syncRolesForSchool($school->id, ['docente']);
+        $teachers[] = $user;
+    }
+
+    // Create a user who is a student (has associated student record)
+    Role::findOrCreate('estudiante', 'web');
+    $studentUser = User::factory()->create(['current_school_id' => $school->id, 'nombres' => 'Student User']);
+    $studentUser->syncRolesForSchool($school->id, ['estudiante']);
+    Estudiante::create([
+        'school_id' => $school->id,
+        'user_id' => $studentUser->id,
+        'rut_numero' => 98765432,
+        'rut_dv' => '1',
+        'nombres_csv' => 'Student User',
+    ]);
+
+    // Create interview
+    $entrevista = Entrevista::create([
+        'school_id' => $school->id,
+        'user_id' => $psicologo->id,
+        'estudiante_id' => $estudiante->id,
+        'fecha' => now()->toDateString(),
+        'hora' => '10:00',
+        'urgencia' => 'normal',
+        'motivo' => 'Test',
+        'estado' => 'pendiente',
+    ]);
+
+    $component = Livewire::actingAs($psicologo)
+        ->test('pages::entrevistas.bitacora', ['entrevista' => $entrevista]);
+
+    // When search input is empty, dropdown should be closed (0 results)
+    $disponiblesInicial = $component->get('usuariosDisponibles');
+    expect(count($disponiblesInicial))->toBe(0);
+
+    // Live search for directivo user returns directivoUser, excludes assistant, student, and creator
+    $component->set('searchUsuarioCompartir', 'Directivo');
+    $searchIds = collect($component->get('usuariosDisponibles'))->pluck('id')->toArray();
+    expect($searchIds)->toContain($directivoUser->id);
+    expect($searchIds)->not->toContain($asistenteUser->id);
+    expect($searchIds)->not->toContain($studentUser->id);
+    expect($searchIds)->not->toContain($psicologo->id);
+
+    // Selecting directivoUser sets selectedUserIdCompartir
+    $component->call('seleccionarUsuarioCompartir', $directivoUser->id);
+    expect($component->get('selectedUserIdCompartir'))->toBe($directivoUser->id);
+});

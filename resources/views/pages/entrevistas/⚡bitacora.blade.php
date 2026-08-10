@@ -140,9 +140,31 @@ new class extends Component {
         $usuarioTarget->notify(new \App\Notifications\EntrevistaCompartidaNotification($this->entrevista, auth()->user()));
 
         $this->selectedUserIdCompartir = null;
+        $this->searchUsuarioCompartir = '';
         $this->entrevista->load(['accesosCompartidos.user', 'accesosCompartidos.grantedBy']);
 
         \Flux::toast("Acceso concedido exitosamente a {$usuarioTarget->nombreCompleto()}.", variant: 'success');
+    }
+
+    public function seleccionarUsuarioCompartir(int $id): void
+    {
+        $usr = \App\Models\User::find($id);
+        if ($usr) {
+            $this->selectedUserIdCompartir = $usr->id;
+            $this->searchUsuarioCompartir = $usr->nombreCompleto() . ' (' . $usr->email . ')';
+        }
+        $this->resetErrorBag('selectedUserIdCompartir');
+    }
+
+    public function updatedSearchUsuarioCompartir(): void
+    {
+        if ($this->selectedUserIdCompartir) {
+            $usr = \App\Models\User::find($this->selectedUserIdCompartir);
+            $currentLabel = $usr ? $usr->nombreCompleto() . ' (' . $usr->email . ')' : '';
+            if ($this->searchUsuarioCompartir !== $currentLabel) {
+                $this->selectedUserIdCompartir = null;
+            }
+        }
     }
 
     public function revocarAccesoCompartido(int $accesoId): void
@@ -172,23 +194,52 @@ new class extends Component {
     #[\Livewire\Attributes\Computed]
     public function usuariosDisponibles()
     {
+        if ($this->selectedUserIdCompartir) {
+            $usr = \App\Models\User::find($this->selectedUserIdCompartir);
+            if ($usr && $this->searchUsuarioCompartir === $usr->nombreCompleto() . ' (' . $usr->email . ')') {
+                return collect();
+            }
+        }
+
+        $term = trim($this->searchUsuarioCompartir);
+        if (strlen($term) < 2) {
+            return collect();
+        }
+
         $schoolId = auth()->user()->current_school_id;
         $idsExistentes = $this->entrevista->accesosCompartidos()->pluck('user_id')->toArray();
         $idsExistentes[] = $this->entrevista->user_id;
 
+        $targetRoles = ['docente', 'directivo', 'psicosocial'];
+        $words = array_filter(explode(' ', $term));
+
         return \App\Models\User::query()
             ->where('current_school_id', $schoolId)
             ->whereNotIn('id', $idsExistentes)
-            ->when(trim($this->searchUsuarioCompartir) !== '', function ($q) {
-                $term = trim($this->searchUsuarioCompartir);
-                $q->where(function ($sub) use ($term) {
-                    $sub->where('nombres', 'like', "%{$term}%")
-                        ->orWhere('apellido_pat', 'like', "%{$term}%")
-                        ->orWhere('email', 'like', "%{$term}%");
-                });
+            ->whereDoesntHave('estudiante')
+            ->whereHas('roles', function ($q) use ($targetRoles, $schoolId) {
+                $q->whereIn('roles.name', $targetRoles)
+                    ->where(function ($sub) use ($schoolId) {
+                        $sub->where('roles.team_id', $schoolId)
+                            ->orWhereNull('roles.team_id');
+                    });
+            })
+            ->where(function ($sub) use ($words) {
+                foreach ($words as $word) {
+                    $w = trim($word);
+                    if ($w === '') {
+                        continue;
+                    }
+                    $sub->where(function ($wQ) use ($w) {
+                        $wQ->where('nombres', 'like', "%{$w}%")
+                            ->orWhere('apellido_pat', 'like', "%{$w}%")
+                            ->orWhere('apellido_mat', 'like', "%{$w}%")
+                            ->orWhere('email', 'like', "%{$w}%");
+                    });
+                }
             })
             ->orderBy('nombres', 'asc')
-            ->take(15)
+            ->take(10)
             ->get();
     }
 
@@ -1553,29 +1604,62 @@ new class extends Component {
 
             {{-- Conceder Nuevo Acceso --}}
             <div class="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 space-y-3">
-                <flux:field>
-                    <flux:label class="font-bold text-xs uppercase tracking-wider text-zinc-500">{{ __('Buscar Funcionario / Docente') }}</flux:label>
+                <div class="relative z-20 w-full">
                     <flux:input 
-                        wire:model.live.debounce.250ms="searchUsuarioCompartir" 
-                        icon="magnifying-glass" 
-                        placeholder="Escriba el nombre o correo del profesor..." 
+                        wire:model.live.debounce.250ms="searchUsuarioCompartir"
+                        :label="__('Buscar Funcionario / Docente (Docente, Directivo, Psicosocial)')" 
+                        icon="magnifying-glass"
+                        placeholder="Escriba nombre o correo del profesional..." 
+                        autocomplete="off" 
                     />
-                </flux:field>
 
-                <flux:field>
-                    <flux:label class="font-bold text-xs uppercase tracking-wider text-zinc-500">{{ __('Seleccionar Usuario') }}</flux:label>
-                    <flux:select wire:model="selectedUserIdCompartir" placeholder="-- Seleccionar usuario --">
-                        @foreach($this->usuariosDisponibles as $usr)
-                            <flux:select.option value="{{ $usr->id }}">
-                                {{ $usr->nombreCompleto() }} ({{ $usr->email }})
-                            </flux:select.option>
-                        @endforeach
-                    </flux:select>
+                    <div wire:loading wire:target="searchUsuarioCompartir" class="mt-2 flex items-center gap-2 text-xs font-semibold text-blue-600 dark:text-blue-400">
+                        <flux:icon.arrow-path class="size-4 animate-spin shrink-0" />
+                        <span>{{ __('Buscando profesionales...') }}</span>
+                    </div>
+
+                    {{-- Dropdown desplegable de resultados --}}
+                    @if (count($this->usuariosDisponibles) > 0)
+                        <div class="absolute mt-1 w-full bg-white dark:bg-zinc-800 rounded-lg shadow-xl border border-zinc-200 dark:border-zinc-700 z-50 overflow-hidden outline-none">
+                            <ul class="max-h-56 overflow-y-auto divide-y divide-zinc-100 dark:divide-zinc-700/50">
+                                @foreach ($this->usuariosDisponibles as $usr)
+                                    <li>
+                                        <button 
+                                            type="button" 
+                                            wire:click="seleccionarUsuarioCompartir({{ $usr->id }})"
+                                            class="w-full text-left px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition flex flex-col items-start gap-0.5 focus:outline-none focus:bg-blue-50 dark:focus:bg-blue-950/40">
+                                            <span class="font-bold text-xs text-zinc-900 dark:text-zinc-100">
+                                                {{ $usr->nombreCompleto() }}
+                                            </span>
+                                            <span class="text-[11px] text-zinc-500 dark:text-zinc-400">
+                                                {{ $usr->email }}
+                                            </span>
+                                        </button>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
+
                     <flux:error name="selectedUserIdCompartir" />
-                </flux:field>
+                </div>
 
-                <div class="flex justify-end pt-2">
-                    <flux:button variant="primary" icon="plus" wire:click="concederAccesoCompartido" class="bg-[#00376e] text-white font-bold text-xs">
+                @if ($selectedUserIdCompartir)
+                    <div class="flex items-center justify-between p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-xs">
+                        <div class="flex items-center gap-2">
+                            <flux:icon.check-circle class="size-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                            <span class="font-semibold text-emerald-900 dark:text-emerald-200">Usuario listo para conceder acceso</span>
+                        </div>
+                    </div>
+                @endif
+
+                <div class="flex justify-end pt-1">
+                    <flux:button 
+                        variant="primary" 
+                        icon="plus" 
+                        wire:click="concederAccesoCompartido" 
+                        class="bg-[#00376e] text-white font-bold text-xs"
+                        :disabled="!$selectedUserIdCompartir">
                         Conceder Acceso
                     </flux:button>
                 </div>

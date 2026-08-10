@@ -182,18 +182,28 @@ test('usuariosDisponibles method of Bitacora page excludes students and lists al
     $estudiante->save();
     $estudiante->refresh();
 
+    // Create directivo user
+    $roleDirectivo = Role::findOrCreate('directivo', 'web');
+    $directivoUser = User::factory()->create(['current_school_id' => $school->id, 'nombres' => 'Directivo User']);
+    $directivoUser->syncRolesForSchool($school->id, ['directivo']);
+
+    // Create assistant user (should be excluded)
+    $roleAsistente = Role::findOrCreate('asistente', 'web');
+    $asistenteUser = User::factory()->create(['current_school_id' => $school->id, 'nombres' => 'Asistente User']);
+    $asistenteUser->syncRolesForSchool($school->id, ['asistente']);
+
     // Create more than 15 teachers to make sure they are not limited to 15
     $teachers = [];
     for ($i = 0; $i < 20; $i++) {
         $user = User::factory()->create(['current_school_id' => $school->id, 'nombres' => "Teacher {$i}"]);
-        $user->assignRole('docente');
+        $user->syncRolesForSchool($school->id, ['docente']);
         $teachers[] = $user;
     }
 
     // Create a user who is a student (has associated student record)
     Role::findOrCreate('estudiante', 'web');
     $studentUser = User::factory()->create(['current_school_id' => $school->id, 'nombres' => 'Student User']);
-    $studentUser->assignRole('estudiante');
+    $studentUser->syncRolesForSchool($school->id, ['estudiante']);
     Estudiante::create([
         'school_id' => $school->id,
         'user_id' => $studentUser->id,
@@ -217,17 +227,19 @@ test('usuariosDisponibles method of Bitacora page excludes students and lists al
     $component = Livewire::actingAs($psicologo)
         ->test('pages::entrevistas.bitacora', ['entrevista' => $entrevista]);
 
-    $disponibles = $component->get('usuariosDisponibles');
-    $ids = collect($disponibles)->pluck('id')->toArray();
+    // When search input is empty, dropdown should be closed (0 results)
+    $disponiblesInicial = $component->get('usuariosDisponibles');
+    expect(count($disponiblesInicial))->toBe(0);
 
-    // Should contain docenteA, docenteB, and all the 20 teachers
-    expect($ids)->toContain($docenteA->id);
-    expect($ids)->toContain($docenteB->id);
-    foreach ($teachers as $t) {
-        expect($ids)->toContain($t->id);
-    }
-    // Should NOT contain the student user
-    expect($ids)->not->toContain($studentUser->id);
-    // Should NOT contain the psicologo (already creator)
-    expect($ids)->not->toContain($psicologo->id);
+    // Live search for directivo user returns directivoUser, excludes assistant, student, and creator
+    $component->set('searchUsuarioCompartir', 'Directivo');
+    $searchIds = collect($component->get('usuariosDisponibles'))->pluck('id')->toArray();
+    expect($searchIds)->toContain($directivoUser->id);
+    expect($searchIds)->not->toContain($asistenteUser->id);
+    expect($searchIds)->not->toContain($studentUser->id);
+    expect($searchIds)->not->toContain($psicologo->id);
+
+    // Selecting directivoUser sets selectedUserIdCompartir
+    $component->call('seleccionarUsuarioCompartir', $directivoUser->id);
+    expect($component->get('selectedUserIdCompartir'))->toBe($directivoUser->id);
 });

@@ -1257,6 +1257,7 @@ new class extends Component {
                 <span class="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1">Motivos Rápidos</span>
                 <div class="flex flex-wrap gap-2">
                     <flux:badge as="button" wire:click="setMotivoPredeterminado('Apoderado no asistió a la cita programada sin dar aviso previo.', 'ausente')" class="cursor-pointer border hover:bg-zinc-100 dark:hover:bg-zinc-700">Apoderado no asistió (Ausente)</flux:badge>
+                    <flux:badge as="button" wire:click="setMotivoPredeterminado('Apoderado llegó tarde a la cita y no fue posible realizar la entrevista.', 'ausente')" class="cursor-pointer border hover:bg-zinc-100 dark:hover:bg-zinc-700">Apoderado llegó tarde (Ausente)</flux:badge>
                     <flux:badge as="button" wire:click="setMotivoPredeterminado('Apoderado avisó previamente que no asistiría.', 'cancelada')" class="cursor-pointer border hover:bg-zinc-100 dark:hover:bg-zinc-700">Avisó inasistencia (Cancelada)</flux:badge>
                     <flux:badge as="button" wire:click="setMotivoPredeterminado('Error al agendar la cita. Entrevista anulada.', 'cancelada')" class="cursor-pointer border hover:bg-zinc-100 dark:hover:bg-zinc-700">Error al agendar (Cancelada)</flux:badge>
                 </div>
@@ -1265,7 +1266,7 @@ new class extends Component {
             <form wire:submit.prevent="marcarNoRealizada" class="space-y-5">
                 <flux:select wire:model="estadoNoRealizada" label="Estado Oficial" required>
                     <option value="" disabled>Seleccione un estado...</option>
-                    <option value="ausente">Ausente (No se presentó a la cita)</option>
+                    <option value="ausente">Ausente (No se presentó o llegó tarde a la cita)</option>
                     <option value="cancelada">Cancelada (Avisó previamente o fue error)</option>
                 </flux:select>
 

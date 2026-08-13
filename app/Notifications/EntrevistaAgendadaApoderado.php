@@ -46,22 +46,27 @@ class EntrevistaAgendadaApoderado extends Notification implements ShouldQueue
         $fecha = Carbon::parse($this->entrevista->fecha)->translatedFormat('l d \d\e F, Y');
         $hora = Carbon::parse($this->entrevista->hora)->format('H:i');
 
-        $mail = (new MailMessage)
-            ->subject('Citación a Entrevista - Liceo New Heaven High School');
-
         $confirmUrl = route('entrevistas.confirmacion_publica', ['token' => $this->entrevista->confirmacion_token]);
 
-        return (new MailMessage)
+        $mail = (new MailMessage)
             ->subject('Citación a Entrevista - Liceo New Heaven High School')
             ->greeting('Estimado/a apoderado/a,')
             ->line('Le informamos que ha sido citado a una entrevista respecto al estudiante **'.$estudiante->nombreCompleto().'**, por el/la docente **'.$docente->nombreCompleto().'**.')
             ->line('**Fecha de la entrevista:** '.$fecha)
             ->line('**Hora:** '.$hora)
             ->line('**Modalidad/Lugar:** '.$this->entrevista->lugar)
-            ->line('Le solicitamos puntualidad. Si la entrevista es presencial, por favor anuncie su llegada en recepción.')
+            ->line('**Motivo:** '.ucfirst($this->entrevista->motivo ?? 'General'));
+
+        if (! empty($this->entrevista->notas_previas)) {
+            $mail->line('**Temas a tratar:** '.$this->entrevista->notas_previas);
+        }
+
+        $mail->line('Le solicitamos puntualidad. Si la entrevista es presencial, por favor anuncie su llegada en recepción.')
             ->action('Confirmar o Rechazar Asistencia', $confirmUrl)
             ->line('Haga clic en el botón superior para confirmar su asistencia o informarnos si no podrá asistir.')
             ->salutation("Atentamente,\nSistema de Entrevistas NHHS");
+
+        return $mail;
     }
 
     /**

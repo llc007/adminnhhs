@@ -42,7 +42,7 @@ class EntrevistaAgendadaDocente extends Notification implements ShouldQueue
         $fecha = Carbon::parse($this->entrevista->fecha)->translatedFormat('l d \d\e F, Y');
         $hora = Carbon::parse($this->entrevista->hora)->format('H:i');
 
-        return (new MailMessage)
+        $mail = (new MailMessage)
             ->subject('Nueva Entrevista Agendada: '.$estudiante->nombreCompleto())
             ->greeting('Hola '.$notifiable->nombres.',')
             ->line('Se ha agendado una nueva entrevista en tu calendario.')
@@ -52,10 +52,17 @@ class EntrevistaAgendadaDocente extends Notification implements ShouldQueue
             ->line('**Hora:** '.$hora)
             ->line('**Modalidad/Lugar:** '.$this->entrevista->lugar)
             ->line('**Motivo:** '.ucfirst($this->entrevista->motivo))
-            ->line('**Urgencia:** '.ucfirst($this->entrevista->urgencia))
-            ->action('Ver Bitácora', route('entrevistas.bitacora', ['entrevista' => $this->entrevista->id]))
+            ->line('**Urgencia:** '.ucfirst($this->entrevista->urgencia));
+
+        if (! empty($this->entrevista->notas_previas)) {
+            $mail->line('**Temas a tratar:** '.$this->entrevista->notas_previas);
+        }
+
+        $mail->action('Ver Bitácora', route('entrevistas.bitacora', ['entrevista' => $this->entrevista->id]))
             ->line('Gracias por utilizar nuestro sistema de gestión.')
             ->salutation("Saludos cordiales,\nSistema de Entrevistas NHHS");
+
+        return $mail;
     }
 
     /**

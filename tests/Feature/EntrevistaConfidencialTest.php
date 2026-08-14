@@ -243,3 +243,42 @@ test('usuariosDisponibles method of Bitacora page excludes students and lists al
     $component->call('seleccionarUsuarioCompartir', $directivoUser->id);
     expect($component->get('selectedUserIdCompartir'))->toBe($directivoUser->id);
 });
+
+test('user with ver-entrevistas-general can see confidential entrevista in index table but cannot view bitacora without ver-entrevistas-confidenciales', function () {
+    [$school, $superadmin, $psicologo, $docenteA, $docenteB, $estudiante] = setupEntrevistaEnv();
+
+    Permission::findOrCreate('ver-entrevistas-general', 'web');
+    $docenteA->givePermissionTo('ver-entrevistas-general');
+
+    $confidencial = Entrevista::create([
+        'school_id' => $school->id,
+        'user_id' => $psicologo->id,
+        'estudiante_id' => $estudiante->id,
+        'fecha' => now()->toDateString(),
+        'hora' => '10:00',
+        'urgencia' => 'normal',
+        'motivo' => 'Caso reservado psicosocial',
+        'estado' => 'pendiente',
+        'es_confidencial' => true,
+    ]);
+
+    app(PermissionRegistrar::class)->setPermissionsTeamId($school->id);
+
+    // Docente A sees the interview in the index listing with Bitácora Privada tag
+    Livewire::actingAs($docenteA)
+        ->test('pages::entrevistas.index')
+        ->assertSee('Caso reservado psicosocial')
+        ->assertSee('Bitácora Privada')
+        ->assertDontSee(route('entrevistas.bitacora', $confidencial->id));
+
+    // Direct route access is forbidden for Docente A
+    $response = $this->actingAs($docenteA)->get(route('entrevistas.bitacora', $confidencial->id));
+    $response->assertForbidden();
+
+    // If Docente A is granted ver-entrevistas-confidenciales, they can view bitacora
+    $docenteA->givePermissionTo('ver-entrevistas-confidenciales');
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    $response2 = $this->actingAs($docenteA)->get(route('entrevistas.bitacora', $confidencial->id));
+    $response2->assertOk();
+});

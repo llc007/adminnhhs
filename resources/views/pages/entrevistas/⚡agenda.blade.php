@@ -191,8 +191,8 @@ new class extends Component {
         // Filtrar las seleccionadas para el dia en curso
         $entrevistasHoy = $entrevistasMes->where('fecha', $this->fechaSeleccionada);
 
-        // Próxima entrevista de hoy que esté pendiente o ingresada
-        $proxima = $entrevistasHoy->whereIn('estado', ['pendiente', 'ingresada'])->first();
+        // Próxima entrevista de hoy que esté pendiente, ingresada o abierta
+        $proxima = $entrevistasHoy->whereIn('estado', ['pendiente', 'ingresada', 'abierta'])->first();
 
         // Aplicamos nuestro filtro temporal para la lista mostrada ("Agenda Activa")
         if ($this->filtroTemporal === 'dia') {
@@ -325,6 +325,7 @@ new class extends Component {
                             $borderColors = [
                                 'pendiente' => 'border-amber-400',
                                 'ingresada' => 'border-emerald-500',
+                                'abierta'   => 'border-sky-500',
                                 'realizada' => 'border-zinc-300 dark:border-zinc-700',
                                 'ausente'   => 'border-red-400',
                                 'cancelada' => 'border-zinc-400 dark:border-zinc-600',
@@ -360,6 +361,8 @@ new class extends Component {
                                     @elseif($cita->estado === 'ingresada')
                                         <flux:badge color="emerald" size="sm" class="animate-pulse">En Recepción
                                         </flux:badge>
+                                    @elseif($cita->estado === 'abierta')
+                                        <flux:badge color="sky" size="sm">Abierta</flux:badge>
                                     @elseif($cita->estado === 'realizada')
                                         <flux:badge color="zinc" size="sm">Realizada</flux:badge>
                                     @elseif($cita->estado === 'ausente')

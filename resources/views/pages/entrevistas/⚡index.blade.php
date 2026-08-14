@@ -12,6 +12,9 @@ new class extends Component {
     use WithPagination;
 
     #[Url]
+    public $searchId = '';
+
+    #[Url]
     public $search = '';
 
     #[Url]
@@ -63,7 +66,7 @@ new class extends Component {
 
     public function clearFilters()
     {
-        $this->reset(['search', 'profesor_id', 'curso_id', 'fecha', 'estado', 'filtroTemporal']);
+        $this->reset(['searchId', 'search', 'profesor_id', 'curso_id', 'fecha', 'estado', 'filtroTemporal']);
         $this->resetPage();
     }
 
@@ -80,26 +83,23 @@ new class extends Component {
 
     public function eliminarEntrevista(): void
     {
-        if (! $this->entrevistaIdAEliminar) {
+        if (!$this->entrevistaIdAEliminar) {
             return;
         }
 
         $entrevista = Entrevista::findOrFail($this->entrevistaIdAEliminar);
 
-        if (auth()->user()->cannot('delete', $entrevista)) {
+        $user = auth()->user();
+        if (!$user->can('delete', $entrevista)) {
             abort(403, 'No tienes permiso para eliminar esta entrevista.');
         }
 
         $entrevista->delete();
 
-        $this->entrevistaIdAEliminar = null;
         $this->modalEliminar = false;
+        $this->entrevistaIdAEliminar = null;
 
-        Flux::toast(
-            heading: 'Entrevista Eliminada',
-            text: 'El registro de la entrevista ha sido eliminado correctamente.',
-            variant: 'success'
-        );
+        session()->flash('message', 'Entrevista eliminada correctamente.');
     }
 
     private function getFilteredQuery()
@@ -128,16 +128,20 @@ new class extends Component {
                         $sub->where('user_id', $userId);
                     });
 
-                // Entrevistas públicas si tiene permiso general
+                // Si tiene permiso general, ve todas las entrevistas en el historial
                 if ($canGeneral) {
-                    $q->orWhere('es_confidencial', false);
-                }
-
-                // Entrevistas confidenciales si tiene permiso psicosocial
-                if ($canConfidenciales) {
+                    $q->orWhereRaw('1 = 1');
+                } elseif ($canConfidenciales) {
                     $q->orWhere('es_confidencial', true);
                 }
             });
+        }
+
+        if (! empty($this->searchId)) {
+            $cleanId = ltrim(trim($this->searchId), '#');
+            if (is_numeric($cleanId)) {
+                $query->where('id', (int) $cleanId);
+            }
         }
 
         if (! empty($this->search)) {
@@ -148,12 +152,8 @@ new class extends Component {
                     if ($w === '') {
                         continue;
                     }
-                    $cleanId = ltrim($w, '#');
-                    $q->where(function ($sub) use ($w, $cleanId) {
-                        if (is_numeric($cleanId)) {
-                            $sub->orWhere('id', (int) $cleanId);
-                        }
-                        $sub->orWhereHas('estudiante', function ($sq) use ($w) {
+                    $q->where(function ($sub) use ($w) {
+                        $sub->whereHas('estudiante', function ($sq) use ($w) {
                             $sq->where('nombres_csv', 'like', '%'.$w.'%')
                                 ->orWhere('rut_numero', 'like', '%'.$w.'%');
                         })->orWhereHas('user', function ($sq) use ($w) {
@@ -289,25 +289,31 @@ new class extends Component {
     @endif
 
     <!-- Bento Filter Section -->
-    <flux:card class="p-6 md:p-8 bg-zinc-50 dark:bg-zinc-800/40 shadow-sm border border-zinc-200 dark:border-zinc-700">
-        <div class="flex items-center gap-2 text-[#00376e] dark:text-blue-400 font-bold mb-4">
-            <flux:icon.funnel class="size-4" />
-            <span class="uppercase tracking-widest text-xs">Panel de Filtros</span>
+    <flux:card class="p-3 sm:p-4 bg-zinc-50 dark:bg-zinc-800/40 shadow-sm border border-zinc-200 dark:border-zinc-700 mb-4">
+        <div class="flex items-center gap-1.5 text-[#00376e] dark:text-blue-400 font-bold mb-2">
+            <flux:icon.funnel class="size-3.5" />
+            <span class="uppercase tracking-widest text-[10px]">Panel de Filtros</span>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-6">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2 items-end">
+            <!-- Buscar por ID -->
+            <flux:field class="lg:col-span-1">
+                <flux:label class="text-[11px]">ID</flux:label>
+                <flux:input size="sm" class="!text-[11px]" wire:model.live.debounce.300ms="searchId" placeholder="# ID" />
+            </flux:field>
+
             @if(!auth()->user()->hasRole('estudiante'))
                 <!-- Search Text -->
-                <flux:field class="lg:col-span-2">
-                    <flux:label>Buscar Texto</flux:label>
-                    <flux:input wire:model.live.debounce.300ms="search" placeholder="Buscar Estudiante o Apoderado..." />
+                <flux:field class="lg:col-span-3">
+                    <flux:label class="text-[11px]">Buscar Texto</flux:label>
+                    <flux:input size="sm" class="!text-[11px]" wire:model.live.debounce.300ms="search" placeholder="Estudiante o Apoderado..." />
                 </flux:field>
             @endif
 
             <!-- Dropdown: Profesor -->
-            <flux:field class="{{ auth()->user()->hasRole('estudiante') ? 'lg:col-span-2' : '' }}">
-                <flux:label>Filtrar por Profesor</flux:label>
-                <flux:select wire:model.live="profesor_id">
+            <flux:field class="{{ auth()->user()->hasRole('estudiante') ? 'lg:col-span-3' : 'lg:col-span-2' }}">
+                <flux:label class="text-[11px]">Profesor</flux:label>
+                <flux:select size="sm" class="!text-[11px]" wire:model.live="profesor_id">
                     <flux:select.option value="">Todos los docentes</flux:select.option>
                     @foreach ($docentes as $docente)
                         <flux:select.option value="{{ $docente->id }}">{{ $docente->nombres }}
@@ -318,9 +324,9 @@ new class extends Component {
 
             @if(!auth()->user()->hasRole('estudiante'))
                 <!-- Dropdown: Curso -->
-                <flux:field>
-                    <flux:label>Filtrar por Curso</flux:label>
-                    <flux:select wire:model.live="curso_id">
+                <flux:field class="lg:col-span-2">
+                    <flux:label class="text-[11px]">Curso</flux:label>
+                    <flux:select size="sm" class="!text-[11px]" wire:model.live="curso_id">
                         <flux:select.option value="">Todos los cursos</flux:select.option>
                         @foreach ($cursos as $curso)
                             <flux:select.option value="{{ $curso->id }}">{{ $curso->nombreCompleto() }}
@@ -331,14 +337,14 @@ new class extends Component {
             @endif
 
             <!-- Temporal -->
-            <flux:field class="{{ auth()->user()->hasRole('estudiante') ? 'lg:col-span-2' : '' }}">
-                <flux:label>Temporalidad <span
-                        class="text-[10px] text-zinc-400 font-normal ml-1">{{ $fecha ? '(' . \Carbon\Carbon::parse($fecha)->format('d/m') . ')' : '' }}</span>
+            <flux:field class="{{ auth()->user()->hasRole('estudiante') ? 'lg:col-span-4' : 'lg:col-span-2' }}">
+                <flux:label class="text-[11px]">Temporalidad <span
+                        class="text-[9px] text-zinc-400 font-normal ml-0.5">{{ $fecha ? '(' . \Carbon\Carbon::parse($fecha)->format('d/m') . ')' : '' }}</span>
                 </flux:label>
-                <div class="flex gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg">
+                <div class="flex gap-0.5 bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-md">
                     <flux:dropdown position="bottom-start" class="flex-1">
                         <button type="button"
-                            class="w-full h-full text-xs py-1.5 rounded-md font-bold flex items-center justify-center gap-1 {{ (empty($filtroTemporal) && !empty($fecha)) || $filtroTemporal === 'dia' ? 'bg-[#00376e] text-white shadow-sm' : 'text-zinc-600 hover:bg-zinc-200 dark:hover:bg-zinc-700' }} transition-colors"
+                            class="w-full h-full text-[10px] py-1 rounded-md font-bold flex items-center justify-center gap-1 {{ (empty($filtroTemporal) && !empty($fecha)) || $filtroTemporal === 'dia' ? 'bg-[#00376e] text-white shadow-sm' : 'text-zinc-600 hover:bg-zinc-200 dark:hover:bg-zinc-700' }} transition-colors"
                             wire:click="setFiltroTemporal('dia')">
                             <flux:icon.calendar class="size-3" /> Día
                         </button>
@@ -348,126 +354,129 @@ new class extends Component {
                     </flux:dropdown>
 
                     <button
-                        class="flex-1 text-xs py-1.5 rounded-md font-bold {{ $filtroTemporal === 'semana' ? 'bg-[#00376e] text-white shadow-sm' : 'text-zinc-600 hover:bg-zinc-200 dark:hover:bg-zinc-700' }} transition-colors"
+                        class="flex-1 text-[10px] py-1 rounded-md font-bold {{ $filtroTemporal === 'semana' ? 'bg-[#00376e] text-white shadow-sm' : 'text-zinc-600 hover:bg-zinc-200 dark:hover:bg-zinc-700' }} transition-colors"
                         wire:click="setFiltroTemporal('semana')">Semana</button>
                     <button
-                        class="flex-1 text-xs py-1.5 rounded-md font-bold {{ $filtroTemporal === 'mes' ? 'bg-[#00376e] text-white shadow-sm' : 'text-zinc-600 hover:bg-zinc-200 dark:hover:bg-zinc-700' }} transition-colors"
+                        class="flex-1 text-[10px] py-1 rounded-md font-bold {{ $filtroTemporal === 'mes' ? 'bg-[#00376e] text-white shadow-sm' : 'text-zinc-600 hover:bg-zinc-200 dark:hover:bg-zinc-700' }} transition-colors"
                         wire:click="setFiltroTemporal('mes')">Mes</button>
                 </div>
             </flux:field>
 
             <!-- Dropdown: Estado -->
-            <flux:field class="{{ auth()->user()->hasRole('estudiante') ? 'lg:col-span-2' : '' }}">
-                <flux:label>Estado</flux:label>
-                <flux:select wire:model.live="estado">
+            <flux:field class="{{ auth()->user()->hasRole('estudiante') ? 'lg:col-span-4' : 'lg:col-span-2' }}">
+                <flux:label class="text-[11px]">Estado</flux:label>
+                <flux:select size="sm" class="!text-[11px]" wire:model.live="estado">
                     <flux:select.option value="">Todos los estados</flux:select.option>
-                    <flux:select.option value="pendiente">Pendiente</flux:select.option>
+                    <flux:select.option value="pendiente">Pendientes</flux:select.option>
                     <flux:select.option value="ingresada">En Recepción</flux:select.option>
-                    <flux:select.option value="realizada">Realizada</flux:select.option>
-                    <flux:select.option value="cancelada">Cancelada</flux:select.option>
+                    <flux:select.option value="abierta">Abiertas</flux:select.option>
+                    <flux:select.option value="realizada">Realizadas</flux:select.option>
+                    <flux:select.option value="cancelada">Canceladas</flux:select.option>
                 </flux:select>
             </flux:field>
         </div>
-
     </flux:card>
 
     <!-- Data Table -->
-    <flux:card class="overflow-hidden shadow-sm">
-        <flux:table>
-            <flux:table.columns>
-                <flux:table.column>Fecha y Hora</flux:table.column>
-                <flux:table.column>Estudiante</flux:table.column>
-                <flux:table.column>Profesor a cargo</flux:table.column>
-                <flux:table.column>Motivo</flux:table.column>
-                <flux:table.column>Estado</flux:table.column>
-                <flux:table.column class="text-right">Acciones</flux:table.column>
-            </flux:table.columns>
+    <flux:card class="overflow-hidden shadow-sm p-0">
+        <div class="px-5 py-1.5 overflow-x-auto">
+            <flux:table>
+                <flux:table.columns>
+                    <flux:table.column class="w-14 text-[11px]">ID</flux:table.column>
+                    <flux:table.column class="text-[11px]">Fecha y Hora</flux:table.column>
+                    <flux:table.column class="text-[11px]">Estudiante</flux:table.column>
+                    <flux:table.column class="text-[11px]">Profesor a cargo</flux:table.column>
+                    <flux:table.column class="text-[11px]">Motivo</flux:table.column>
+                    <flux:table.column class="text-[11px]">Estado</flux:table.column>
+                    <flux:table.column class="text-right text-[11px]">Acciones</flux:table.column>
+                </flux:table.columns>
 
-            <flux:table.rows>
-                @forelse($entrevistas as $entrevista)
-                    <flux:table.row>
-                        <flux:table.cell>
-                            <div class="flex items-center gap-2">
-                                <flux:icon.calendar class="size-4 text-zinc-400" />
-                                <span
-                                    class="font-semibold text-zinc-800 dark:text-zinc-200">{{ \Carbon\Carbon::parse($entrevista->fecha)->translatedFormat('d M, Y') }}</span>
-                            </div>
-                            <div class="flex items-center gap-2 text-xs text-zinc-500 ml-6 mt-0.5">
-                                <span>{{ \Carbon\Carbon::parse($entrevista->hora)->format('H:i') }} hrs</span>
-                                <span class="font-mono text-[11px] font-bold text-zinc-400 dark:text-zinc-500">#{{ $entrevista->id }}</span>
-                            </div>
-                        </flux:table.cell>
+                <flux:table.rows>
+                    @forelse($entrevistas as $entrevista)
+                        <flux:table.row class="hover:bg-zinc-50/80 dark:hover:bg-zinc-800/40">
+                            <flux:table.cell class="py-1.5">
+                                <span class="font-mono text-[11px] font-bold text-zinc-600 dark:text-zinc-400">#{{ $entrevista->id }}</span>
+                            </flux:table.cell>
 
-                        <flux:table.cell>
-                            <div class="flex items-center gap-3">
-                                {{--
-                                @if ($entrevista->estudiante)
-                                    <flux:avatar class="size-8" initials="{{ $entrevista->estudiante->initials() }}" :src="$entrevista->estudiante->avatar" />
-                                @else
-                                    <flux:avatar class="size-8" initials="??" />
-                                @endif
-                                --}}
-                                <div>
-                                    <span
-                                        class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $entrevista->estudiante ? $entrevista->estudiante->nombreCompleto() : '-' }}</span>
-                                    <p class="text-[10px] text-zinc-500">
-                                        {{ $entrevista->estudiante && $entrevista->estudiante->curso ? $entrevista->estudiante->curso->nombreCompleto() : 'Sin Curso' }}</p>
+                            <flux:table.cell class="py-1.5">
+                                <div class="flex items-center gap-1 text-[11px] font-semibold text-zinc-800 dark:text-zinc-200">
+                                    <flux:icon.calendar class="size-3 text-zinc-400 shrink-0" />
+                                    <span>{{ \Carbon\Carbon::parse($entrevista->fecha)->translatedFormat('d M, Y') }}</span>
+                                    <span class="text-zinc-400 font-normal ml-0.5">{{ \Carbon\Carbon::parse($entrevista->hora)->format('H:i') }} hrs</span>
                                 </div>
-                            </div>
-                        </flux:table.cell>
+                            </flux:table.cell>
 
-                        <flux:table.cell>
-                            <p class="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                                {{ $entrevista->user?->nombres }} {{ $entrevista->user?->apellido_pat }}
-                            </p>
-                        </flux:table.cell>
+                            <flux:table.cell class="py-1.5">
+                                <div class="leading-tight">
+                                    <span class="text-[11px] font-bold text-zinc-900 dark:text-zinc-100 block">{{ $entrevista->estudiante ? $entrevista->estudiante->nombreCompleto() : '-' }}</span>
+                                    <span class="text-[9px] text-zinc-400 font-medium uppercase block mt-0.5">{{ $entrevista->estudiante && $entrevista->estudiante->curso ? $entrevista->estudiante->curso->nombreCompleto() : 'Sin Curso' }}</span>
+                                </div>
+                            </flux:table.cell>
 
-                        <flux:table.cell>
-                            <flux:badge color="zinc" size="sm" class="uppercase text-[10px]">
-                                {{ $entrevista->motivo ?? 'General' }}</flux:badge>
-                        </flux:table.cell>
+                            <flux:table.cell class="py-1.5">
+                                <span class="text-[11px] font-medium text-zinc-700 dark:text-zinc-300">
+                                    {{ $entrevista->user?->nombres }} {{ $entrevista->user?->apellido_pat }}
+                                </span>
+                            </flux:table.cell>
 
-                        <flux:table.cell>
-                            @if ($entrevista->estado === 'realizada')
-                                <flux:badge color="emerald" size="sm" icon="check-circle">Realizada</flux:badge>
-                            @elseif($entrevista->estado === 'ingresada')
-                                <flux:badge color="blue" size="sm">En Recepción</flux:badge>
-                            @elseif($entrevista->estado === 'pendiente')
-                                <flux:badge color="amber" size="sm" icon="clock">Pendiente</flux:badge>
-                            @else
-                                <flux:badge color="red" size="sm">{{ ucfirst($entrevista->estado) }}
-                                </flux:badge>
-                            @endif
-                        </flux:table.cell>
+                            <flux:table.cell class="py-1.5">
+                                <div class="flex items-center gap-1 flex-wrap">
+                                    <flux:badge color="zinc" size="xs" class="uppercase text-[9px] py-0.5 px-1.5 font-bold tracking-wide">
+                                        {{ $entrevista->motivo ?? 'General' }}</flux:badge>
+                                    @if ($entrevista->es_confidencial)
+                                        <flux:badge color="purple" size="xs" icon="lock-closed" class="uppercase text-[9px] py-0.5 px-1.5 font-bold tracking-wide">
+                                            Confidencial</flux:badge>
+                                    @endif
+                                </div>
+                            </flux:table.cell>
 
-                        <flux:table.cell class="text-right">
-                            <div class="flex items-center justify-end gap-2">
-                                @can('view', $entrevista)
-                                    <flux:button size="sm" variant="subtle"
-                                        href="{{ route('entrevistas.bitacora', $entrevista->id) }}">Ver Bitácora</flux:button>
-                                @endcan
+                            <flux:table.cell class="py-1.5">
+                                @if ($entrevista->estado === 'realizada')
+                                    <flux:badge color="emerald" size="xs" icon="check-circle" class="uppercase text-[9px] py-0.5 px-1.5 font-bold tracking-wide">Realizada</flux:badge>
+                                @elseif($entrevista->estado === 'abierta')
+                                    <flux:badge color="sky" size="xs" icon="arrow-right-start-on-rectangle" class="uppercase text-[9px] py-0.5 px-1.5 font-bold tracking-wide">Abierta</flux:badge>
+                                @elseif($entrevista->estado === 'ingresada')
+                                    <flux:badge color="blue" size="xs" class="uppercase text-[9px] py-0.5 px-1.5 font-bold tracking-wide">En Recepción</flux:badge>
+                                @elseif($entrevista->estado === 'pendiente')
+                                    <flux:badge color="amber" size="xs" icon="clock" class="uppercase text-[9px] py-0.5 px-1.5 font-bold tracking-wide">Pendiente</flux:badge>
+                                @else
+                                    <flux:badge color="red" size="xs" class="uppercase text-[9px] py-0.5 px-1.5 font-bold tracking-wide">{{ ucfirst($entrevista->estado) }}</flux:badge>
+                                @endif
+                            </flux:table.cell>
 
-                                @can('delete', $entrevista)
-                                    <flux:button size="sm" variant="danger" icon="trash"
-                                        wire:click="confirmarEliminacion({{ $entrevista->id }})" title="Eliminar entrevista"></flux:button>
-                                @endcan
-                            </div>
-                        </flux:table.cell>
-                    </flux:table.row>
-                @empty
-                    <flux:table.row>
-                        <flux:table.cell colspan="6">
-                            <div class="py-12 text-center text-zinc-500">
-                                <flux:icon.magnifying-glass class="size-8 mx-auto opacity-50 mb-3" />
-                                <p>No se encontraron entrevistas con los filtros seleccionados.</p>
-                            </div>
-                        </flux:table.cell>
-                    </flux:table.row>
-                @endforelse
-            </flux:table.rows>
-        </flux:table>
+                            <flux:table.cell class="py-1.5 text-right">
+                                <div class="flex items-center justify-end gap-1">
+                                    @can('view', $entrevista)
+                                        <flux:button size="xs" variant="subtle"
+                                            href="{{ route('entrevistas.bitacora', $entrevista->id) }}" class="font-bold text-[10px]">Ver Bitácora</flux:button>
+                                    @else
+                                        <span class="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium italic inline-flex items-center gap-1 py-1 px-2 bg-zinc-100 dark:bg-zinc-800 rounded-md">
+                                            <flux:icon.lock-closed class="size-3 text-purple-500" /> Bitácora Privada
+                                        </span>
+                                    @endcan
 
-        <div class="p-4 bg-zinc-50 dark:bg-zinc-800/20 border-t border-zinc-200 dark:border-zinc-700">
+                                    @can('delete', $entrevista)
+                                        <flux:button size="xs" variant="danger" icon="trash"
+                                            wire:click="confirmarEliminacion({{ $entrevista->id }})" title="Eliminar entrevista"></flux:button>
+                                    @endcan
+                                </div>
+                            </flux:table.cell>
+                        </flux:table.row>
+                    @empty
+                        <flux:table.row>
+                            <flux:table.cell colspan="7">
+                                <div class="py-8 text-center text-zinc-500">
+                                    <flux:icon.magnifying-glass class="size-6 mx-auto opacity-50 mb-2" />
+                                    <p class="text-xs">No se encontraron entrevistas con los filtros seleccionados.</p>
+                                </div>
+                            </flux:table.cell>
+                        </flux:table.row>
+                    @endforelse
+                </flux:table.rows>
+            </flux:table>
+        </div>
+
+        <div class="p-3 sm:px-5 bg-zinc-50 dark:bg-zinc-800/20 border-t border-zinc-200 dark:border-zinc-700">
             {{ $entrevistas->links(data: ['scrollTo' => false]) }}
         </div>
     </flux:card>

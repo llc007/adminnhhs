@@ -19,17 +19,65 @@ new class extends Component {
     public $tasaAsistencia = 0;
     public $totalAsistencias = 0;
     public $totalAusencias = 0;
+    public $totalAgendadasAnio = 0;
+    public $totalCanceladasAnio = 0;
+    public $totalPendientesAnio = 0;
+    public int $anioActual = 2026;
+    public string $filtroAsistenciaPeriodo = 'anio';
+    public string $etiquetaAsistenciaPeriodo = '';
 
     public $realizadasHastaHoy = 0;
     public $agendadasHastaHoy = 0;
     public $tasaEfectividad = 0;
+    public string $nombreMes = '';
+    public string $fechaHoyTexto = '';
+
+    public function updatedFiltroAsistenciaPeriodo()
+    {
+        $this->calcularAsistencia();
+    }
+
+    public function calcularAsistencia()
+    {
+        $schoolId = auth()->user()->current_school_id;
+        $now = now('America/Santiago')->locale('es');
+        $this->anioActual = (int) $now->format('Y');
+
+        $query = Entrevista::where('school_id', $schoolId)->whereYear('fecha', $this->anioActual);
+
+        if ($this->filtroAsistenciaPeriodo !== 'anio' && is_numeric($this->filtroAsistenciaPeriodo)) {
+            $mesInt = (int) $this->filtroAsistenciaPeriodo;
+            $query->whereMonth('fecha', $mesInt);
+            $nombreMes = mb_convert_case(Carbon::create($this->anioActual, $mesInt, 1)->locale('es')->translatedFormat('F'), MB_CASE_TITLE);
+            $this->etiquetaAsistenciaPeriodo = "{$nombreMes} {$this->anioActual}";
+        } else {
+            $this->etiquetaAsistenciaPeriodo = "Año {$this->anioActual}";
+        }
+
+        $this->totalAgendadasAnio = (clone $query)->count();
+        $asistieron = (clone $query)->where('estado', 'realizada')->count();
+        $ausentes = (clone $query)->where('estado', 'ausente')->count();
+        $canceladas = (clone $query)->where('estado', 'cancelada')->count();
+        $pendientes = (clone $query)->whereIn('estado', ['pendiente', 'ingresada', 'abierta'])->count();
+
+        $this->totalAsistencias = $asistieron;
+        $this->totalAusencias = $ausentes;
+        $this->totalCanceladasAnio = $canceladas;
+        $this->totalPendientesAnio = $pendientes;
+        $tot = $asistieron + $ausentes;
+        $this->tasaAsistencia = $tot > 0 ? round(($asistieron / $tot) * 100, 1) : 0;
+    }
 
     public function mount()
     {
         $schoolId = auth()->user()->current_school_id;
-        $hoy = now('America/Santiago')->format('Y-m-d');
-        $mesInicio = now('America/Santiago')->startOfMonth()->format('Y-m-d');
-        $mesFin = now('America/Santiago')->endOfMonth()->format('Y-m-d');
+        $now = now('America/Santiago')->locale('es');
+        $hoy = $now->format('Y-m-d');
+        $mesInicio = $now->copy()->startOfMonth()->format('Y-m-d');
+        $mesFin = $now->copy()->endOfMonth()->format('Y-m-d');
+
+        $this->nombreMes = mb_strtoupper($now->translatedFormat('F'));
+        $this->fechaHoyTexto = mb_strtoupper('AL ' . $now->translatedFormat('j \d\e F'));
 
         // KPIs
         $this->kpiHoy = Entrevista::where('school_id', $schoolId)->whereDate('fecha', $hoy)->count();
@@ -38,7 +86,7 @@ new class extends Component {
             ->count();
         $this->kpiActivos = Entrevista::where('school_id', $schoolId)
             ->whereDate('fecha', $hoy)
-            ->whereIn('estado', ['ingresada', 'en_curso'])
+            ->whereIn('estado', ['ingresada', 'abierta', 'en_curso'])
             ->count();
 
         $this->kpiCanceladas = Entrevista::where('school_id', $schoolId)
@@ -65,20 +113,21 @@ new class extends Component {
             ->join('users', 'entrevistas.user_id', '=', 'users.id')
             ->where('entrevistas.school_id', $schoolId)
             ->whereBetween('entrevistas.fecha', [$mesInicio, $mesFin])
-            ->select('users.nombres', 'users.apellido_pat', DB::raw('count(*) as total'))
+            ->select('users.nombres', 'users.apellido_pat', DB::raw('count(entrevistas.id) as total'))
             ->groupBy('users.id', 'users.nombres', 'users.apellido_pat')
             ->orderByDesc('total')
             ->limit(5)
             ->get();
 
-        // Urgencias (del mes)
+        // Distribución Urgencia (del mes)
+        $totalUrgs = max(1, $this->kpiMes);
         $urgs = Entrevista::where('school_id', $schoolId)
             ->whereBetween('fecha', [$mesInicio, $mesFin])
             ->select('urgencia', DB::raw('count(*) as total'))
             ->groupBy('urgencia')
             ->pluck('total', 'urgencia')
             ->toArray();
-        $totalUrgs = array_sum($urgs) ?: 1;
+
         $this->urgencias = [
             'normal' => ['count' => $urgs['normal'] ?? 0, 'pct' => round((($urgs['normal'] ?? 0) / $totalUrgs) * 100)],
             'prioritario' => ['count' => $urgs['prioritario'] ?? 0, 'pct' => round((($urgs['prioritario'] ?? 0) / $totalUrgs) * 100)],
@@ -99,17 +148,11 @@ new class extends Component {
         }
         arsort($this->motivos);
 
-        // Asistencia Histórica
-        $asistieron = Entrevista::where('school_id', $schoolId)->where('estado', 'realizada')->count();
-        $ausentes = Entrevista::where('school_id', $schoolId)->where('estado', 'ausente')->count();
-        $this->totalAsistencias = $asistieron;
-        $this->totalAusencias = $ausentes;
-        $tot = $asistieron + $ausentes;
-        $this->tasaAsistencia = $tot > 0 ? round(($asistieron / $tot) * 100, 1) : 0;
+        // Asistencia Año / Mes
+        $this->calcularAsistencia();
     }
 };
 ?>
-
 
 
 <div class="max-w-7xl mx-auto w-full pb-10">
@@ -168,7 +211,7 @@ new class extends Component {
                         <flux:icon.calendar class="size-5 text-indigo-600 dark:text-indigo-400" />
                     </div>
                     <span
-                        class="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{{ __('Este Mes') }}</span>
+                        class="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{{ $nombreMes }}</span>
                 </div>
                 <p class="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase">{{ __('Agendadas / No Realizadas') }}</p>
                 <div class="flex items-baseline gap-1 mt-1">
@@ -193,7 +236,7 @@ new class extends Component {
                     <div class="w-10 h-10 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg flex items-center justify-center">
                         <flux:icon.check-circle class="size-5 text-emerald-600 dark:text-emerald-400" />
                     </div>
-                    <span class="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{{ __('A la Fecha') }}</span>
+                    <span class="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{{ $fechaHoyTexto }}</span>
                 </div>
                 <p class="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase">{{ __('Efectividad') }}</p>
                 <div class="flex items-baseline gap-1 mt-1">
@@ -362,32 +405,63 @@ new class extends Component {
 
     {{-- Fila 3: Métrica de Asistencia Institucional --}}
     <flux:card
-        class="bg-gradient-to-br from-[#00376e] to-[#004d97] text-white overflow-hidden relative p-8 md:p-10 !border-0">
+        class="bg-gradient-to-br from-[#00376e] to-[#004d97] text-white overflow-hidden relative p-6 sm:p-8 md:p-10 !border-0">
         {{-- Patrón de fondo opcional --}}
         <div class="absolute inset-0 opacity-10"
             style="background-image: radial-gradient(white 1px, transparent 1px); background-size: 20px 20px;"></div>
 
-        <div class="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
-            <div class="space-y-4 text-center md:text-left">
-                <h3 class="text-xl font-bold text-white/90">Tasa de Asistencia Histórica de Apoderados</h3>
-                <div class="flex flex-col md:flex-row items-center md:items-baseline gap-4">
+        <div class="relative z-10 flex flex-col lg:flex-row justify-between items-center gap-8">
+            <div class="space-y-3 text-center lg:text-left">
+                <div>
+                    <select wire:model.live="filtroAsistenciaPeriodo"
+                        class="bg-white/15 hover:bg-white/25 text-white text-xs font-bold py-1 px-2.5 rounded-lg border border-white/20 focus:outline-none cursor-pointer mb-2">
+                        <option value="anio" class="text-zinc-900 font-normal">Año {{ $anioActual }} (Todo el año)</option>
+                        <option value="1" class="text-zinc-900 font-normal">Enero {{ $anioActual }}</option>
+                        <option value="2" class="text-zinc-900 font-normal">Febrero {{ $anioActual }}</option>
+                        <option value="3" class="text-zinc-900 font-normal">Marzo {{ $anioActual }}</option>
+                        <option value="4" class="text-zinc-900 font-normal">Abril {{ $anioActual }}</option>
+                        <option value="5" class="text-zinc-900 font-normal">Mayo {{ $anioActual }}</option>
+                        <option value="6" class="text-zinc-900 font-normal">Junio {{ $anioActual }}</option>
+                        <option value="7" class="text-zinc-900 font-normal">Julio {{ $anioActual }}</option>
+                        <option value="8" class="text-zinc-900 font-normal">Agosto {{ $anioActual }}</option>
+                        <option value="9" class="text-zinc-900 font-normal">Septiembre {{ $anioActual }}</option>
+                        <option value="10" class="text-zinc-900 font-normal">Octubre {{ $anioActual }}</option>
+                        <option value="11" class="text-zinc-900 font-normal">Noviembre {{ $anioActual }}</option>
+                        <option value="12" class="text-zinc-900 font-normal">Diciembre {{ $anioActual }}</option>
+                    </select>
+                    <h3 class="text-xl font-bold text-white/90">Tasa de Asistencia de Apoderados</h3>
+                </div>
+                <div class="flex flex-col sm:flex-row items-center sm:items-baseline gap-4 justify-center lg:justify-start">
                     <p class="text-6xl font-extrabold tracking-tighter text-white">{{ $tasaAsistencia }}%</p>
-                    <span class="px-3 py-1 bg-white/20 rounded-full text-xs font-bold text-white shadow-sm">Rendimiento
-                        Histórico</span>
+                    <span class="px-3 py-1 bg-white/20 rounded-full text-xs font-bold text-white shadow-sm">{{ $etiquetaAsistenciaPeriodo }}</span>
                 </div>
             </div>
 
-            <div class="flex gap-8 bg-black/20 p-6 rounded-2xl backdrop-blur-md shadow-lg border border-white/10">
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-5 bg-black/20 p-5 sm:p-6 rounded-2xl backdrop-blur-md shadow-lg border border-white/10 w-full lg:w-auto">
                 <div class="text-center">
+                    <p class="text-[10px] font-bold text-blue-200 uppercase tracking-widest mb-1">Agendadas</p>
+                    <p class="text-2xl font-bold text-white">{{ $totalAgendadasAnio }}</p>
+                    <p class="text-xs text-white/70 mt-1">Total {{ $anioActual }}</p>
+                </div>
+                <div class="text-center border-l border-white/15 pl-3 sm:pl-5">
                     <p class="text-[10px] font-bold text-emerald-300 uppercase tracking-widest mb-1">Asistieron</p>
                     <p class="text-2xl font-bold text-white">{{ $totalAsistencias }}</p>
-                    <p class="text-xs text-white/70 mt-1">Citas Realizadas</p>
+                    <p class="text-xs text-white/70 mt-1">Realizadas</p>
                 </div>
-                <div class="w-px bg-white/20"></div>
-                <div class="text-center">
-                    <p class="text-[10px] font-bold text-red-300 uppercase tracking-widest mb-1">Ausentes</p>
+                <div class="text-center border-l border-white/15 pl-3 sm:pl-5">
+                    <p class="text-[10px] font-bold text-amber-300 uppercase tracking-widest mb-1">Ausentes</p>
                     <p class="text-2xl font-bold text-white">{{ $totalAusencias }}</p>
                     <p class="text-xs text-white/70 mt-1">No Realizadas</p>
+                </div>
+                <div class="text-center border-l border-white/15 pl-3 sm:pl-5">
+                    <p class="text-[10px] font-bold text-rose-300 uppercase tracking-widest mb-1">Canceladas</p>
+                    <p class="text-2xl font-bold text-white">{{ $totalCanceladasAnio }}</p>
+                    <p class="text-xs text-white/70 mt-1">Anuladas</p>
+                </div>
+                <div class="text-center border-l border-white/15 pl-3 sm:pl-5 col-span-2 sm:col-span-1">
+                    <p class="text-[10px] font-bold text-sky-300 uppercase tracking-widest mb-1">Pendientes</p>
+                    <p class="text-2xl font-bold text-white">{{ $totalPendientesAnio }}</p>
+                    <p class="text-xs text-white/70 mt-1">Por Realizar</p>
                 </div>
             </div>
         </div>

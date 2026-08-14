@@ -289,6 +289,26 @@ test('interviews with exit recorded move to the bottom of the reception list', f
     expect($pos2)->toBeLessThan($pos1);
 });
 
+test('recepcionista can register exit and status updates to abierta', function () {
+    Notification::fake();
+    [$user, $entrevista] = setupTestEnvironment();
+
+    $entrevista->update([
+        'estado' => 'ingresada',
+        'lugar' => 'BOX 1',
+        'hora_llegada' => '10:00:00',
+    ]);
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::entrevistas.recepcion')
+        ->call('registrarSalida', $entrevista->id);
+
+    $entrevista->refresh();
+    expect($entrevista->estado)->toBe('abierta');
+    expect($entrevista->mensaje_recepcion)->toContain('[SALIDA]');
+});
+
 test('recepcionista can revert entry and return interview to pending state', function () {
     [$user, $entrevista] = setupTestEnvironment();
 

@@ -755,7 +755,7 @@ new class extends Component {
                                 {{ $entrevista->estudiante->nombreCompleto() ?? 'No registrado' }}
                             </p>
                             <p class="text-xs text-zinc-500 font-medium mt-1">
-                                {{ $entrevista->estudiante->rutCompleto() ?? '-' }} • {{ $entrevista->estudiante->curso->nombreCompleto() ?? '-' }}
+                                {{ $entrevista->estudiante->rutCompleto() ?? '-' }} • {{ ($entrevista->estudiante && $entrevista->estudiante->curso) ? $entrevista->estudiante->curso->nombreCompleto() : 'Sin Curso' }}
                             </p>
                         </div>
                         <div>

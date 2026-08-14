@@ -245,24 +245,30 @@ new class extends Component {
         abort_unless($this->canIngresar, 403);
 
         $entrevista = Entrevista::find($id);
-        
-        if ($entrevista && !str_contains($entrevista->mensaje_recepcion ?? '', '[SALIDA]')) {
+
+        if ($entrevista && ! str_contains($entrevista->mensaje_recepcion ?? '', '[SALIDA]')) {
             $hora = now('America/Santiago')->format('H:i');
             $notaSalida = "[SALIDA] El apoderado se retiró del recinto a las {$hora}.";
-            
-            $nuevoMensaje = $entrevista->mensaje_recepcion 
-                ? $entrevista->mensaje_recepcion . "\n\n" . $notaSalida 
+
+            $nuevoMensaje = $entrevista->mensaje_recepcion
+                ? $entrevista->mensaje_recepcion . "\n\n" . $notaSalida
                 : $notaSalida;
 
-            $entrevista->update([
-                'mensaje_recepcion' => $nuevoMensaje
-            ]);
+            $updateData = [
+                'mensaje_recepcion' => $nuevoMensaje,
+            ];
+
+            if ($entrevista->estado === 'ingresada') {
+                $updateData['estado'] = 'abierta';
+            }
+
+            $entrevista->update($updateData);
 
             if ($entrevista->user) {
                 $entrevista->user->notify(new SalidaApoderado($entrevista));
             }
 
-            \Flux::toast('Salida registrada exitosamente.', variant: 'success');
+            \Flux::toast('Salida registrada exitosamente. La cita quedó en estado Abierta.', variant: 'success');
         }
     }
 
@@ -398,15 +404,14 @@ new class extends Component {
                             $isEven = $loop->even;
                             $rowClass = 'hover:bg-zinc-50/80 dark:hover:bg-zinc-800/40 transition-colors group';
                             $firstCellClass = 'px-6 py-5';
-                            
-                            if ($cita->estado === 'ingresada' && !str_contains($cita->mensaje_recepcion ?? '', '[SALIDA]')) {
+                                        if ($cita->estado === 'ingresada') {
                                 // Visita Activa (dentro del recinto)
                                 $rowClass .= ' bg-emerald-50/70 dark:bg-emerald-500/[0.08]';
                                 $hourClass = 'text-emerald-700 dark:text-emerald-300';
-                            } elseif ($cita->estado === 'ingresada' && str_contains($cita->mensaje_recepcion ?? '', '[SALIDA]')) {
-                                // Se retiró
-                                $rowClass .= ' bg-amber-50/30 dark:bg-amber-500/[0.04] text-zinc-500 dark:text-zinc-400';
-                                $hourClass = 'text-zinc-500 dark:text-zinc-450';
+                            } elseif ($cita->estado === 'abierta') {
+                                // Se retiró del recinto (bitácora abierta)
+                                $rowClass .= ' bg-sky-50/50 dark:bg-sky-500/[0.05] text-zinc-600 dark:text-zinc-400';
+                                $hourClass = 'text-sky-700 dark:text-sky-400';
                             } elseif ($cita->estado === 'pendiente') {
                                 // Pendiente
                                 $rowClass .= $isEven ? ' bg-zinc-50/60 dark:bg-zinc-900/80' : ' bg-white dark:bg-zinc-900/30';
@@ -431,7 +436,7 @@ new class extends Component {
                             </td>
                             <td class="px-6 py-5">
                                 @if($cita->estudiante)
-                                    <p class="font-bold text-lg {{ in_array($cita->estado, ['cancelada', 'ausente']) ? 'text-zinc-400 dark:text-zinc-500 line-through decoration-zinc-300 dark:decoration-zinc-700' : (in_array($cita->estado, ['realizada']) || ($cita->estado === 'ingresada' && str_contains($cita->mensaje_recepcion ?? '', '[SALIDA]')) ? 'text-zinc-500 dark:text-zinc-400' : 'text-zinc-900 dark:text-white') }}">
+                                    <p class="font-bold text-lg {{ in_array($cita->estado, ['cancelada', 'ausente']) ? 'text-zinc-400 dark:text-zinc-500 line-through decoration-zinc-300 dark:decoration-zinc-700' : (in_array($cita->estado, ['realizada']) || ($cita->estado === 'abierta' || str_contains($cita->mensaje_recepcion ?? '', '[SALIDA]')) ? 'text-zinc-500 dark:text-zinc-400' : 'text-zinc-900 dark:text-white') }}">
                                         {{ $cita->estudiante->nombreCompleto() }}
                                     </p>
                                     <p class="text-xs text-zinc-500 dark:text-zinc-400 font-semibold uppercase mt-0.5">
@@ -443,7 +448,7 @@ new class extends Component {
                             </td>
                             <td class="px-6 py-5">
                                 @if($cita->estudiante)
-                                    <p class="font-bold text-base {{ in_array($cita->estado, ['cancelada', 'ausente']) ? 'text-zinc-400 dark:text-zinc-500 line-through decoration-zinc-300 dark:decoration-zinc-700' : (in_array($cita->estado, ['realizada']) || ($cita->estado === 'ingresada' && str_contains($cita->mensaje_recepcion ?? '', '[SALIDA]')) ? 'text-zinc-500 dark:text-zinc-400' : 'text-zinc-800 dark:text-zinc-200') }}">
+                                    <p class="font-bold text-base {{ in_array($cita->estado, ['cancelada', 'ausente']) ? 'text-zinc-400 dark:text-zinc-500 line-through decoration-zinc-300 dark:decoration-zinc-700' : (in_array($cita->estado, ['realizada']) || ($cita->estado === 'abierta' || str_contains($cita->mensaje_recepcion ?? '', '[SALIDA]')) ? 'text-zinc-500 dark:text-zinc-400' : 'text-zinc-800 dark:text-zinc-200') }}">
                                         {{ $cita->estudiante->apoderado_nombres ? $cita->estudiante->apoderado_nombres . ' ' . $cita->estudiante->apoderado_apellido_pat : 'Sin nombre registrado' }}
                                     </p>
                                     <p class="text-xs text-zinc-500 dark:text-zinc-400 font-mono mt-0.5">
@@ -452,7 +457,7 @@ new class extends Component {
                                 @endif
                             </td>
                             <td class="px-6 py-5">
-                                <p class="font-bold text-base {{ in_array($cita->estado, ['cancelada', 'ausente']) ? 'text-zinc-400 dark:text-zinc-500 line-through decoration-zinc-300 dark:decoration-zinc-700' : (in_array($cita->estado, ['realizada']) || ($cita->estado === 'ingresada' && str_contains($cita->mensaje_recepcion ?? '', '[SALIDA]')) ? 'text-zinc-500 dark:text-zinc-400' : 'text-zinc-800 dark:text-zinc-200') }}">
+                                <p class="font-bold text-base {{ in_array($cita->estado, ['cancelada', 'ausente']) ? 'text-zinc-400 dark:text-zinc-500 line-through decoration-zinc-300 dark:decoration-zinc-700' : (in_array($cita->estado, ['realizada']) || ($cita->estado === 'abierta' || str_contains($cita->mensaje_recepcion ?? '', '[SALIDA]')) ? 'text-zinc-500 dark:text-zinc-400' : 'text-zinc-800 dark:text-zinc-200') }}">
                                     {{ $cita->user ? trim($cita->user->nombres . ' ' . $cita->user->apellido_pat) : 'Usuario' }}
                                 </p>
                             </td>
@@ -461,13 +466,11 @@ new class extends Component {
                                     @if($cita->estado === 'pendiente')
                                         <flux:badge size="sm" color="zinc" class="w-24 justify-center">Pendiente</flux:badge>
                                     @elseif($cita->estado === 'ingresada')
-                                        @if(str_contains($cita->mensaje_recepcion ?? '', '[SALIDA]'))
-                                            <flux:badge size="sm" color="amber" class="w-24 justify-center">Se Retiró</flux:badge>
-                                            <p class="text-[10px] text-zinc-500 mt-0.5">(Bitácora Abierta)</p>
-                                        @else
-                                            <flux:badge size="sm" color="emerald" class="w-24 justify-center">Ingresó</flux:badge>
-                                            <p class="text-[10px] text-zinc-500 mt-0.5">({{ \Carbon\Carbon::parse($cita->hora_llegada)->format('H:i') }})</p>
-                                        @endif
+                                        <flux:badge size="sm" color="emerald" class="w-24 justify-center">Ingresó</flux:badge>
+                                        <p class="text-[10px] text-zinc-500 mt-0.5">({{ \Carbon\Carbon::parse($cita->hora_llegada)->format('H:i') }})</p>
+                                    @elseif($cita->estado === 'abierta')
+                                        <flux:badge size="sm" color="sky" class="w-24 justify-center">Abierta</flux:badge>
+                                        <p class="text-[10px] text-zinc-500 mt-0.5">(Se retiró)</p>
                                     @elseif($cita->estado === 'realizada')
                                         <flux:badge size="sm" color="blue" class="w-24 justify-center">Realizada</flux:badge>
                                         @if(str_contains($cita->mensaje_recepcion ?? '', '[SALIDA]'))
@@ -480,7 +483,7 @@ new class extends Component {
                                     @endif
 
                                     {{-- Botón interactivo de Lugar de Atención --}}
-                                    @if(in_array($cita->estado, ['ingresada', 'realizada']))
+                                    @if(in_array($cita->estado, ['ingresada', 'abierta', 'realizada']))
                                         @if($this->canIngresar)
                                             <flux:dropdown position="bottom">
                                                 @if (strtoupper($cita->lugar ?? '') === 'PENDIENTE' || empty($cita->lugar))

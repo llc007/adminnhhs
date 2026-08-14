@@ -189,3 +189,90 @@ test('switching between active and archived views works and reopening an archive
 
     expect($completada->refresh()->estado)->toBe('pendiente');
 });
+
+test('ti staff can save progress notes on an active task without completing or archiving it', function () {
+    $user = User::factory()->create();
+    $schoolId = DB::table('schools')->insertGetId([
+        'name' => 'Test School',
+        'domain' => 'test.com',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    $user->update(['current_school_id' => $schoolId]);
+    $user->syncRolesForSchool($schoolId, ['ti']);
+    $this->actingAs($user);
+
+    $task = TiTask::create([
+        'titulo' => 'Mantenimiento Servidor BD',
+        'frecuencia' => 'semanal',
+        'estado' => 'pendiente',
+        'fecha_programada' => now()->format('Y-m-d'),
+        'creado_por' => $user->id,
+    ]);
+
+    Livewire::test('pages::ti.tareas.index')
+        ->call('abrirModalCompletar', $task->id)
+        ->set('notas_cierre', 'Paso 1 completado: Limpieza física realizada')
+        ->call('guardarAvance')
+        ->assertHasNoErrors();
+
+    $task->refresh();
+    expect($task->estado)->toBe('en_progreso');
+    expect($task->notas_cierre)->toBe('Paso 1 completado: Limpieza física realizada');
+    expect($task->fecha_completada)->toBeNull();
+});
+
+test('completing a task requires a non-empty closing note', function () {
+    $user = User::factory()->create();
+    $schoolId = DB::table('schools')->insertGetId([
+        'name' => 'Test School',
+        'domain' => 'test.com',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    $user->update(['current_school_id' => $schoolId]);
+    $user->syncRolesForSchool($schoolId, ['ti']);
+    $this->actingAs($user);
+
+    $task = TiTask::create([
+        'titulo' => 'Revisión Servidor Web',
+        'frecuencia' => 'diaria',
+        'estado' => 'pendiente',
+        'fecha_programada' => now()->format('Y-m-d'),
+        'creado_por' => $user->id,
+    ]);
+
+    Livewire::test('pages::ti.tareas.index')
+        ->call('abrirModalCompletar', $task->id)
+        ->set('notas_cierre', '')
+        ->call('confirmarCompletar')
+        ->assertHasErrors(['notas_cierre']);
+});
+
+test('clicking task title opens modal with full task details', function () {
+    $user = User::factory()->create();
+    $schoolId = DB::table('schools')->insertGetId([
+        'name' => 'Test School',
+        'domain' => 'test.com',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    $user->update(['current_school_id' => $schoolId]);
+    $user->syncRolesForSchool($schoolId, ['ti']);
+    $this->actingAs($user);
+
+    $task = TiTask::create([
+        'titulo' => 'Revisión Wifi Ed Básaica Extensa',
+        'descripcion' => 'Esta es una descripción extremadamente larga que supera los 50 caracteres para probar el truncado y la visualización completa dentro del modal.',
+        'frecuencia' => 'diaria',
+        'estado' => 'pendiente',
+        'fecha_programada' => now()->format('Y-m-d'),
+        'creado_por' => $user->id,
+    ]);
+
+    Livewire::test('pages::ti.tareas.index')
+        ->call('verDetalle', $task->id)
+        ->assertSet('showModalDetalle', true)
+        ->assertSet('selectedTaskForDetail.id', $task->id)
+        ->assertSee('Esta es una descripción extremadamente larga');
+});

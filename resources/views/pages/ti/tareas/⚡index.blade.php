@@ -7,6 +7,7 @@ use App\Models\TiTask;
 use App\Models\User;
 use Carbon\Carbon;
 use Flux\Flux;
+use Illuminate\Support\Str;
 
 new #[Title('Tareas de TI')] class extends Component {
     use WithPagination;
@@ -20,6 +21,10 @@ new #[Title('Tareas de TI')] class extends Component {
     public string $filtroEstado = 'todos'; // todos, pendiente, en_progreso, vencida
     public string $filtroPrioridad = 'todas';
     public string $filtroCategoria = 'todas';
+
+    // Modal Ver Detalle
+    public bool $showModalDetalle = false;
+    public ?TiTask $selectedTaskForDetail = null;
 
     // Modal Crear / Editar
     public bool $showModalTask = false;
@@ -42,6 +47,12 @@ new #[Title('Tareas de TI')] class extends Component {
     public function mount(): void
     {
         $this->fecha_programada = now()->format('Y-m-d');
+    }
+
+    public function verDetalle(int $id): void
+    {
+        $this->selectedTaskForDetail = TiTask::with(['asignado', 'creador'])->findOrFail($id);
+        $this->showModalDetalle = true;
     }
 
     public function updatedVista(): void
@@ -147,7 +158,7 @@ new #[Title('Tareas de TI')] class extends Component {
                 $q->orderBy('fecha_completada', 'desc')
                   ->orderBy('id', 'desc');
             })
-            ->paginate(15);
+            ->paginate(30);
     }
 
     public function abrirModalCrear(): void
@@ -250,9 +261,28 @@ new #[Title('Tareas de TI')] class extends Component {
 
     public function abrirModalCompletar(int $id): void
     {
-        $this->completingTaskId = $id;
-        $this->notas_cierre = '';
+        $this->resetValidation();
+        $task = TiTask::findOrFail($id);
+        $this->completingTaskId = $task->id;
+        $this->notas_cierre = $task->notas_cierre ?? '';
         $this->showModalCompletar = true;
+    }
+
+    public function guardarAvance(): void
+    {
+        if (! $this->completingTaskId) {
+            return;
+        }
+
+        $task = TiTask::findOrFail($this->completingTaskId);
+        $task->update([
+            'notas_cierre' => $this->notas_cierre,
+            'estado' => $task->estado === 'pendiente' ? 'en_progreso' : $task->estado,
+        ]);
+
+        Flux::toast('Avance guardado correctamente.');
+        $this->showModalCompletar = false;
+        $this->completingTaskId = null;
     }
 
     public function confirmarCompletar(): void
@@ -260,6 +290,12 @@ new #[Title('Tareas de TI')] class extends Component {
         if (! $this->completingTaskId) {
             return;
         }
+
+        $this->validate([
+            'notas_cierre' => 'required|string|min:1',
+        ], [
+            'notas_cierre.required' => 'Es obligatorio escribir un mensaje u observación antes de finalizar (ej: OK).',
+        ]);
 
         $task = TiTask::findOrFail($this->completingTaskId);
         $siguiente = $task->completar($this->notas_cierre);
@@ -295,17 +331,9 @@ new #[Title('Tareas de TI')] class extends Component {
 
 <div class="space-y-6">
     <!-- Header principal -->
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-            <flux:heading size="xl" level="1">Gestión de Tareas de TI</flux:heading>
-            <flux:subheading size="lg">Administra las tareas técnicas periódicas y realiza seguimiento del trabajo del equipo</flux:subheading>
-        </div>
-
-        <div class="flex items-center gap-2">
-            <flux:button variant="primary" icon="plus" wire:click="abrirModalCrear">
-                Nueva Tarea
-            </flux:button>
-        </div>
+    <div>
+        <flux:heading size="xl" level="1">Gestión de Tareas de TI</flux:heading>
+        <flux:subheading size="lg">Administra las tareas técnicas periódicas y realiza seguimiento del trabajo del equipo</flux:subheading>
     </div>
 
     <!-- Selector de Modo de Vista (Activas vs Archivadas) -->
@@ -342,51 +370,6 @@ new #[Title('Tareas de TI')] class extends Component {
         @endif
     </div>
 
-    <!-- Tarjetas de estadísticas (Solo en vista Activas) -->
-    @if($vista === 'activas')
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm flex items-center justify-between">
-                <div>
-                    <span class="text-xs font-medium text-zinc-500 uppercase tracking-wider">Pendientes Totales</span>
-                    <div class="text-2xl font-bold text-zinc-900 dark:text-white mt-1">{{ $this->stats['pendientes'] }}</div>
-                </div>
-                <div class="p-3 bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 rounded-lg">
-                    <flux:icon name="clipboard-document-list" class="size-6" />
-                </div>
-            </div>
-
-            <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm flex items-center justify-between">
-                <div>
-                    <span class="text-xs font-medium text-zinc-500 uppercase tracking-wider">Completadas Hoy</span>
-                    <div class="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">{{ $this->stats['completadas_hoy'] }}</div>
-                </div>
-                <div class="p-3 bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 rounded-lg">
-                    <flux:icon name="check-circle" class="size-6" />
-                </div>
-            </div>
-
-            <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm flex items-center justify-between">
-                <div>
-                    <span class="text-xs font-medium text-zinc-500 uppercase tracking-wider">Tareas Vencidas</span>
-                    <div class="text-2xl font-bold text-rose-600 dark:text-rose-400 mt-1">{{ $this->stats['vencidas'] }}</div>
-                </div>
-                <div class="p-3 bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400 rounded-lg">
-                    <flux:icon name="exclamation-triangle" class="size-6" />
-                </div>
-            </div>
-
-            <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm flex items-center justify-between">
-                <div>
-                    <span class="text-xs font-medium text-zinc-500 uppercase tracking-wider">Diarias por Hacer</span>
-                    <div class="text-2xl font-bold text-amber-600 dark:text-amber-400 mt-1">{{ $this->stats['diarias_pendientes'] }}</div>
-                </div>
-                <div class="p-3 bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 rounded-lg">
-                    <flux:icon name="arrow-path" class="size-6" />
-                </div>
-            </div>
-        </div>
-    @endif
-
     <!-- Navegación por Pestañas de Frecuencia -->
     <div class="border-b border-zinc-200 dark:border-zinc-800">
         <nav class="-mb-px flex space-x-6 overflow-x-auto" aria-label="Tabs">
@@ -411,15 +394,15 @@ new #[Title('Tareas de TI')] class extends Component {
         </nav>
     </div>
 
-    <!-- Barra de Filtros -->
-    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between bg-zinc-50 dark:bg-zinc-900/50 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800">
-        <div class="flex-1 max-w-md">
+    <!-- Barra de Filtros + Botón Nueva Tarea (Integrado) -->
+    <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between bg-zinc-50 dark:bg-zinc-900/50 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800">
+        <div class="flex-1 w-full lg:max-w-md">
             <flux:input wire:model.live.debounce.300ms="search" placeholder="Buscar por título, descripción o notas..." icon="magnifying-glass" />
         </div>
 
-        <div class="flex flex-wrap items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2 w-full lg:w-auto">
             @if($vista === 'activas')
-                <flux:select wire:model.live="filtroEstado" class="w-40">
+                <flux:select wire:model.live="filtroEstado" class="w-full sm:w-36">
                     <option value="todos">Estado: Todos</option>
                     <option value="pendiente">Pendientes</option>
                     <option value="en_progreso">En Progreso</option>
@@ -427,7 +410,7 @@ new #[Title('Tareas de TI')] class extends Component {
                 </flux:select>
             @endif
 
-            <flux:select wire:model.live="filtroPrioridad" class="w-40">
+            <flux:select wire:model.live="filtroPrioridad" class="w-full sm:w-36">
                 <option value="todas">Prioridad: Todas</option>
                 <option value="critica">🔴 Crítica</option>
                 <option value="alta">🟠 Alta</option>
@@ -435,7 +418,7 @@ new #[Title('Tareas de TI')] class extends Component {
                 <option value="baja">🟢 Baja</option>
             </flux:select>
 
-            <flux:select wire:model.live="filtroCategoria" class="w-44">
+            <flux:select wire:model.live="filtroCategoria" class="w-full sm:w-40">
                 <option value="todas">Categoría: Todas</option>
                 <option value="Servidores">Servidores</option>
                 <option value="Redes">Redes</option>
@@ -445,10 +428,14 @@ new #[Title('Tareas de TI')] class extends Component {
                 <option value="Respaldos">Respaldos</option>
                 <option value="Licencias">Licencias</option>
             </flux:select>
+
+            <flux:button variant="primary" icon="plus" wire:click="abrirModalCrear" class="w-full sm:w-auto shrink-0">
+                Nueva Tarea
+            </flux:button>
         </div>
     </div>
 
-    <!-- Listado / Tabla de Tareas -->
+    <!-- Listado / Tabla de Tareas (Prioridad visual superior en mobile) -->
     <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-sm">
         @if($this->tareas->isEmpty())
             <div class="py-12 text-center">
@@ -485,11 +472,11 @@ new #[Title('Tareas de TI')] class extends Component {
                                 <!-- Checkbox / Botón de Acción rápida -->
                                 <td class="py-3 px-4 text-center">
                                     @if($vista === 'archivadas' || $t->estado === 'completada')
-                                        <button wire:click="reabrirTarea({{ $t->id }})" title="Reabrir y mover a activas" class="text-emerald-600 dark:text-emerald-400 hover:opacity-80 transition-opacity">
+                                        <button wire:click="reabrirTarea({{ $t->id }})" title="Reabrir y mover a activas" class="text-emerald-600 dark:text-emerald-400 hover:opacity-80 transition-opacity p-1">
                                             <flux:icon name="check-circle" class="size-6" variant="solid" />
                                         </button>
                                     @else
-                                        <button wire:click="abrirModalCompletar({{ $t->id }})" title="Completar y archivar" class="text-zinc-300 hover:text-emerald-500 dark:text-zinc-600 dark:hover:text-emerald-400 transition-colors">
+                                        <button wire:click="abrirModalCompletar({{ $t->id }})" title="Completar y archivar" class="text-zinc-300 hover:text-emerald-500 dark:text-zinc-600 dark:hover:text-emerald-400 transition-colors p-1">
                                             <flux:icon name="clock" class="size-6" />
                                         </button>
                                     @endif
@@ -497,15 +484,21 @@ new #[Title('Tareas de TI')] class extends Component {
 
                                 <!-- Título y Descripción -->
                                 <td class="py-3 px-4">
-                                    <div class="font-semibold text-zinc-900 dark:text-zinc-100 {{ $vista === 'archivadas' ? 'text-zinc-600 dark:text-zinc-300' : '' }}">
+                                    <button wire:click="verDetalle({{ $t->id }})" title="Ver detalle completo" class="font-semibold text-zinc-900 dark:text-zinc-100 hover:text-primary-600 dark:hover:text-primary-400 hover:underline text-left transition-colors cursor-pointer block {{ $vista === 'archivadas' ? 'text-zinc-600 dark:text-zinc-300' : '' }}">
                                         {{ $t->titulo }}
-                                    </div>
+                                    </button>
                                     @if($t->descripcion)
-                                        <div class="text-xs text-zinc-500 line-clamp-1 mt-0.5">{{ $t->descripcion }}</div>
+                                        <div class="text-xs text-zinc-500 max-w-xs sm:max-w-sm truncate mt-0.5" title="{{ $t->descripcion }}">
+                                            {{ Str::limit($t->descripcion, 50) }}
+                                        </div>
                                     @endif
 
-                                    <!-- Muestra notas de cierre si está archivada -->
-                                    @if($vista === 'archivadas' && $t->notas_cierre)
+                                    <!-- Muestra notas de avance en activas o notas de cierre en archivadas -->
+                                    @if($vista === 'activas' && $t->notas_cierre)
+                                        <div class="mt-1 text-xs p-1.5 rounded bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 text-blue-800 dark:text-blue-300 italic">
+                                            📝 <strong>Avance:</strong> {{ $t->notas_cierre }}
+                                        </div>
+                                    @elseif($vista === 'archivadas' && $t->notas_cierre)
                                         <div class="mt-1 text-xs p-1.5 rounded bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-900 text-emerald-800 dark:text-emerald-300 italic">
                                             💬 {{ $t->notas_cierre }}
                                         </div>
@@ -593,6 +586,7 @@ new #[Title('Tareas de TI')] class extends Component {
                                         @if($vista === 'archivadas')
                                             <flux:button size="xs" variant="ghost" icon="arrow-path" wire:click="reabrirTarea({{ $t->id }})" title="Reabrir tarea" />
                                         @else
+                                            <flux:button size="xs" variant="ghost" icon="document-text" wire:click="abrirModalCompletar({{ $t->id }})" title="Anotar avance / Completar" />
                                             <flux:button size="xs" variant="ghost" icon="pencil-square" wire:click="abrirModalEditar({{ $t->id }})" title="Editar tarea" />
                                         @endif
                                         <flux:button size="xs" variant="ghost" icon="trash" class="text-rose-600 hover:text-rose-700 dark:text-rose-400" wire:click="eliminarTarea({{ $t->id }})" wire:confirm="¿Seguro que deseas eliminar esta tarea?" title="Eliminar tarea" />
@@ -610,8 +604,53 @@ new #[Title('Tareas de TI')] class extends Component {
         @endif
     </div>
 
-    <!-- Modal Crear / Editar Tarea -->
-    <flux:modal wire:model="showModalTask" class="w-full max-w-xl">
+    <!-- Tarjetas de estadísticas (Posicionadas debajo de la tabla) -->
+    @if($vista === 'activas')
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 pt-2">
+            <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm flex items-center justify-between">
+                <div>
+                    <span class="text-xs font-medium text-zinc-500 uppercase tracking-wider">Pendientes Totales</span>
+                    <div class="text-2xl font-bold text-zinc-900 dark:text-white mt-1">{{ $this->stats['pendientes'] }}</div>
+                </div>
+                <div class="p-3 bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 rounded-lg">
+                    <flux:icon name="clipboard-document-list" class="size-6" />
+                </div>
+            </div>
+
+            <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm flex items-center justify-between">
+                <div>
+                    <span class="text-xs font-medium text-zinc-500 uppercase tracking-wider">Completadas Hoy</span>
+                    <div class="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">{{ $this->stats['completadas_hoy'] }}</div>
+                </div>
+                <div class="p-3 bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 rounded-lg">
+                    <flux:icon name="check-circle" class="size-6" />
+                </div>
+            </div>
+
+            <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm flex items-center justify-between">
+                <div>
+                    <span class="text-xs font-medium text-zinc-500 uppercase tracking-wider">Tareas Vencidas</span>
+                    <div class="text-2xl font-bold text-rose-600 dark:text-rose-400 mt-1">{{ $this->stats['vencidas'] }}</div>
+                </div>
+                <div class="p-3 bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400 rounded-lg">
+                    <flux:icon name="exclamation-triangle" class="size-6" />
+                </div>
+            </div>
+
+            <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm flex items-center justify-between">
+                <div>
+                    <span class="text-xs font-medium text-zinc-500 uppercase tracking-wider">Diarias por Hacer</span>
+                    <div class="text-2xl font-bold text-amber-600 dark:text-amber-400 mt-1">{{ $this->stats['diarias_pendientes'] }}</div>
+                </div>
+                <div class="p-3 bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 rounded-lg">
+                    <flux:icon name="arrow-path" class="size-6" />
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- Modal Crear / Editar Tarea (Optimizado para Mobile / iPhone Pro Max) -->
+    <flux:modal wire:model="showModalTask" class="w-full max-w-xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <div class="space-y-6">
             <div>
                 <flux:heading size="lg">{{ $editingTaskId ? 'Editar Tarea de TI' : 'Nueva Tarea de TI' }}</flux:heading>
@@ -619,12 +658,12 @@ new #[Title('Tareas de TI')] class extends Component {
             </div>
 
             <form wire:submit="guardarTarea" class="space-y-4">
-                <flux:input label="Título de la Tarea" wire:model="titulo" placeholder="ej. Revisión de respaldos en Servidor NAS" required />
+                <flux:input label="Título de la Tarea" wire:model="titulo" placeholder="ej. Revisión de respaldos en Servidor NAS" required class="w-full" />
 
-                <flux:textarea label="Descripción u Observaciones" wire:model="descripcion" placeholder="Detalla los pasos o requerimientos específicos..." rows="3" />
+                <flux:textarea label="Descripción u Observaciones" wire:model="descripcion" placeholder="Detalla los pasos o requerimientos específicos..." rows="3" class="w-full" />
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <flux:select label="Frecuencia" wire:model="frecuencia">
+                    <flux:select label="Frecuencia" wire:model="frecuencia" class="w-full">
                         <option value="diaria">⚡ Diaria</option>
                         <option value="semanal">📅 Semanal</option>
                         <option value="semestral">🏛️ Semestral</option>
@@ -632,7 +671,7 @@ new #[Title('Tareas de TI')] class extends Component {
                         <option value="unica">📌 Puntual (Única)</option>
                     </flux:select>
 
-                    <flux:select label="Prioridad" wire:model="prioridad">
+                    <flux:select label="Prioridad" wire:model="prioridad" class="w-full">
                         <option value="baja">🟢 Baja</option>
                         <option value="media">🟡 Media</option>
                         <option value="alta">🟠 Alta</option>
@@ -641,7 +680,7 @@ new #[Title('Tareas de TI')] class extends Component {
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <flux:select label="Categoría" wire:model="categoria">
+                    <flux:select label="Categoría" wire:model="categoria" class="w-full">
                         <option value="Servidores">Servidores</option>
                         <option value="Redes">Redes / Wi-Fi</option>
                         <option value="Equipos/Salas">Equipos & Salas de Computación</option>
@@ -651,7 +690,7 @@ new #[Title('Tareas de TI')] class extends Component {
                         <option value="Licencias">Licencias & Software</option>
                     </flux:select>
 
-                    <flux:select label="Responsable Asignado" wire:model="asignado_a">
+                    <flux:select label="Responsable Asignado" wire:model="asignado_a" class="w-full">
                         <option value="">Sin asignar</option>
                         @foreach($this->usuarios as $u)
                             <option value="{{ $u->id }}">{{ $u->nombreCompleto() ?: $u->email }}</option>
@@ -660,8 +699,8 @@ new #[Title('Tareas de TI')] class extends Component {
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <flux:input type="date" label="Fecha Programada" wire:model="fecha_programada" required />
-                    <flux:input type="date" label="Fecha Vencimiento (Opcional)" wire:model="fecha_vencimiento" />
+                    <flux:input type="date" label="Fecha Programada" wire:model="fecha_programada" required class="w-full" />
+                    <flux:input type="date" label="Fecha Vencimiento (Opcional)" wire:model="fecha_vencimiento" class="w-full" />
                 </div>
 
                 @if($frecuencia !== 'unica')
@@ -670,34 +709,106 @@ new #[Title('Tareas de TI')] class extends Component {
                     </div>
                 @endif
 
-                <div class="flex items-center justify-end gap-3 pt-4">
-                    <flux:button variant="ghost" wire:click="$set('showModalTask', false)">Cancelar</flux:button>
-                    <flux:button variant="primary" type="submit">Guardar Tarea</flux:button>
+                <div class="flex flex-col sm:flex-row items-center justify-end gap-2 pt-4">
+                    <flux:button variant="ghost" class="w-full sm:w-auto" wire:click="$set('showModalTask', false)">Cancelar</flux:button>
+                    <flux:button variant="primary" class="w-full sm:w-auto" type="submit">Guardar Tarea</flux:button>
                 </div>
             </form>
         </div>
     </flux:modal>
 
-    <!-- Modal Completar Tarea -->
-    <flux:modal wire:model="showModalCompletar" class="w-full max-w-md">
+    <!-- Modal Avances / Completar Tarea (Optimizado para Mobile) -->
+    <flux:modal wire:model="showModalCompletar" class="w-full max-w-md max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <div class="space-y-6">
             <div>
-                <flux:heading size="lg">Completar y Archivar Tarea</flux:heading>
-                <flux:subheading>¿Deseas agregar alguna nota de cierre u observación al finalizar?</flux:subheading>
+                <flux:heading size="lg">Avances y Cierre de Tarea</flux:heading>
+                <flux:subheading>Anota el progreso actual o confirma el cierre definitivo de la tarea.</flux:subheading>
             </div>
 
             <div class="space-y-4">
-                <flux:textarea label="Notas de Cierre (Opcional)" wire:model="notas_cierre" placeholder="ej. Todo verificado correctamente, respaldo guardado en volumen secundario." rows="3" />
+                <flux:textarea label="Notas de Cierre / Observaciones *" wire:model="notas_cierre" placeholder="ej. OK, o detalle del trabajo realizado..." rows="4" required class="w-full" />
 
                 <p class="text-xs text-zinc-500 dark:text-zinc-400">
-                    💡 La tarea se moverá al apartado de <strong>Archivadas / Listas</strong> y, si es recurrente, el sistema programará automáticamente el siguiente ciclo en las Tareas Activas.
+                    💡 Puedes guardar tus anotaciones con <strong>Guardar Avance</strong> para continuar trabajando en la tarea, o presionar <strong>Confirmar y Archivar</strong> una vez que esté completamente terminada.
                 </p>
 
-                <div class="flex items-center justify-end gap-3 pt-2">
-                    <flux:button variant="ghost" wire:click="$set('showModalCompletar', false)">Cancelar</flux:button>
-                    <flux:button variant="primary" wire:click="confirmarCompletar">Confirmar y Archivar</flux:button>
+                <div class="flex flex-col sm:flex-row items-center justify-end gap-2 pt-2">
+                    <flux:button variant="ghost" class="w-full sm:w-auto" wire:click="$set('showModalCompletar', false)">Cancelar</flux:button>
+                    <flux:button variant="outline" class="w-full sm:w-auto" wire:click="guardarAvance">
+                        Guardar Avance
+                    </flux:button>
+                    <flux:button variant="primary" class="w-full sm:w-auto" wire:click="confirmarCompletar" wire:confirm="¿Estás seguro de finalizar y archivar esta tarea? Si es una tarea recurrente, se creará automáticamente el siguiente ciclo.">
+                        Confirmar y Archivar
+                    </flux:button>
                 </div>
             </div>
         </div>
+    </flux:modal>
+
+    <!-- Modal Ver Detalle Completo de Tarea (Optimizado para Mobile) -->
+    <flux:modal wire:model="showModalDetalle" class="w-full max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+        @if($selectedTaskForDetail)
+            <div class="space-y-6">
+                <div>
+                    <div class="flex items-center gap-2 mb-2">
+                        <flux:badge size="sm" color="{{ match($selectedTaskForDetail->frecuencia) { 'diaria' => 'sky', 'semanal' => 'indigo', 'semestral' => 'purple', 'anual' => 'amber', default => 'zinc' } }}">
+                            {{ ucfirst($selectedTaskForDetail->frecuencia) }}
+                        </flux:badge>
+                        <flux:badge size="sm" color="{{ match($selectedTaskForDetail->prioridad) { 'critica' => 'red', 'alta' => 'orange', 'media' => 'yellow', default => 'green' } }}">
+                            {{ ucfirst($selectedTaskForDetail->prioridad) }}
+                        </flux:badge>
+                        @if($selectedTaskForDetail->categoria)
+                            <span class="text-xs px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-medium text-zinc-600 dark:text-zinc-400">
+                                {{ $selectedTaskForDetail->categoria }}
+                            </span>
+                        @endif
+                    </div>
+                    <flux:heading size="xl">{{ $selectedTaskForDetail->titulo }}</flux:heading>
+                </div>
+
+                <div class="space-y-4 text-sm">
+                    @if($selectedTaskForDetail->descripcion)
+                        <div class="p-3 bg-zinc-50 dark:bg-zinc-800/60 rounded-xl border border-zinc-200 dark:border-zinc-700/60">
+                            <span class="text-xs font-bold text-zinc-500 uppercase tracking-wider block mb-1">Descripción Completa:</span>
+                            <p class="whitespace-pre-line text-sm text-zinc-800 dark:text-zinc-200 leading-relaxed">{{ $selectedTaskForDetail->descripcion }}</p>
+                        </div>
+                    @endif
+
+                    @if($selectedTaskForDetail->notas_cierre)
+                        <div class="p-3 bg-blue-50 dark:bg-blue-950/40 rounded-xl border border-blue-200 dark:border-blue-900 text-blue-900 dark:text-blue-200">
+                            <span class="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider block mb-1">Avances / Observaciones:</span>
+                            <p class="whitespace-pre-line text-sm italic">{{ $selectedTaskForDetail->notas_cierre }}</p>
+                        </div>
+                    @endif
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-zinc-50 dark:bg-zinc-800/40 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                        <div>
+                            <span class="text-zinc-500 block font-medium">Fecha Programada:</span>
+                            <span class="font-semibold text-zinc-800 dark:text-zinc-200">{{ $selectedTaskForDetail->fecha_programada ? $selectedTaskForDetail->fecha_programada->format('d/m/Y') : 'N/A' }}</span>
+                        </div>
+                        <div>
+                            <span class="text-zinc-500 block font-medium">Fecha Vencimiento:</span>
+                            <span class="font-semibold text-zinc-800 dark:text-zinc-200">{{ $selectedTaskForDetail->fecha_vencimiento ? $selectedTaskForDetail->fecha_vencimiento->format('d/m/Y') : 'Sin fecha limite' }}</span>
+                        </div>
+                        <div>
+                            <span class="text-zinc-500 block font-medium">Estado:</span>
+                            <span class="font-semibold text-zinc-800 dark:text-zinc-200 capitalize">{{ $selectedTaskForDetail->estado }}</span>
+                        </div>
+                        <div>
+                            <span class="text-zinc-500 block font-medium">Asignado a:</span>
+                            <span class="font-semibold text-zinc-800 dark:text-zinc-200">{{ $selectedTaskForDetail->asignado ? $selectedTaskForDetail->asignado->nombreCompleto() : 'Sin asignar' }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex flex-col sm:flex-row items-center justify-end gap-2 pt-2">
+                    <flux:button variant="ghost" class="w-full sm:w-auto" wire:click="$set('showModalDetalle', false)">Cerrar</flux:button>
+                    @if($selectedTaskForDetail->estado !== 'completada')
+                        <flux:button variant="outline" class="w-full sm:w-auto" wire:click="abrirModalCompletar({{ $selectedTaskForDetail->id }}); $set('showModalDetalle', false);">Anotar Avance / Completar</flux:button>
+                        <flux:button variant="primary" class="w-full sm:w-auto" wire:click="abrirModalEditar({{ $selectedTaskForDetail->id }}); $set('showModalDetalle', false);">Editar</flux:button>
+                    @endif
+                </div>
+            </div>
+        @endif
     </flux:modal>
 </div>

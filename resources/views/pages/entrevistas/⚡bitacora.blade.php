@@ -36,6 +36,7 @@ new class extends Component {
 
     // Modal Firma Presencial
     public bool $modalFirmaPresencial = false;
+    public bool $modalFirmaTableta = false;
     public string $firmanteNombre = '';
     public string $firmanteRutNumero = '';
     public string $firmanteRutDv = '';
@@ -477,6 +478,19 @@ new class extends Component {
 
         $this->firmaSvg = ($this->bitacora && $this->bitacora->firma_svg) ? $this->bitacora->firma_svg : '';
         $this->modalFirmaPresencial = true;
+        $this->modalFirmaTableta = false;
+    }
+
+    public function abrirModoTableta()
+    {
+        $this->modalFirmaPresencial = false;
+        $this->modalFirmaTableta = true;
+    }
+
+    public function abrirModoCompacto()
+    {
+        $this->modalFirmaTableta = false;
+        $this->modalFirmaPresencial = true;
     }
 
     public function guardarFirmaPresencial()
@@ -510,6 +524,7 @@ new class extends Component {
         ]);
 
         $this->modalFirmaPresencial = false;
+        $this->modalFirmaTableta = false;
         \Flux::toast('Firma presencial registrada correctamente.', variant: 'success');
     }
 
@@ -1334,24 +1349,24 @@ new class extends Component {
         </div>
     </flux:modal>
 
-    <!-- Modal Firma Presencial -->
+    <!-- Modal Firma Presencial (Modo Estándar) -->
     <flux:modal wire:model="modalFirmaPresencial" class="md:w-[32rem]">
-        <div class="space-y-6">
+        <div class="space-y-5">
             <div>
                 <flux:heading size="lg" class="flex items-center gap-2">
                     <flux:icon.pencil-square class="size-5 text-blue-600" />
                     Firma Presencial del Apoderado / Asistente
                 </flux:heading>
-                <flux:text class="mt-1">Confirme o modifique el nombre y RUT del asistente antes de realizar la firma en pantalla.</flux:text>
+                <flux:text class="mt-1 text-xs">Confirme o modifique el nombre y RUT del asistente antes de realizar la firma.</flux:text>
             </div>
 
             <form wire:submit.prevent="guardarFirmaPresencial" class="space-y-4">
-                <flux:input wire:model="firmanteNombre" label="Nombre Completo del Firmante" placeholder="EJ: MARÍA PAZ LÓPEZ" required class="uppercase" />
+                <flux:input wire:model="firmanteNombre" label="Nombre Completo del Firmante" placeholder="EJ: MARÍA PAZ LÓPEZ" required class="uppercase !text-xs" />
                 <flux:error name="firmanteNombre" />
 
                 <div class="flex gap-2 items-end">
-                    <flux:input wire:model="firmanteRutNumero" label="RUT del Firmante" placeholder="12345678" class="flex-1" required />
-                    <flux:input wire:model="firmanteRutDv" label="DV" placeholder="K" class="w-16 uppercase" maxlength="1" />
+                    <flux:input wire:model="firmanteRutNumero" label="RUT del Firmante" placeholder="12345678" class="flex-1 !text-xs" required />
+                    <flux:input wire:model="firmanteRutDv" label="DV" placeholder="K" class="w-16 uppercase !text-xs" maxlength="1" />
                 </div>
                 <flux:error name="firmanteRutNumero" />
 
@@ -1373,7 +1388,7 @@ new class extends Component {
                         
                         const rect = this.canvas.getBoundingClientRect();
                         const w = (rect.width && rect.width > 0) ? Math.round(rect.width) : 450;
-                        const h = (rect.height && rect.height > 0) ? Math.round(rect.height) : 150;
+                        const h = (rect.height && rect.height > 0) ? Math.round(rect.height) : 140;
 
                         this.canvas.width = w;
                         this.canvas.height = h;
@@ -1411,9 +1426,6 @@ new class extends Component {
 
                             const onDown = (e) => {
                                 e.preventDefault();
-                                if (e.pointerId && this.canvas.setPointerCapture) {
-                                    try { this.canvas.setPointerCapture(e.pointerId); } catch(err) {}
-                                }
                                 this.isDrawing = true;
                                 this.hasDrawn = true;
                                 const pos = getPos(e);
@@ -1432,37 +1444,88 @@ new class extends Component {
                             const onUp = (e) => {
                                 if (this.isDrawing) {
                                     this.isDrawing = false;
-                                    if (e.pointerId && this.canvas.releasePointerCapture) {
-                                        try { this.canvas.releasePointerCapture(e.pointerId); } catch(err) {}
-                                    }
-                                    $wire.set('firmaSvg', this.canvas.toDataURL('image/png'));
+                                    $wire.set('firmaSvg', this.getTrimmedDataUrl());
                                 }
                             };
-
-                            this.canvas.addEventListener('pointerdown', onDown);
-                            this.canvas.addEventListener('pointermove', onMove);
-                            this.canvas.addEventListener('pointerup', onUp);
-                            this.canvas.addEventListener('pointercancel', onUp);
 
                             this.canvas.addEventListener('mousedown', onDown);
                             this.canvas.addEventListener('mousemove', onMove);
                             this.canvas.addEventListener('mouseup', onUp);
+                            this.canvas.addEventListener('mouseleave', onUp);
 
                             this.canvas.addEventListener('touchstart', onDown, { passive: false });
                             this.canvas.addEventListener('touchmove', onMove, { passive: false });
                             this.canvas.addEventListener('touchend', onUp);
                         }
                     },
+                    getTrimmedDataUrl() {
+                        if (!this.canvas || !this.ctx) return '';
+                        const w = this.canvas.width;
+                        const h = this.canvas.height;
+                        if (w === 0 || h === 0) return '';
+
+                        try {
+                            const imgData = this.ctx.getImageData(0, 0, w, h);
+                            const data = imgData.data;
+                            let minX = w, minY = h, maxX = 0, maxY = 0;
+                            let found = false;
+
+                            for (let y = 0; y < h; y += 2) {
+                                for (let x = 0; x < w; x += 2) {
+                                    const idx = (y * w + x) * 4;
+                                    const r = data[idx];
+                                    const g = data[idx + 1];
+                                    const b = data[idx + 2];
+                                    const a = data[idx + 3];
+
+                                    if (a > 30 && (r < 235 || g < 235 || b < 235)) {
+                                        if (x < minX) minX = x;
+                                        if (x > maxX) maxX = x;
+                                        if (y < minY) minY = y;
+                                        if (y > maxY) maxY = y;
+                                        found = true;
+                                    }
+                                }
+                            }
+
+                            if (!found) return this.canvas.toDataURL('image/png');
+
+                            const pad = 16;
+                            minX = Math.max(0, minX - pad);
+                            minY = Math.max(0, minY - pad);
+                            maxX = Math.min(w, maxX + pad);
+                            maxY = Math.min(h, maxY + pad);
+
+                            const cropW = maxX - minX;
+                            const cropH = maxY - minY;
+
+                            const trimmedCanvas = document.createElement('canvas');
+                            trimmedCanvas.width = cropW;
+                            trimmedCanvas.height = cropH;
+
+                            const tCtx = trimmedCanvas.getContext('2d');
+                            tCtx.drawImage(this.canvas, minX, minY, cropW, cropH, 0, 0, cropW, cropH);
+
+                            return trimmedCanvas.toDataURL('image/png');
+                        } catch(err) {
+                            return this.canvas.toDataURL('image/png');
+                        }
+                    },
                     clearCanvas() {
-                        this.setupCanvas();
                         if (this.canvas && this.ctx) {
                             this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
                             this.hasDrawn = false;
                             $wire.set('firmaSvg', '');
                         }
                     }
-                }" wire:ignore class="space-y-2 pt-2">
-                    <label class="block text-xs font-bold uppercase tracking-wider text-zinc-500">Trazar Firma Digital:</label>
+                }" wire:ignore class="space-y-2 pt-1">
+                    <div class="flex justify-between items-center">
+                        <label class="block text-xs font-bold uppercase tracking-wider text-zinc-500">Trazar Firma Digital:</label>
+                        <button type="button" wire:click="abrirModoTableta" class="text-[#00376e] dark:text-blue-400 font-bold hover:underline cursor-pointer flex items-center gap-1.5 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 px-2.5 py-1 rounded-lg text-xs">
+                            <flux:icon.arrows-pointing-out class="size-3.5 text-blue-600 dark:text-blue-400" />
+                            Modo Tableta Digital (Pantalla Completa)
+                        </button>
+                    </div>
                     <div class="relative border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-xl bg-white dark:bg-zinc-950 overflow-hidden">
                         <canvas 
                             x-ref="canvas" 
@@ -1473,16 +1536,221 @@ new class extends Component {
                         </div>
                     </div>
                     <div class="flex justify-between items-center text-xs">
-                        <button type="button" @click="clearCanvas()" class="text-zinc-500 hover:text-zinc-700 underline cursor-pointer">Limpiar trazado</button>
+                        <button type="button" @click="clearCanvas()" class="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 underline cursor-pointer">Limpiar trazado</button>
                     </div>
                 </div>
 
-                <div class="flex justify-end gap-3 pt-4 border-t border-zinc-100 dark:border-zinc-800">
+                <div class="flex justify-end gap-3 pt-3 border-t border-zinc-100 dark:border-zinc-800">
                     <flux:button wire:click="$set('modalFirmaPresencial', false)" variant="ghost">Cancelar</flux:button>
-                    <flux:button type="submit" variant="primary" icon="check">Guardar Firma</flux:button>
+                    <flux:button type="submit" variant="primary" icon="check" wire:loading.attr="disabled">Guardar Firma</flux:button>
                 </div>
             </form>
         </div>
+    </flux:modal>
+
+    <!-- Modal Firma Tableta Digital (Optimizado para no requerir Scroll) -->
+    <flux:modal wire:model="modalFirmaTableta" class="w-full max-w-5xl md:max-w-6xl p-4 sm:p-5 space-y-3">
+        <form wire:submit.prevent="guardarFirmaPresencial" class="space-y-3">
+            <!-- Header Superior -->
+            <div class="flex items-center justify-between pb-2 border-b border-zinc-200 dark:border-zinc-800">
+                <div class="flex items-center gap-2.5">
+                    <div class="p-1.5 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-lg">
+                        <flux:icon.pencil-square class="size-5" />
+                    </div>
+                    <div>
+                        <h3 class="text-sm sm:text-base font-bold text-zinc-900 dark:text-white">Lienzo Amplio — Tableta Digitalizadora</h3>
+                        <p class="text-[11px] text-zinc-500">Superficie amplia optimizada para lápiz digital y pantallas táctiles.</p>
+                    </div>
+                </div>
+                <flux:button wire:click="abrirModoCompacto" variant="ghost" icon="arrows-pointing-in" size="sm">
+                    Modo Compacto
+                </flux:button>
+            </div>
+
+            <!-- Campos Rápidos de Firmante (Inline) -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-zinc-50 dark:bg-zinc-900/60 p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                <div class="sm:col-span-2">
+                    <flux:input wire:model="firmanteNombre" label="Nombre Completo del Firmante" placeholder="EJ: MARÍA PAZ LÓPEZ" required class="uppercase !text-xs" />
+                </div>
+                <div class="flex gap-2 items-end">
+                    <flux:input wire:model="firmanteRutNumero" label="RUT" placeholder="12345678" class="flex-1 !text-xs" required />
+                    <flux:input wire:model="firmanteRutDv" label="DV" placeholder="K" class="w-14 uppercase !text-xs" maxlength="1" />
+                </div>
+            </div>
+
+            <!-- Canvas Amplio pero Acotado (Sin Scroll) -->
+            <div x-data="{
+                canvas: null,
+                ctx: null,
+                isDrawing: false,
+                hasDrawn: false,
+                init() {
+                    this.$nextTick(() => {
+                        this.setupCanvas();
+                    });
+                },
+                setupCanvas() {
+                    this.canvas = this.$refs.canvas;
+                    if (!this.canvas) return;
+                    this.ctx = this.canvas.getContext('2d');
+                    
+                    const rect = this.canvas.getBoundingClientRect();
+                    const w = (rect.width && rect.width > 0) ? Math.round(rect.width) : 1000;
+                    const h = (rect.height && rect.height > 0) ? Math.round(rect.height) : 380;
+
+                    this.canvas.width = w;
+                    this.canvas.height = h;
+
+                    this.ctx.lineWidth = 4;
+                    this.ctx.lineCap = 'round';
+                    this.ctx.lineJoin = 'round';
+                    this.ctx.strokeStyle = '#020617';
+
+                    if ($wire.firmaSvg && !this.hasDrawn) {
+                        const img = new Image();
+                        img.onload = () => {
+                            if (this.ctx && this.canvas) {
+                                this.ctx.drawImage(img, 0, 0, this.canvas.width, this.canvas.height);
+                                this.hasDrawn = true;
+                            }
+                        };
+                        img.src = $wire.firmaSvg;
+                    }
+
+                    if (!this.canvas.dataset.listenersAttached) {
+                        this.canvas.dataset.listenersAttached = 'true';
+
+                        const getPos = (e) => {
+                            const r = this.canvas.getBoundingClientRect();
+                            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                            const scaleX = r.width > 0 ? (this.canvas.width / r.width) : 1;
+                            const scaleY = r.height > 0 ? (this.canvas.height / r.height) : 1;
+                            return {
+                                x: (clientX - r.left) * scaleX,
+                                y: (clientY - r.top) * scaleY
+                            };
+                        };
+
+                        const onDown = (e) => {
+                            e.preventDefault();
+                            this.isDrawing = true;
+                            this.hasDrawn = true;
+                            const pos = getPos(e);
+                            this.ctx.beginPath();
+                            this.ctx.moveTo(pos.x, pos.y);
+                        };
+
+                        const onMove = (e) => {
+                            if (!this.isDrawing) return;
+                            e.preventDefault();
+                            const pos = getPos(e);
+                            this.ctx.lineTo(pos.x, pos.y);
+                            this.ctx.stroke();
+                        };
+
+                        const onUp = (e) => {
+                            if (this.isDrawing) {
+                                this.isDrawing = false;
+                                $wire.set('firmaSvg', this.getTrimmedDataUrl());
+                            }
+                        };
+
+                        this.canvas.addEventListener('mousedown', onDown);
+                        this.canvas.addEventListener('mousemove', onMove);
+                        this.canvas.addEventListener('mouseup', onUp);
+                        this.canvas.addEventListener('mouseleave', onUp);
+
+                        this.canvas.addEventListener('touchstart', onDown, { passive: false });
+                        this.canvas.addEventListener('touchmove', onMove, { passive: false });
+                        this.canvas.addEventListener('touchend', onUp);
+                    }
+                },
+                getTrimmedDataUrl() {
+                    if (!this.canvas || !this.ctx) return '';
+                    const w = this.canvas.width;
+                    const h = this.canvas.height;
+                    if (w === 0 || h === 0) return '';
+
+                    try {
+                        const imgData = this.ctx.getImageData(0, 0, w, h);
+                        const data = imgData.data;
+                        let minX = w, minY = h, maxX = 0, maxY = 0;
+                        let found = false;
+
+                        for (let y = 0; y < h; y += 2) {
+                            for (let x = 0; x < w; x += 2) {
+                                const idx = (y * w + x) * 4;
+                                const r = data[idx];
+                                const g = data[idx + 1];
+                                const b = data[idx + 2];
+                                const a = data[idx + 3];
+
+                                if (a > 30 && (r < 235 || g < 235 || b < 235)) {
+                                    if (x < minX) minX = x;
+                                    if (x > maxX) maxX = x;
+                                    if (y < minY) minY = y;
+                                    if (y > maxY) maxY = y;
+                                    found = true;
+                                }
+                            }
+                        }
+
+                        if (!found) return this.canvas.toDataURL('image/png');
+
+                        const pad = 16;
+                        minX = Math.max(0, minX - pad);
+                        minY = Math.max(0, minY - pad);
+                        maxX = Math.min(w, maxX + pad);
+                        maxY = Math.min(h, maxY + pad);
+
+                        const cropW = maxX - minX;
+                        const cropH = maxY - minY;
+
+                        const trimmedCanvas = document.createElement('canvas');
+                        trimmedCanvas.width = cropW;
+                        trimmedCanvas.height = cropH;
+
+                        const tCtx = trimmedCanvas.getContext('2d');
+                        tCtx.drawImage(this.canvas, minX, minY, cropW, cropH, 0, 0, cropW, cropH);
+
+                        return trimmedCanvas.toDataURL('image/png');
+                    } catch(err) {
+                        return this.canvas.toDataURL('image/png');
+                    }
+                },
+                clearCanvas() {
+                    if (this.canvas && this.ctx) {
+                        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                        this.hasDrawn = false;
+                        $wire.set('firmaSvg', '');
+                    }
+                }
+            }" wire:ignore class="flex flex-col relative">
+                <div class="relative w-full h-[40vh] sm:h-[44vh] max-h-[380px] border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-2xl bg-white dark:bg-zinc-950 overflow-hidden shadow-inner">
+                    <canvas 
+                        x-ref="canvas" 
+                        class="w-full h-full touch-none cursor-crosshair bg-white"
+                    ></canvas>
+                    <div x-show="!hasDrawn" class="absolute inset-0 flex items-center justify-center pointer-events-none text-sm font-semibold text-zinc-400">
+                        ✍️ Firme aquí con su tableta digitalizadora
+                    </div>
+                </div>
+
+                <div class="flex justify-between items-center text-xs pt-1.5">
+                    <button type="button" @click="clearCanvas()" class="text-zinc-500 hover:text-rose-600 dark:hover:text-rose-400 underline cursor-pointer flex items-center gap-1 font-medium text-[11px]">
+                        <flux:icon.trash class="size-3.5" /> Limpiar trazado
+                    </button>
+                    <span class="text-zinc-400 text-[11px]">Auto-recorte activado</span>
+                </div>
+            </div>
+
+            <!-- Footer de Acciones (Siempre Visible) -->
+            <div class="flex justify-end items-center gap-3 pt-2.5 border-t border-zinc-200 dark:border-zinc-800">
+                <flux:button wire:click="$set('modalFirmaTableta', false)" variant="ghost" size="sm">Cancelar</flux:button>
+                <flux:button type="submit" variant="primary" icon="check" size="sm" wire:loading.attr="disabled">Guardar Firma en Bitácora</flux:button>
+            </div>
+        </form>
     </flux:modal>
 
     <!-- Modal Firma Online -->

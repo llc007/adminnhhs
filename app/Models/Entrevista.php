@@ -21,6 +21,9 @@ class Entrevista extends Model
         'fecha',
         'hora',
         'hora_llegada',
+        'recepcionista_ingreso_id',
+        'recepcionista_salida_id',
+        'hora_salida',
         'urgencia',
         'motivo',
         'notas_previas',
@@ -92,6 +95,22 @@ class Entrevista extends Model
     public function accesosCompartidos(): HasMany
     {
         return $this->hasMany(EntrevistaCompartida::class, 'entrevista_id');
+    }
+
+    /**
+     * El funcionario de recepción que registró el ingreso del apoderado
+     */
+    public function recepcionistaIngreso(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'recepcionista_ingreso_id');
+    }
+
+    /**
+     * El funcionario de recepción que registró la salida del apoderado
+     */
+    public function recepcionistaSalida(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'recepcionista_salida_id');
     }
 
     /**

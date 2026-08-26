@@ -76,7 +76,7 @@ new class extends Component {
     #[\Livewire\Attributes\Computed]
     public function proximasEntrevistas()
     {
-        $query = Entrevista::with(['estudiante.curso', 'user'])
+        $query = Entrevista::with(['estudiante.curso', 'user', 'recepcionistaIngreso', 'recepcionistaSalida'])
                    ->where('school_id', auth()->user()->current_school_id);
 
         $hoy = now('America/Santiago')->format('Y-m-d');
@@ -159,7 +159,7 @@ new class extends Component {
         $lugares = $this->lugares;
         
         // Entrevistas que están físicamente en el colegio ahora mismo
-        $activas = Entrevista::with(['user', 'estudiante'])
+        $activas = Entrevista::with(['user', 'estudiante', 'recepcionistaIngreso', 'recepcionistaSalida'])
             ->where('school_id', auth()->user()->current_school_id)
             ->whereDate('fecha', $hoy)
             ->whereIn('estado', ['ingresada', 'realizada'])
@@ -226,6 +226,7 @@ new class extends Component {
                 'estado' => 'ingresada',
                 'lugar' => $this->lugarIngreso,
                 'hora_llegada' => now('America/Santiago')->format('H:i:s'),
+                'recepcionista_ingreso_id' => auth()->id(),
                 'mensaje_recepcion' => trim($this->mensajeRecepcion) !== '' ? $this->mensajeRecepcion : null,
             ]);
 
@@ -248,7 +249,8 @@ new class extends Component {
 
         if ($entrevista && ! str_contains($entrevista->mensaje_recepcion ?? '', '[SALIDA]')) {
             $hora = now('America/Santiago')->format('H:i');
-            $notaSalida = "[SALIDA] El apoderado se retiró del recinto a las {$hora}.";
+            $userNombre = auth()->user() ? auth()->user()->nombreCompleto() : 'Recepción';
+            $notaSalida = "[SALIDA] El apoderado se retiró del recinto a las {$hora} (Registrado por: {$userNombre}).";
 
             $nuevoMensaje = $entrevista->mensaje_recepcion
                 ? $entrevista->mensaje_recepcion . "\n\n" . $notaSalida
@@ -256,6 +258,8 @@ new class extends Component {
 
             $updateData = [
                 'mensaje_recepcion' => $nuevoMensaje,
+                'recepcionista_salida_id' => auth()->id(),
+                'hora_salida' => now('America/Santiago')->format('H:i:s'),
             ];
 
             if ($entrevista->estado === 'ingresada') {
@@ -282,6 +286,9 @@ new class extends Component {
             $entrevista->update([
                 'estado' => 'pendiente',
                 'hora_llegada' => null,
+                'recepcionista_ingreso_id' => null,
+                'recepcionista_salida_id' => null,
+                'hora_salida' => null,
                 'mensaje_recepcion' => null,
                 'lugar' => null,
             ]);
@@ -467,14 +474,29 @@ new class extends Component {
                                         <flux:badge size="sm" color="zinc" class="w-24 justify-center">Pendiente</flux:badge>
                                     @elseif($cita->estado === 'ingresada')
                                         <flux:badge size="sm" color="emerald" class="w-24 justify-center">Ingresó</flux:badge>
-                                        <p class="text-[10px] text-zinc-500 mt-0.5">({{ \Carbon\Carbon::parse($cita->hora_llegada)->format('H:i') }})</p>
+                                        <p class="text-[10px] text-zinc-500 mt-0.5">
+                                            {{ \Carbon\Carbon::parse($cita->hora_llegada)->format('H:i') }}
+                                            @if($cita->recepcionistaIngreso)
+                                                <span class="text-zinc-400 block text-[9px] truncate max-w-[110px]" title="Ingreso registrado por: {{ $cita->recepcionistaIngreso->nombreCompleto() }}">por {{ $cita->recepcionistaIngreso->nombres }}</span>
+                                            @endif
+                                        </p>
                                     @elseif($cita->estado === 'abierta')
                                         <flux:badge size="sm" color="sky" class="w-24 justify-center">Abierta</flux:badge>
-                                        <p class="text-[10px] text-zinc-500 mt-0.5">(Se retiró)</p>
+                                        <p class="text-[10px] text-zinc-500 mt-0.5">
+                                            (Se retiró)
+                                            @if($cita->recepcionistaSalida)
+                                                <span class="text-zinc-400 block text-[9px] truncate max-w-[110px]" title="Salida registrada por: {{ $cita->recepcionistaSalida->nombreCompleto() }}">por {{ $cita->recepcionistaSalida->nombres }}</span>
+                                            @endif
+                                        </p>
                                     @elseif($cita->estado === 'realizada')
                                         <flux:badge size="sm" color="blue" class="w-24 justify-center">Realizada</flux:badge>
                                         @if(str_contains($cita->mensaje_recepcion ?? '', '[SALIDA]'))
-                                            <p class="text-[10px] text-zinc-500 mt-0.5">(Se retiró)</p>
+                                            <p class="text-[10px] text-zinc-500 mt-0.5">
+                                                (Se retiró)
+                                                @if($cita->recepcionistaSalida)
+                                                    <span class="text-zinc-400 block text-[9px] truncate max-w-[110px]" title="Salida registrada por: {{ $cita->recepcionistaSalida->nombreCompleto() }}">por {{ $cita->recepcionistaSalida->nombres }}</span>
+                                                @endif
+                                            </p>
                                         @else
                                             <p class="text-[10px] text-emerald-600 font-bold mt-0.5">(En Recinto)</p>
                                         @endif

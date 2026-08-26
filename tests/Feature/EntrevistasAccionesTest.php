@@ -244,6 +244,7 @@ test('registering arrival in reception sends mail and database notification to d
     $entrevista->refresh();
     expect($entrevista->estado)->toBe('ingresada');
     expect($entrevista->lugar)->toBe('BOX 1');
+    expect($entrevista->recepcionista_ingreso_id)->toBe($user->id);
 
     Notification::assertSentTo(
         $user,
@@ -307,6 +308,8 @@ test('recepcionista can register exit and status updates to abierta', function (
     $entrevista->refresh();
     expect($entrevista->estado)->toBe('abierta');
     expect($entrevista->mensaje_recepcion)->toContain('[SALIDA]');
+    expect($entrevista->recepcionista_salida_id)->toBe($user->id);
+    expect($entrevista->hora_salida)->not->toBeNull();
 });
 
 test('recepcionista can revert entry and return interview to pending state', function () {
@@ -316,6 +319,9 @@ test('recepcionista can revert entry and return interview to pending state', fun
         'estado' => 'ingresada',
         'lugar' => 'BOX 2',
         'hora_llegada' => '10:15:00',
+        'recepcionista_ingreso_id' => $user->id,
+        'recepcionista_salida_id' => $user->id,
+        'hora_salida' => '10:45:00',
         'mensaje_recepcion' => 'Apoderado presente',
     ]);
 
@@ -327,6 +333,9 @@ test('recepcionista can revert entry and return interview to pending state', fun
     $entrevista->refresh();
     expect($entrevista->estado)->toBe('pendiente');
     expect($entrevista->hora_llegada)->toBeNull();
+    expect($entrevista->recepcionista_ingreso_id)->toBeNull();
+    expect($entrevista->recepcionista_salida_id)->toBeNull();
+    expect($entrevista->hora_salida)->toBeNull();
     expect($entrevista->mensaje_recepcion)->toBeNull();
     expect($entrevista->lugar)->toBeNull();
 });

@@ -781,7 +781,7 @@ new class extends Component {
                             <p class="text-[10px] text-zinc-500 mt-1 uppercase">{{ $entrevista->estudiante->apoderado_parentesco ?? 'Vínculo' }}</p>
                         </div>
                         <div>
-                            <label class="block text-[10px] uppercase font-bold text-zinc-400 mb-1 tracking-wider">Agendada el</label>
+                            <label class="block text-[10px] uppercase font-bold text-zinc-400 mb-1 tracking-wider">Fecha de Entrevista</label>
                             <p class="text-sm font-semibold text-zinc-900 dark:text-zinc-200">{{ \Carbon\Carbon::parse($entrevista->fecha)->translatedFormat('d M, Y') }}</p>
                             <p class="text-[10px] text-zinc-500 mt-1 uppercase">{{ \Carbon\Carbon::parse($entrevista->hora)->format('H:i') }} hrs</p>
                         </div>
@@ -1052,6 +1052,12 @@ new class extends Component {
                 <h3 class="text-xs font-bold text-[#00376e] dark:text-blue-400 uppercase tracking-wider mb-4 border-b border-zinc-200 dark:border-zinc-700 pb-3">Estado Analítico</h3>
                 <div class="space-y-4">
                     <div class="flex justify-between items-center text-xs">
+                        <span class="text-zinc-500 font-medium tracking-wide">Agendada el</span>
+                        <span class="text-zinc-700 dark:text-zinc-300 font-semibold" title="{{ $entrevista->created_at ? $entrevista->created_at->setTimezone('America/Santiago')->format('d/m/Y H:i') . ' hrs' : '' }}">
+                            {{ $entrevista->created_at ? $entrevista->created_at->setTimezone('America/Santiago')->translatedFormat('d M, Y H:i') . ' hrs' : 'No registrado' }}
+                        </span>
+                    </div>
+                    <div class="flex justify-between items-center text-xs">
                         <span class="text-zinc-500 font-medium tracking-wide">Estado Ficha</span>
                         <flux:badge color="zinc" size="sm">{{ ucfirst($bitacora?->estado_formulario ?? 'Nuevo Borrador') }}</flux:badge>
                     </div>
@@ -1158,12 +1164,27 @@ new class extends Component {
                     <div class="flex-1">
                         <p class="font-bold text-sm text-amber-900 dark:text-amber-400 mb-1">Registro de Recepción</p>
                         <p class="text-xs font-medium text-amber-700 dark:text-amber-500/80 leading-relaxed">
-                            El apoderado fue registrado y derivado al recinto a las {{ \Carbon\Carbon::parse($entrevista->hora_llegada)->format('H:i') }}.
+                            El apoderado fue registrado a las {{ \Carbon\Carbon::parse($entrevista->hora_llegada)->format('H:i') }} hrs
+                            @if($entrevista->recepcionistaIngreso)
+                                por <span class="font-bold text-amber-900 dark:text-amber-300">{{ $entrevista->recepcionistaIngreso->nombreCompleto() }}</span>
+                            @endif
+                            @if($entrevista->lugar)
+                                y derivado a <span class="font-bold text-amber-900 dark:text-amber-300">{{ $entrevista->lugar }}</span>
+                            @endif.
                         </p>
+
+                        @if($entrevista->hora_salida || str_contains($entrevista->mensaje_recepcion ?? '', '[SALIDA]'))
+                            <p class="text-xs font-medium text-amber-700 dark:text-amber-500/80 leading-relaxed mt-1">
+                                Salida del recinto registrada a las {{ $entrevista->hora_salida ? \Carbon\Carbon::parse($entrevista->hora_salida)->format('H:i') . ' hrs' : 'previamente' }}
+                                @if($entrevista->recepcionistaSalida)
+                                    (por <span class="font-bold text-amber-900 dark:text-amber-300">{{ $entrevista->recepcionistaSalida->nombreCompleto() }}</span>).
+                                @endif
+                            </p>
+                        @endif
 
                         @if($entrevista->mensaje_recepcion)
                             <div class="mt-3 p-3 bg-white/50 dark:bg-amber-900/30 rounded-lg border border-amber-200/50 dark:border-amber-800/50">
-                                <p class="text-[10px] font-bold uppercase tracking-widest text-amber-800/70 dark:text-amber-500/70 mb-1">Nota de Recepcionista:</p>
+                                <p class="text-[10px] font-bold uppercase tracking-widest text-amber-800/70 dark:text-amber-500/70 mb-1">Historial / Notas de Recepción:</p>
                                 <p class="text-xs font-bold text-amber-900 dark:text-amber-400 whitespace-pre-wrap">"{{ $entrevista->mensaje_recepcion }}"</p>
                             </div>
                         @endif

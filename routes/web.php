@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\MailWebhookController;
+use App\Http\Controllers\ReportesPrintController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/login')->name('home');
@@ -15,6 +16,12 @@ Route::post('webhooks/mail', [MailWebhookController::class, 'handle'])->name('we
 Route::middleware(['auth', 'verified', 'role:administrador,directivo,superadmin'])->group(function () {
     Route::livewire('dashboard', 'pages::entrevistas.dashboard')->name('dashboard');
     Route::livewire('/entrevistas/dashboard', 'pages::entrevistas.dashboard')->name('entrevistas.dashboard');
+});
+
+// Reportes Estadísticos — Administradores, Directivos y usuarios con permiso
+Route::middleware(['auth', 'verified', 'role_or_permission:superadmin|administrador|directivo|ver-reportes-entrevistas'])->group(function () {
+    Route::livewire('/reportes', 'pages::reportes.index')->name('reportes.index');
+    Route::get('/reportes/imprimir/entrevistas-profesor', [ReportesPrintController::class, 'entrevistasProfesor'])->name('reportes.imprimir.profesores');
 });
 
 // Recepción / Portería — requiere permiso ingresar-apoderado, ver-recepcion o superadmin

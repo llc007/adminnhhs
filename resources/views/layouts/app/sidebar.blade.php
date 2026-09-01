@@ -35,6 +35,13 @@
                         </flux:sidebar.item>
                     @endif
 
+                    @if (auth()->user()->hasRole(['superadmin', 'administrador', 'directivo']) || auth()->user()->can('ver-reportes-entrevistas'))
+                        <flux:sidebar.item icon="chart-bar" :href="route('reportes.index')"
+                            :current="request()->routeIs('reportes.index')" wire:navigate>
+                            {{ __('Reportes') }}
+                        </flux:sidebar.item>
+                    @endif
+
                     @if (auth()->user()->canAny(['ingresar-apoderado', 'ver-recepcion']) || auth()->user()->hasRole('superadmin'))
                         <flux:sidebar.item icon="building-office-2" :href="route('entrevistas.recepcion')"
                             :current="request()->routeIs('entrevistas.recepcion')" wire:navigate>

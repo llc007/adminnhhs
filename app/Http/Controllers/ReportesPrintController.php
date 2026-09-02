@@ -61,6 +61,8 @@ class ReportesPrintController extends Controller
             }
         };
 
+        $today = now('America/Santiago')->toDateString();
+
         $query = User::query()
             ->whereHas('schools', fn ($q) => $q->where('schools.id', $schoolId))
             ->whereDoesntHave('roles', function ($q) use ($schoolId) {
@@ -73,9 +75,9 @@ class ReportesPrintController extends Controller
             ->withCount([
                 'entrevistas as total_agendadas' => fn ($q) => $q->where('school_id', $schoolId)->where($dateClosure),
                 'entrevistas as total_realizadas' => fn ($q) => $q->where('school_id', $schoolId)->where('estado', 'realizada')->where($dateClosure),
-                'entrevistas as total_canceladas' => fn ($q) => $q->where('school_id', $schoolId)->where('estado', 'cancelada')->where($dateClosure),
-                'entrevistas as total_abiertas' => fn ($q) => $q->where('school_id', $schoolId)->whereIn('estado', ['abierta', 'ingresada', 'pendiente'])->where($dateClosure),
-                'entrevistas as total_ausentes' => fn ($q) => $q->where('school_id', $schoolId)->where('estado', 'ausente')->where($dateClosure),
+                'entrevistas as total_canceladas' => fn ($q) => $q->where('school_id', $schoolId)->whereIn('estado', ['cancelada', 'ausente'])->where($dateClosure),
+                'entrevistas as total_pendientes' => fn ($q) => $q->where('school_id', $schoolId)->whereIn('estado', ['pendiente', 'ingresada', 'abierta'])->where('fecha', '>=', $today)->where($dateClosure),
+                'entrevistas as total_abiertas' => fn ($q) => $q->where('school_id', $schoolId)->whereIn('estado', ['pendiente', 'ingresada', 'abierta'])->where('fecha', '<', $today)->where($dateClosure),
             ]);
 
         if ($cargo !== 'todos') {
@@ -115,8 +117,8 @@ class ReportesPrintController extends Controller
             'agendadas' => $funcionarios->sum('total_agendadas'),
             'realizadas' => $funcionarios->sum('total_realizadas'),
             'canceladas' => $funcionarios->sum('total_canceladas'),
+            'pendientes' => $funcionarios->sum('total_pendientes'),
             'abiertas' => $funcionarios->sum('total_abiertas'),
-            'ausentes' => $funcionarios->sum('total_ausentes'),
         ];
         $totales['tasa_realizacion'] = $totales['agendadas'] > 0
             ? round(($totales['realizadas'] / $totales['agendadas']) * 100)

@@ -111,6 +111,30 @@ function setupReportesEnvironment()
         'estado' => 'pendiente',
     ]);
 
+    // Interview 4: Past pending interview (Abierta / Vencida)
+    Entrevista::create([
+        'school_id' => $schoolId,
+        'user_id' => $docente->id,
+        'estudiante_id' => $estudianteId,
+        'fecha' => now('America/Santiago')->subDays(5)->format('Y-m-d'),
+        'hora' => '09:00:00',
+        'motivo' => 'Reunión Familiar',
+        'urgencia' => 'normal',
+        'estado' => 'pendiente',
+    ]);
+
+    // Interview 5: Absent interview (Ausente)
+    Entrevista::create([
+        'school_id' => $schoolId,
+        'user_id' => $docente->id,
+        'estudiante_id' => $estudianteId,
+        'fecha' => now('America/Santiago')->format('Y-m-d'),
+        'hora' => '14:00:00',
+        'motivo' => 'Reunión Convivencia',
+        'urgencia' => 'normal',
+        'estado' => 'ausente',
+    ]);
+
     return [$admin, $docente, $schoolId];
 }
 
@@ -150,10 +174,11 @@ test('admin or directivo can access reportes page and view consolidated stats', 
 
     expect($testItem)->toBeNull();
     expect($docenteItem)->not->toBeNull();
-    expect($docenteItem->total_agendadas)->toBe(3);
+    expect($docenteItem->total_agendadas)->toBe(5);
     expect($docenteItem->total_realizadas)->toBe(1);
-    expect($docenteItem->total_canceladas)->toBe(1);
-    expect($docenteItem->total_abiertas)->toBe(1);
+    expect($docenteItem->total_canceladas)->toBe(2); // 1 cancelada + 1 ausente
+    expect($docenteItem->total_pendientes)->toBe(1); // 1 hoy pendiente
+    expect($docenteItem->total_abiertas)->toBe(1);   // 1 pasada pendiente
 });
 
 test('search filter works by name or rut', function () {
@@ -224,7 +249,7 @@ test('admin can switch to problematicas por curso and view cross matrix stats', 
 
     $fila1A = collect($matriz)->first(fn ($item) => $item->curso->nivel === 1 && $item->curso->letra === 'A');
     expect($fila1A)->not->toBeNull();
-    expect($fila1A->total)->toBe(3);
+    expect($fila1A->total)->toBe(5);
 
     // Test sorting by causa_dominante and total
     $component->call('sort', 'causa_dominante')
@@ -285,11 +310,41 @@ test('admin can filter dynamic chart by specific course or view all courses', fu
         ->assertSee('Distribución de Problemáticas');
 
     $datosGeneral = $component->get('datosGraficoCausas');
-    expect($datosGeneral['total'])->toBeGreaterThanOrEqual(3);
+    expect($datosGeneral['total'])->toBeGreaterThanOrEqual(5);
     expect($datosGeneral['cursoTitulo'])->toBe('Consolidado General (Todo el Establecimiento)');
 
     $component->set('graficoCursoId', (string) $curso->id);
     $datosCurso = $component->get('datosGraficoCausas');
-    expect($datosCurso['total'])->toBe(3);
+    expect($datosCurso['total'])->toBe(5);
     expect($datosCurso['cursoTitulo'])->toBe('1° Medio A');
+});
+
+test('teacher agenda displays warning banner for expired unclosed interviews and links to historial', function () {
+    [$admin, $docente, $schoolId] = setupReportesEnvironment();
+
+    $pastDate = now('America/Santiago')->subDays(5)->format('Y-m-d');
+
+    app(PermissionRegistrar::class)->setPermissionsTeamId($schoolId);
+    $docente->givePermissionTo([
+        Permission::findOrCreate('ver-entrevistas-propias', 'web'),
+    ]);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    $this->actingAs($docente);
+
+    Livewire::test('pages::entrevistas.agenda')
+        ->set('fechaSeleccionada', $pastDate)
+        ->set('filtroTemporal', 'dia')
+        ->assertOk()
+        ->assertSee('entrevista pasada pendiente de cierre')
+        ->assertSee('Ver mis entrevistas abiertas')
+        ->assertSee('Sin Cerrar (Vencida)');
+
+    // Test that historial general correctly filters by docente and abierta
+    Livewire::test('pages::entrevistas.index')
+        ->set('profesor_id', (string) $docente->id)
+        ->set('estado', 'abierta')
+        ->assertOk()
+        ->assertSee('Reunión Familiar')
+        ->assertSee('Abierta (Sin Cerrar)');
 });

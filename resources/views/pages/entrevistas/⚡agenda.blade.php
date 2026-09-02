@@ -212,6 +212,21 @@ new class extends Component {
         $totalMes = $entrevistasMes->count();
         $realizadas = $entrevistasMes->where('estado', 'realizada')->count();
 
+        $today = now('America/Santiago')->toDateString();
+
+        // Entrevistas pasadas que siguen sin cerrarse (Abiertas / Vencidas)
+        $citasVencidasSinCerrar = Entrevista::with(['estudiante.curso'])
+            ->where('school_id', auth()->user()->current_school_id)
+            ->where(function ($q) use ($userId, $user) {
+                if (! $user->hasRole('superadmin')) {
+                    $q->where('user_id', $userId);
+                }
+            })
+            ->whereIn('estado', ['pendiente', 'ingresada', 'abierta'])
+            ->where('fecha', '<', $today)
+            ->orderBy('fecha', 'asc')
+            ->get();
+
         // Anuncios del Tablón
         $anuncios = AnuncioAgenda::with(['user', 'reacciones'])
             ->where('school_id', auth()->user()->current_school_id)
@@ -226,6 +241,8 @@ new class extends Component {
             'user' => $user,
             'realizadas' => $realizadas,
             'totalMes' => $totalMes,
+            'citasVencidasSinCerrar' => $citasVencidasSinCerrar,
+            'today' => $today,
             'anuncios' => $anuncios,
         ];
     }
@@ -301,6 +318,31 @@ new class extends Component {
             </section>
         @endif
 
+        <!-- Alerta de Citas Pasadas Pendientes de Cierre -->
+        @if ($citasVencidasSinCerrar->isNotEmpty())
+            <section class="rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/80 p-5 sm:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
+                <div class="flex items-start sm:items-center gap-3.5">
+                    <div class="p-2.5 bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 rounded-xl shrink-0">
+                        <flux:icon.exclamation-triangle class="size-6" />
+                    </div>
+                    <div>
+                        <h3 class="text-sm sm:text-base font-bold text-amber-950 dark:text-amber-100 flex items-center gap-2">
+                            Tienes {{ $citasVencidasSinCerrar->count() }} {{ $citasVencidasSinCerrar->count() === 1 ? 'entrevista pasada pendiente de cierre' : 'entrevistas pasadas pendientes de cierre' }}
+                        </h3>
+                        <p class="text-xs text-amber-800 dark:text-amber-300 mt-0.5">
+                            La fecha programada ya ocurrió. Recuerda completar el acta o registrar la inasistencia/cancelación para mantener tu agenda al día.
+                        </p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    <flux:button size="sm" variant="primary" href="{{ route('entrevistas.index', ['profesor_id' => auth()->id(), 'estado' => 'abierta']) }}" wire:navigate class="bg-amber-600 hover:bg-amber-700 text-white font-bold shadow-sm">
+                        <flux:icon.funnel class="size-4 mr-1.5" />
+                        Ver mis entrevistas abiertas
+                    </flux:button>
+                </div>
+            </section>
+        @endif
+
         <!-- Bento Grid -->
         <div class="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
 
@@ -322,8 +364,9 @@ new class extends Component {
                     @forelse($entrevistasLista as $cita)
                         @php
                             $estasRendido = in_array($cita->estado, ['realizada', 'ausente', 'cancelada']);
+                            $esVencida = !$estasRendido && $cita->fecha < $today;
                             $borderColors = [
-                                'pendiente' => 'border-amber-400',
+                                'pendiente' => $esVencida ? 'border-amber-500' : 'border-amber-400',
                                 'ingresada' => 'border-emerald-500',
                                 'abierta'   => 'border-sky-500',
                                 'realizada' => 'border-zinc-300 dark:border-zinc-700',
@@ -332,12 +375,12 @@ new class extends Component {
                             ];
                         @endphp
                         <div
-                            class="group bg-white dark:bg-zinc-900 p-5 rounded-2xl flex items-center gap-6 border-l-4 {{ $borderColors[$cita->estado] ?? 'border-blue-400' }} shadow-sm hover:shadow-md transition-all {{ $estasRendido ? 'opacity-60 grayscale hover:grayscale-0' : '' }}">
+                            class="group bg-white dark:bg-zinc-900 p-5 rounded-2xl flex items-center gap-6 border-l-4 {{ $borderColors[$cita->estado] ?? 'border-blue-400' }} shadow-sm hover:shadow-md transition-all {{ $estasRendido ? 'opacity-60 grayscale hover:grayscale-0' : '' }} {{ $esVencida ? 'bg-amber-50/40 dark:bg-amber-950/20' : '' }}">
 
                             <!-- Hora Block -->
                             <div class="text-center min-w-[70px]">
                                 <p class="text-[10px] font-bold text-zinc-400 uppercase truncate mb-0.5">{{ \Carbon\Carbon::parse($cita->fecha)->format('d M') }}</p>
-                                <p class="text-sm font-bold {{ $estasRendido ? 'text-zinc-500' : 'text-[#00376e] dark:text-blue-400' }}">
+                                <p class="text-sm font-bold {{ $estasRendido ? 'text-zinc-500' : ($esVencida ? 'text-amber-700 dark:text-amber-400' : 'text-[#00376e] dark:text-blue-400') }}">
                                     {{ \Carbon\Carbon::parse($cita->hora)->format('H:i') }}</p>
                                 <p class="text-[10px] font-bold font-mono text-zinc-400 dark:text-zinc-500 mt-0.5">#{{ $cita->id }}</p>
                             </div>
@@ -356,7 +399,9 @@ new class extends Component {
                                         <flux:badge color="indigo" size="sm">🤝 Compartida</flux:badge>
                                     @endif
 
-                                    @if ($cita->estado === 'pendiente')
+                                    @if ($esVencida)
+                                        <flux:badge color="amber" size="sm" class="font-bold">⚠️ Sin Cerrar (Vencida)</flux:badge>
+                                    @elseif ($cita->estado === 'pendiente')
                                         <flux:badge color="amber" size="sm">Pendiente</flux:badge>
                                     @elseif($cita->estado === 'ingresada')
                                         <flux:badge color="emerald" size="sm" class="animate-pulse">En Recepción

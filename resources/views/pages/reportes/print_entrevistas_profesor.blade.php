@@ -335,12 +335,16 @@
                 <div class="summary-value mono" style="color: #047857;">{{ $totales['realizadas'] }}</div>
             </div>
             <div class="summary-card" style="background-color: #fff1f2; border-color: #fecdd3;">
-                <div class="summary-title" style="color: #9f1239;">Canceladas</div>
+                <div class="summary-title" style="color: #9f1239;">Canc. / Aus.</div>
                 <div class="summary-value mono" style="color: #be123c;">{{ $totales['canceladas'] }}</div>
             </div>
             <div class="summary-card" style="background-color: #f0f9ff; border-color: #bae6fd;">
-                <div class="summary-title" style="color: #075985;">Abiertas / Pend.</div>
-                <div class="summary-value mono" style="color: #0284c7;">{{ $totales['abiertas'] }}</div>
+                <div class="summary-title" style="color: #075985;">Pendientes</div>
+                <div class="summary-value mono" style="color: #0284c7;">{{ $totales['pendientes'] }}</div>
+            </div>
+            <div class="summary-card" style="background-color: #fffbeb; border-color: #fde68a;">
+                <div class="summary-title" style="color: #92400e;">Abiertas (Venc.)</div>
+                <div class="summary-value mono" style="color: #b45309;">{{ $totales['abiertas'] }}</div>
             </div>
             <div class="summary-card" style="background-color: #f5f3ff; border-color: #ddd6fe;">
                 <div class="summary-title" style="color: #5b21b6;">% Cumplimiento</div>
@@ -352,16 +356,17 @@
         <table class="spreadsheet">
             <thead>
                 <tr>
-                    <th style="width: 22px;">N°</th>
-                    <th class="text-left" style="width: 170px;">Nombre Funcionario</th>
-                    <th class="text-left" style="width: 155px;">Correo Institucional</th>
-                    <th style="width: 75px;">RUT</th>
-                    <th style="width: 65px;">Cargo</th>
-                    <th style="width: 48px;">Agend.</th>
-                    <th style="width: 48px;">Realiz.</th>
-                    <th style="width: 48px;">Canc.</th>
-                    <th style="width: 48px;">Abiert.</th>
-                    <th style="width: 48px;">% Real.</th>
+                    <th style="width: 20px;">N°</th>
+                    <th class="text-left" style="width: 160px;">Nombre Funcionario</th>
+                    <th class="text-left" style="width: 140px;">Correo Institucional</th>
+                    <th style="width: 70px;">RUT</th>
+                    <th style="width: 60px;">Cargo</th>
+                    <th style="width: 44px;">Agend.</th>
+                    <th style="width: 44px;">Realiz.</th>
+                    <th style="width: 44px;">Canc/Aus</th>
+                    <th style="width: 44px;">Pend.</th>
+                    <th style="width: 44px;">Abiertas</th>
+                    <th style="width: 44px;">% Real.</th>
                 </tr>
             </thead>
             <tbody>
@@ -384,12 +389,13 @@
                         <td class="center mono" style="font-weight: 700;">{{ $docente->total_agendadas }}</td>
                         <td class="center mono" style="font-weight: 700; color: #047857;">{{ $docente->total_realizadas }}</td>
                         <td class="center mono" style="font-weight: 700; color: #be123c;">{{ $docente->total_canceladas }}</td>
-                        <td class="center mono" style="font-weight: 700; color: #0284c7;">{{ $docente->total_abiertas }}</td>
+                        <td class="center mono" style="font-weight: 700; color: #0284c7;">{{ $docente->total_pendientes }}</td>
+                        <td class="center mono" style="font-weight: 700; color: #b45309;">{{ $docente->total_abiertas }}</td>
                         <td class="center mono" style="font-weight: 700;">{{ $tasa }}</td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="10" class="center" style="padding: 15px; color: #64748b;">
+                        <td colspan="11" class="center" style="padding: 15px; color: #64748b;">
                             No se encontraron registros de funcionarios para los filtros seleccionados.
                         </td>
                     </tr>

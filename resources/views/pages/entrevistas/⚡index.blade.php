@@ -190,9 +190,24 @@ new class extends Component {
             $query->whereDate('fecha', $anchor->toDateString());
         }
 
+        $today = now('America/Santiago')->toDateString();
+
         if (! empty($this->estado)) {
             if ($this->estado === 'cancelada') {
                 $query->whereIn('estado', ['cancelada', 'ausente']);
+            } elseif ($this->estado === 'abierta') {
+                // Abiertas: citas cuya fecha ya pasó y no han sido cerradas, o con estado explícito 'abierta'
+                $query->where(function ($q) use ($today) {
+                    $q->where('estado', 'abierta')
+                        ->orWhere(function ($sq) use ($today) {
+                            $sq->whereIn('estado', ['pendiente', 'ingresada'])
+                                ->where('fecha', '<', $today);
+                        });
+                });
+            } elseif ($this->estado === 'pendiente') {
+                // Pendientes: citas vigentes de hoy o futuro
+                $query->whereIn('estado', ['pendiente', 'ingresada', 'abierta'])
+                    ->where('fecha', '>=', $today);
             } else {
                 $query->where('estado', $this->estado);
             }
@@ -245,10 +260,18 @@ new class extends Component {
         $entrevistas = $query->paginate(15);
 
         // Métricas dinámicas basadas en los filtros actuales
+        $today = now('America/Santiago')->toDateString();
         $baseQuery = clone $query;
         $totalMes = (clone $baseQuery)->count();
         $realizadasMes = (clone $baseQuery)->where('estado', 'realizada')->count();
-        $pendientesMes = (clone $baseQuery)->whereIn('estado', ['pendiente', 'ingresada'])->count();
+        $pendientesMes = (clone $baseQuery)->whereIn('estado', ['pendiente', 'ingresada', 'abierta'])->where('fecha', '>=', $today)->count();
+        $abiertasMes = (clone $baseQuery)->where(function ($q) use ($today) {
+            $q->where('estado', 'abierta')
+                ->orWhere(function ($sq) use ($today) {
+                    $sq->whereIn('estado', ['pendiente', 'ingresada'])
+                        ->where('fecha', '<', $today);
+                });
+        })->count();
         $canceladasMes = (clone $baseQuery)->whereIn('estado', ['cancelada', 'ausente'])->count();
 
         $porcentaje = $totalMes > 0 ? round(($realizadasMes / $totalMes) * 100) : 0;
@@ -259,6 +282,7 @@ new class extends Component {
             'cursos' => $cursos,
             'porcentaje' => $porcentaje,
             'pendientesMes' => $pendientesMes,
+            'abiertasMes' => $abiertasMes,
             'canceladasMes' => $canceladasMes,
         ]);
     }
@@ -367,11 +391,11 @@ new class extends Component {
                 <flux:label class="text-[11px]">Estado</flux:label>
                 <flux:select size="sm" class="!text-[11px]" wire:model.live="estado">
                     <flux:select.option value="">Todos los estados</flux:select.option>
-                    <flux:select.option value="pendiente">Pendientes</flux:select.option>
+                    <flux:select.option value="pendiente">Pendientes (Vigentes)</flux:select.option>
+                    <flux:select.option value="abierta">Abiertas (Sin Cerrar)</flux:select.option>
                     <flux:select.option value="ingresada">En Recepción</flux:select.option>
-                    <flux:select.option value="abierta">Abiertas</flux:select.option>
                     <flux:select.option value="realizada">Realizadas</flux:select.option>
-                    <flux:select.option value="cancelada">Canceladas</flux:select.option>
+                    <flux:select.option value="cancelada">Canceladas / Ausentes</flux:select.option>
                 </flux:select>
             </flux:field>
         </div>
@@ -431,16 +455,26 @@ new class extends Component {
                             </flux:table.cell>
 
                             <flux:table.cell class="py-1.5">
+                                @php
+                                    $today = now('America/Santiago')->toDateString();
+                                    $esPasada = in_array($entrevista->estado, ['pendiente', 'ingresada', 'abierta']) && $entrevista->fecha < $today;
+                                @endphp
                                 @if ($entrevista->estado === 'realizada')
                                     <flux:badge color="emerald" size="xs" icon="check-circle" class="uppercase text-[9px] py-0.5 px-1.5 font-bold tracking-wide">Realizada</flux:badge>
+                                @elseif($esPasada)
+                                    <flux:badge color="amber" size="xs" icon="exclamation-circle" class="uppercase text-[9px] py-0.5 px-1.5 font-bold tracking-wide">Abierta (Sin Cerrar)</flux:badge>
                                 @elseif($entrevista->estado === 'abierta')
                                     <flux:badge color="sky" size="xs" icon="arrow-right-start-on-rectangle" class="uppercase text-[9px] py-0.5 px-1.5 font-bold tracking-wide">Abierta</flux:badge>
                                 @elseif($entrevista->estado === 'ingresada')
                                     <flux:badge color="blue" size="xs" class="uppercase text-[9px] py-0.5 px-1.5 font-bold tracking-wide">En Recepción</flux:badge>
                                 @elseif($entrevista->estado === 'pendiente')
-                                    <flux:badge color="amber" size="xs" icon="clock" class="uppercase text-[9px] py-0.5 px-1.5 font-bold tracking-wide">Pendiente</flux:badge>
+                                    <flux:badge color="sky" size="xs" icon="clock" class="uppercase text-[9px] py-0.5 px-1.5 font-bold tracking-wide">Pendiente</flux:badge>
+                                @elseif($entrevista->estado === 'ausente')
+                                    <flux:badge color="red" size="xs" class="uppercase text-[9px] py-0.5 px-1.5 font-bold tracking-wide">Ausente</flux:badge>
+                                @elseif($entrevista->estado === 'cancelada')
+                                    <flux:badge color="zinc" size="xs" class="uppercase text-[9px] py-0.5 px-1.5 font-bold tracking-wide">Cancelada</flux:badge>
                                 @else
-                                    <flux:badge color="red" size="xs" class="uppercase text-[9px] py-0.5 px-1.5 font-bold tracking-wide">{{ ucfirst($entrevista->estado) }}</flux:badge>
+                                    <flux:badge color="zinc" size="xs" class="uppercase text-[9px] py-0.5 px-1.5 font-bold tracking-wide">{{ ucfirst($entrevista->estado) }}</flux:badge>
                                 @endif
                             </flux:table.cell>
 

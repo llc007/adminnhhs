@@ -147,6 +147,8 @@ new #[Title('Módulo de Reportes')] class extends Component {
             }
         };
 
+        $today = now('America/Santiago')->toDateString();
+
         $query = \App\Models\User::query()
             ->whereHas('schools', fn($q) => $q->where('schools.id', $schoolId))
             ->whereDoesntHave('roles', function ($q) use ($schoolId) {
@@ -159,9 +161,9 @@ new #[Title('Módulo de Reportes')] class extends Component {
             ->withCount([
                 'entrevistas as total_agendadas' => fn($q) => $q->where('school_id', $schoolId)->where($dateClosure),
                 'entrevistas as total_realizadas' => fn($q) => $q->where('school_id', $schoolId)->where('estado', 'realizada')->where($dateClosure),
-                'entrevistas as total_canceladas' => fn($q) => $q->where('school_id', $schoolId)->where('estado', 'cancelada')->where($dateClosure),
-                'entrevistas as total_abiertas' => fn($q) => $q->where('school_id', $schoolId)->whereIn('estado', ['abierta', 'ingresada', 'pendiente'])->where($dateClosure),
-                'entrevistas as total_ausentes' => fn($q) => $q->where('school_id', $schoolId)->where('estado', 'ausente')->where($dateClosure),
+                'entrevistas as total_canceladas' => fn($q) => $q->where('school_id', $schoolId)->whereIn('estado', ['cancelada', 'ausente'])->where($dateClosure),
+                'entrevistas as total_pendientes' => fn($q) => $q->where('school_id', $schoolId)->whereIn('estado', ['pendiente', 'ingresada', 'abierta'])->where('fecha', '>=', $today)->where($dateClosure),
+                'entrevistas as total_abiertas' => fn($q) => $q->where('school_id', $schoolId)->whereIn('estado', ['pendiente', 'ingresada', 'abierta'])->where('fecha', '<', $today)->where($dateClosure),
             ]);
 
         if ($this->cargo !== 'todos') {
@@ -188,7 +190,7 @@ new #[Title('Módulo de Reportes')] class extends Component {
             });
         }
 
-        if (in_array($this->sortBy, ['total_agendadas', 'total_realizadas', 'total_canceladas', 'total_abiertas'])) {
+        if (in_array($this->sortBy, ['total_agendadas', 'total_realizadas', 'total_canceladas', 'total_pendientes', 'total_abiertas'])) {
             $query->orderBy($this->sortBy, $this->sortDirection);
         } elseif ($this->sortBy === 'rut_numero') {
             $query->orderBy('rut_numero', $this->sortDirection);
@@ -211,6 +213,7 @@ new #[Title('Módulo de Reportes')] class extends Component {
     {
         $schoolId = auth()->user()->current_school_id;
         [$startDate, $endDate] = $this->getPeriodoDates();
+        $today = now('America/Santiago')->toDateString();
 
         $citasQuery = \App\Models\Entrevista::where('school_id', $schoolId);
         if ($startDate && $endDate) {
@@ -219,13 +222,15 @@ new #[Title('Módulo de Reportes')] class extends Component {
 
         $agendadas = (clone $citasQuery)->count();
         $realizadas = (clone $citasQuery)->where('estado', 'realizada')->count();
-        $canceladas = (clone $citasQuery)->where('estado', 'cancelada')->count();
-        $abiertas = (clone $citasQuery)->whereIn('estado', ['abierta', 'ingresada', 'pendiente'])->count();
+        $canceladas = (clone $citasQuery)->whereIn('estado', ['cancelada', 'ausente'])->count();
+        $pendientes = (clone $citasQuery)->whereIn('estado', ['pendiente', 'ingresada', 'abierta'])->where('fecha', '>=', $today)->count();
+        $abiertas = (clone $citasQuery)->whereIn('estado', ['pendiente', 'ingresada', 'abierta'])->where('fecha', '<', $today)->count();
 
         return [
             'agendadas' => $agendadas,
             'realizadas' => $realizadas,
             'canceladas' => $canceladas,
+            'pendientes' => $pendientes,
             'abiertas' => $abiertas,
             'tasa_realizacion' => $agendadas > 0 ? round(($realizadas / $agendadas) * 100) : 0,
         ];
@@ -301,9 +306,9 @@ new #[Title('Módulo de Reportes')] class extends Component {
                 'Cargo / Roles',
                 'Total Agendadas',
                 'Realizadas',
-                'Canceladas / Reagendadas',
-                'Abiertas / Pendientes',
-                'Ausentes / No Asistio',
+                'Canceladas / Ausentes',
+                'Pendientes (Próximas)',
+                'Abiertas (Sin Cerrar)',
                 'Tasa Realizacion (%)',
             ], ';');
 
@@ -322,8 +327,8 @@ new #[Title('Módulo de Reportes')] class extends Component {
                     $docente->total_agendadas,
                     $docente->total_realizadas,
                     $docente->total_canceladas,
+                    $docente->total_pendientes,
                     $docente->total_abiertas,
-                    $docente->total_ausentes,
                     $tasa,
                 ], ';');
             }
@@ -859,18 +864,17 @@ new #[Title('Módulo de Reportes')] class extends Component {
                 <flux:table :paginate="$this->funcionarios">
                     <flux:table.columns>
                         <flux:table.column sortable :sorted="$sortBy === 'nombres'" :direction="$sortDirection"
-                            wire:click="sort('nombres')">{{ __('Nombre del Funcionario') }}</flux:table.column>
-                        <flux:table.column sortable :sorted="$sortBy === 'rut_numero'" :direction="$sortDirection"
-                            wire:click="sort('rut_numero')">{{ __('RUT') }}</flux:table.column>
-                        <flux:table.column>{{ __('Cargo') }}</flux:table.column>
+                            wire:click="sort('nombres')">{{ __('Funcionario') }}</flux:table.column>
                         <flux:table.column sortable :sorted="$sortBy === 'total_agendadas'" :direction="$sortDirection"
                             wire:click="sort('total_agendadas')" class="text-center">{{ __('Agendadas') }}</flux:table.column>
                         <flux:table.column sortable :sorted="$sortBy === 'total_realizadas'" :direction="$sortDirection"
                             wire:click="sort('total_realizadas')" class="text-center">{{ __('Realizadas') }}</flux:table.column>
                         <flux:table.column sortable :sorted="$sortBy === 'total_canceladas'" :direction="$sortDirection"
-                            wire:click="sort('total_canceladas')" class="text-center">{{ __('Canceladas') }}</flux:table.column>
+                            wire:click="sort('total_canceladas')" class="text-center">{{ __('Canceladas / Ausentes') }}</flux:table.column>
+                        <flux:table.column sortable :sorted="$sortBy === 'total_pendientes'" :direction="$sortDirection"
+                            wire:click="sort('total_pendientes')" class="text-center">{{ __('Pendientes') }}</flux:table.column>
                         <flux:table.column sortable :sorted="$sortBy === 'total_abiertas'" :direction="$sortDirection"
-                            wire:click="sort('total_abiertas')" class="text-center">{{ __('Abiertas') }}</flux:table.column>
+                            wire:click="sort('total_abiertas')" class="text-center" title="Citas pasadas sin cerrar">{{ __('Abiertas') }}</flux:table.column>
                         <flux:table.column class="text-right print:hidden">{{ __('Acciones') }}</flux:table.column>
                     </flux:table.columns>
 
@@ -895,39 +899,8 @@ new #[Title('Módulo de Reportes')] class extends Component {
                                             <div class="text-sm font-bold text-zinc-900 dark:text-zinc-100">
                                                 {{ $funcionario->nombreCompleto() }}
                                             </div>
-                                            <div class="text-xs text-zinc-500">{{ $funcionario->email }}</div>
+                                            <div class="text-xs text-zinc-500 font-mono">{{ $funcionario->email }}</div>
                                         </div>
-                                    </div>
-                                </flux:table.cell>
-                                
-                                <flux:table.cell class="font-mono text-xs">
-                                    {{ $funcionario->rutCompleto() ?? '-' }}
-                                </flux:table.cell>
-
-                                <flux:table.cell>
-                                    <div class="flex flex-wrap gap-1">
-                                        @php
-                                            $roleLabels = [
-                                                'docente' => ['label' => 'Docente', 'color' => 'blue'],
-                                                'inspector' => ['label' => 'Inspector', 'color' => 'indigo'],
-                                                'asistente' => ['label' => 'Asistente', 'color' => 'teal'],
-                                                'psicosocial' => ['label' => 'Psicosocial', 'color' => 'cyan'],
-                                                'recepcion' => ['label' => 'Recepción', 'color' => 'emerald'],
-                                                'directivo' => ['label' => 'Directivo', 'color' => 'violet'],
-                                                'administrador' => ['label' => 'Administrador', 'color' => 'rose'],
-                                                'solicitante_adquisiciones' => ['label' => 'Solicitante Adq.', 'color' => 'amber'],
-                                                'ti' => ['label' => 'Personal TI', 'color' => 'sky'],
-                                            ];
-                                            $displayRoles = array_diff($funcionario->active_roles, ['superadmin', 'externo']);
-                                        @endphp
-                                        @forelse ($displayRoles as $role)
-                                            @php
-                                                $info = $roleLabels[$role] ?? ['label' => ucfirst($role), 'color' => 'zinc'];
-                                            @endphp
-                                            <flux:badge size="sm" :color="$info['color']">{{ $info['label'] }}</flux:badge>
-                                        @empty
-                                            <flux:badge size="sm" color="blue">Docente</flux:badge>
-                                        @endforelse
                                     </div>
                                 </flux:table.cell>
 
@@ -949,7 +922,7 @@ new #[Title('Módulo de Reportes')] class extends Component {
                                     @endif
                                 </flux:table.cell>
 
-                                {{-- CANCELADAS --}}
+                                {{-- CANCELADAS / AUSENTES --}}
                                 <flux:table.cell class="text-center font-bold">
                                     @if($funcionario->total_canceladas > 0)
                                         <span class="px-2.5 py-1 bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/50 rounded-md font-mono text-sm">
@@ -960,10 +933,21 @@ new #[Title('Módulo de Reportes')] class extends Component {
                                     @endif
                                 </flux:table.cell>
 
-                                {{-- ABIERTAS / PENDIENTES --}}
+                                {{-- PENDIENTES (VIGENTES) --}}
+                                <flux:table.cell class="text-center font-bold">
+                                    @if($funcionario->total_pendientes > 0)
+                                        <span class="px-2.5 py-1 bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/50 rounded-md font-mono text-sm">
+                                            {{ $funcionario->total_pendientes }}
+                                        </span>
+                                    @else
+                                        <span class="text-zinc-400 font-mono text-sm">0</span>
+                                    @endif
+                                </flux:table.cell>
+
+                                {{-- ABIERTAS (SIN CERRAR / VENCIDAS) --}}
                                 <flux:table.cell class="text-center font-bold">
                                     @if($funcionario->total_abiertas > 0)
-                                        <span class="px-2.5 py-1 bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/50 rounded-md font-mono text-sm">
+                                        <span class="px-2.5 py-1 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/50 rounded-md font-mono text-sm font-bold" title="Citas con fecha pasada que aún no se han cerrado">
                                             {{ $funcionario->total_abiertas }}
                                         </span>
                                     @else
@@ -1401,16 +1385,22 @@ new #[Title('Módulo de Reportes')] class extends Component {
                                     </span>
                                     
                                     {{-- Badge de Estado --}}
+                                    @php
+                                        $todayStr = now('America/Santiago')->toDateString();
+                                        $esPasada = $cita->fecha < $todayStr;
+                                    @endphp
                                     @if($cita->estado === 'realizada')
                                         <flux:badge size="sm" color="emerald">Realizada</flux:badge>
                                     @elseif($cita->estado === 'cancelada')
                                         <flux:badge size="sm" color="red">Cancelada</flux:badge>
+                                    @elseif($cita->estado === 'ausente')
+                                        <flux:badge size="sm" color="red">Ausente</flux:badge>
+                                    @elseif(in_array($cita->estado, ['pendiente', 'ingresada', 'abierta']) && $esPasada)
+                                        <flux:badge size="sm" color="amber" class="font-bold">⚠️ Abierta (Sin Cerrar)</flux:badge>
                                     @elseif($cita->estado === 'ingresada')
-                                        <flux:badge size="sm" color="amber">En Recinto</flux:badge>
-                                    @elseif($cita->estado === 'abierta')
-                                        <flux:badge size="sm" color="sky">Abierta</flux:badge>
+                                        <flux:badge size="sm" color="sky">En Recinto</flux:badge>
                                     @else
-                                        <flux:badge size="sm" color="zinc">{{ ucfirst($cita->estado) }}</flux:badge>
+                                        <flux:badge size="sm" color="sky">Pendiente</flux:badge>
                                     @endif
                                 </div>
 

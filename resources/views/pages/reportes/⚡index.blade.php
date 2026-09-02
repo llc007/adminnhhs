@@ -374,7 +374,8 @@ new #[Title('Módulo de Reportes')] class extends Component {
             ->orderBy('letra', 'asc')
             ->get();
 
-        $entrevistasQuery = \App\Models\Entrevista::with('estudiante')
+        $entrevistasQuery = \App\Models\Entrevista::select('id', 'school_id', 'estudiante_id', 'motivo', 'fecha')
+            ->with('estudiante:id,curso_id')
             ->where('school_id', $schoolId);
 
         if ($startDate && $endDate) {
@@ -519,7 +520,8 @@ new #[Title('Módulo de Reportes')] class extends Component {
         $schoolId = auth()->user()->current_school_id;
         [$startDate, $endDate] = $this->getPeriodoDates();
 
-        $query = \App\Models\Entrevista::with('estudiante')
+        $query = \App\Models\Entrevista::select('id', 'school_id', 'estudiante_id', 'motivo', 'fecha')
+            ->with('estudiante:id,curso_id')
             ->where('school_id', $schoolId);
 
         if ($startDate && $endDate) {
@@ -1071,7 +1073,21 @@ new #[Title('Módulo de Reportes')] class extends Component {
             </div>
 
             <!-- Gráfico Dinámico de Causas por Curso (Columnas Verticales Hacia Arriba) -->
-            <flux:card class="p-6">
+            <flux:card class="p-6 relative overflow-hidden">
+                <!-- Overlay de Carga (Spinner) -->
+                <div wire:loading.flex wire:target="graficoCursoId, periodo, modalidad"
+                     class="absolute inset-0 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-[2px] z-30 flex flex-col items-center justify-center transition-all">
+                    <div class="p-3.5 bg-white dark:bg-zinc-800 rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-700 flex items-center gap-3">
+                        <svg class="animate-spin size-5 text-[#00376e] dark:text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                        </svg>
+                        <span class="text-xs font-bold text-zinc-800 dark:text-zinc-200 animate-pulse">
+                            {{ __('Actualizando gráfico...') }}
+                        </span>
+                    </div>
+                </div>
+
                 <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-zinc-200 dark:border-zinc-700 pb-4 mb-6">
                     <div class="space-y-1">
                         <div class="flex items-center gap-2">

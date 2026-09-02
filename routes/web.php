@@ -22,6 +22,7 @@ Route::middleware(['auth', 'verified', 'role:administrador,directivo,superadmin'
 Route::middleware(['auth', 'verified', 'role_or_permission:superadmin|administrador|directivo|ver-reportes-entrevistas'])->group(function () {
     Route::livewire('/reportes', 'pages::reportes.index')->name('reportes.index');
     Route::get('/reportes/imprimir/entrevistas-profesor', [ReportesPrintController::class, 'entrevistasProfesor'])->name('reportes.imprimir.profesores');
+    Route::get('/reportes/imprimir/problematicas-curso', [ReportesPrintController::class, 'problematicasCurso'])->name('reportes.imprimir.problematicas');
 });
 
 // Recepción / Portería — requiere permiso ingresar-apoderado, ver-recepcion o superadmin

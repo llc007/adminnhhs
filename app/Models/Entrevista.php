@@ -120,4 +120,42 @@ class Entrevista extends Model
     {
         return $this->belongsToMany(User::class, 'entrevista_compartida', 'entrevista_id', 'user_id')->withTimestamps();
     }
+
+    /**
+     * Normaliza cualquier texto o slug de motivo a su categoría oficial estandarizada
+     */
+    public static function normalizarCategoria(?string $motivo): string
+    {
+        if (empty($motivo)) {
+            return 'Otro';
+        }
+
+        $m = mb_strtolower(trim($motivo));
+
+        if (str_contains($m, 'rendimiento') || str_contains($m, 'nota') || str_contains($m, 'academico') || str_contains($m, 'académico')) {
+            return 'Rendimiento Académico';
+        }
+
+        if (str_contains($m, 'conducta') || str_contains($m, 'convivencia') || str_contains($m, 'disciplina')) {
+            return 'Conducta y Convivencia';
+        }
+
+        if (str_contains($m, 'asistencia') || str_contains($m, 'puntualidad') || str_contains($m, 'atraso') || str_contains($m, 'inasistencia')) {
+            return 'Asistencia y Puntualidad';
+        }
+
+        if (str_contains($m, 'personal') || str_contains($m, 'familiar') || str_contains($m, 'apoderado')) {
+            return 'Asunto Personal / Familiar';
+        }
+
+        if (str_contains($m, 'psico') || str_contains($m, 'evaluacion') || str_contains($m, 'evaluación') || str_contains($m, 'pie')) {
+            return 'Evaluación Psicopedagógica';
+        }
+
+        if (str_contains($m, 'medica') || str_contains($m, 'médica') || str_contains($m, 'salud') || str_contains($m, 'medico') || str_contains($m, 'médico')) {
+            return 'Situación Médica';
+        }
+
+        return 'Otro';
+    }
 }

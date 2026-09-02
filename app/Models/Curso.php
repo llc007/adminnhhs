@@ -21,7 +21,7 @@ class Curso extends Model
     {
         return [
             'modalidad' => Modalidad::class,
-            'nivel'     => 'integer',
+            'nivel' => 'integer',
         ];
     }
 
@@ -64,5 +64,14 @@ class Curso extends Model
     public function nombreCompleto(): string
     {
         return $this->modalidad->displayCurso($this->nivel, $this->letra);
+    }
+
+    /**
+     * Get the abbreviated display name for the course.
+     * Example: "2°A", "1°B", "1°MA", "3°MB"
+     */
+    public function nombreAbreviado(): string
+    {
+        return $this->modalidad->displayCursoAbreviado($this->nivel, $this->letra);
     }
 }

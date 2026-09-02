@@ -206,3 +206,90 @@ test('admin can access print/pdf view with official spreadsheet format', functio
         ->assertSee('JUAN PABLO PEREZ')
         ->assertSee('TOTALES CONSOLIDADOS');
 });
+
+test('admin can switch to problematicas por curso and view cross matrix stats', function () {
+    [$admin, $docente, $schoolId] = setupReportesEnvironment();
+
+    $this->actingAs($admin);
+
+    $component = Livewire::test('pages::reportes.index')
+        ->set('tipoReporte', 'problematicas_curso')
+        ->assertOk()
+        ->assertSee('Matriz: Problemáticas por Curso')
+        ->assertSee('Diagnóstico Global')
+        ->assertSee('1°MA');
+
+    $matriz = $component->get('matrizProblematicas');
+    expect($matriz)->not->toBeEmpty();
+
+    $fila1A = collect($matriz)->first(fn ($item) => $item->curso->nivel === 1 && $item->curso->letra === 'A');
+    expect($fila1A)->not->toBeNull();
+    expect($fila1A->total)->toBe(3);
+
+    // Test sorting by causa_dominante and total
+    $component->call('sort', 'causa_dominante')
+        ->assertSet('sortBy', 'causa_dominante');
+
+    $component->call('sort', 'total')
+        ->assertSet('sortBy', 'total');
+});
+
+test('admin can view course drilldown modal and filter by category', function () {
+    [$admin, $docente, $schoolId] = setupReportesEnvironment();
+
+    $curso = DB::table('cursos')->where('school_id', $schoolId)->first();
+
+    $this->actingAs($admin);
+
+    Livewire::test('pages::reportes.index')
+        ->set('tipoReporte', 'problematicas_curso')
+        ->call('verDetalleCurso', $curso->id, 'Rendimiento Académico')
+        ->assertSet('modalDetalleCurso', true)
+        ->assertSee('EMILY SAAVEDRA')
+        ->assertSee('Reunión Rendimiento');
+});
+
+test('admin can export problematicas matrix to csv', function () {
+    [$admin, $docente, $schoolId] = setupReportesEnvironment();
+
+    $this->actingAs($admin);
+
+    $response = Livewire::test('pages::reportes.index')
+        ->set('tipoReporte', 'problematicas_curso')
+        ->call('exportarExcelProblematicas');
+
+    expect($response->effects['download'])->not->toBeNull();
+});
+
+test('admin can access print/pdf view for problematicas por curso', function () {
+    [$admin, $docente, $schoolId] = setupReportesEnvironment();
+
+    $this->actingAs($admin)
+        ->get(route('reportes.imprimir.problematicas', ['periodo' => 'ano_actual']))
+        ->assertOk()
+        ->assertSee('Matriz de Diagnóstico: Problemáticas por Curso y Motivo')
+        ->assertSee('Colegio Reportes Test')
+        ->assertSee('1°MA');
+});
+
+test('admin can filter dynamic chart by specific course or view all courses', function () {
+    [$admin, $docente, $schoolId] = setupReportesEnvironment();
+
+    $curso = DB::table('cursos')->where('school_id', $schoolId)->first();
+
+    $this->actingAs($admin);
+
+    $component = Livewire::test('pages::reportes.index')
+        ->set('tipoReporte', 'problematicas_curso')
+        ->assertOk()
+        ->assertSee('Distribución de Problemáticas');
+
+    $datosGeneral = $component->get('datosGraficoCausas');
+    expect($datosGeneral['total'])->toBeGreaterThanOrEqual(3);
+    expect($datosGeneral['cursoTitulo'])->toBe('Consolidado General (Todo el Establecimiento)');
+
+    $component->set('graficoCursoId', (string) $curso->id);
+    $datosCurso = $component->get('datosGraficoCausas');
+    expect($datosCurso['total'])->toBe(3);
+    expect($datosCurso['cursoTitulo'])->toBe('1° Medio A');
+});

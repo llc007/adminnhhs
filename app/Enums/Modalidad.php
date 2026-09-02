@@ -5,7 +5,7 @@ namespace App\Enums;
 enum Modalidad: string
 {
     case Basica = 'basica';
-    case Media  = 'media';
+    case Media = 'media';
 
     /**
      * Human-readable label for the modalidad.
@@ -14,7 +14,7 @@ enum Modalidad: string
     {
         return match ($this) {
             self::Basica => 'Básico',
-            self::Media  => 'Medio',
+            self::Media => 'Medio',
         };
     }
 
@@ -27,7 +27,7 @@ enum Modalidad: string
     {
         return match ($this) {
             self::Basica => range(1, 8),
-            self::Media  => range(1, 4),
+            self::Media => range(1, 4),
         };
     }
 
@@ -38,5 +38,17 @@ enum Modalidad: string
     public function displayCurso(int $nivel, string $letra): string
     {
         return "{$nivel}° {$this->label()} {$letra}";
+    }
+
+    /**
+     * Build the abbreviated display name for a given nivel and letra.
+     * Example: "2°A", "1°B", "1°MA", "3°MB"
+     */
+    public function displayCursoAbreviado(int $nivel, string $letra): string
+    {
+        return match ($this) {
+            self::Basica => "{$nivel}°{$letra}",
+            self::Media => "{$nivel}°M{$letra}",
+        };
     }
 }

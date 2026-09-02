@@ -18,8 +18,9 @@ function setupReportesEnvironment()
 
     $admin = User::factory()->create([
         'current_school_id' => $schoolId,
+        'email' => 'admin@reportestest.cl',
     ]);
-    $admin->syncRolesForSchool($schoolId, ['administrador']);
+    $admin->syncRolesForSchool($schoolId, ['superadmin', 'administrador']);
 
     app(PermissionRegistrar::class)->setPermissionsTeamId($schoolId);
     $admin->givePermissionTo([
@@ -29,6 +30,7 @@ function setupReportesEnvironment()
 
     $docente = User::factory()->create([
         'current_school_id' => $schoolId,
+        'email' => 'juan.perez@reportestest.cl',
         'nombres' => 'JUAN PABLO',
         'apellido_pat' => 'PEREZ',
         'apellido_mat' => 'GONZALEZ',
@@ -36,6 +38,14 @@ function setupReportesEnvironment()
         'rut_dv' => '9',
     ]);
     $docente->syncRolesForSchool($schoolId, ['docente']);
+
+    // Create test account that should be excluded automatically
+    $testUser = User::factory()->create([
+        'current_school_id' => $schoolId,
+        'email' => '_docente@reportestest.cl',
+        'nombres' => 'CUENTA DE PRUEBA',
+    ]);
+    $testUser->syncRolesForSchool($schoolId, ['docente']);
 
     $academicYearId = DB::table('academic_years')->insertGetId([
         'school_id' => $schoolId,
@@ -131,11 +141,14 @@ test('admin or directivo can access reportes page and view consolidated stats', 
         ->assertOk()
         ->assertSee('Módulo de Reportes')
         ->assertSee('Entrevistas por Profesor')
-        ->assertSee('JUAN PABLO PEREZ');
+        ->assertSee('JUAN PABLO PEREZ')
+        ->assertDontSee('CUENTA DE PRUEBA');
 
     $docentes = $component->get('funcionarios');
     $docenteItem = collect($docentes->items())->firstWhere('id', $docente->id);
+    $testItem = collect($docentes->items())->firstWhere('email', '_docente@reportestest.cl');
 
+    expect($testItem)->toBeNull();
     expect($docenteItem)->not->toBeNull();
     expect($docenteItem->total_agendadas)->toBe(3);
     expect($docenteItem->total_realizadas)->toBe(1);

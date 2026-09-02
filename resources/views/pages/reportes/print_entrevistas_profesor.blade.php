@@ -367,8 +367,8 @@
             <tbody>
                 @forelse ($funcionarios as $index => $docente)
                     @php
-                        $roles = $docente->active_roles;
-                        $rolTexto = !empty($roles) ? ucfirst($roles[0]) : 'Docente';
+                        $displayRoles = array_diff($docente->active_roles, ['superadmin', 'externo']);
+                        $rolTexto = !empty($displayRoles) ? ucfirst(reset($displayRoles)) : 'Docente';
                         $tasa = $docente->total_agendadas > 0
                             ? round(($docente->total_realizadas / $docente->total_agendadas) * 100) . '%'
                             : '0%';

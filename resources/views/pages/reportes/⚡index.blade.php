@@ -104,6 +104,9 @@ new #[Title('Módulo de Reportes')] class extends Component {
                 $q->where('roles.team_id', $schoolId)
                     ->where('roles.name', 'estudiante');
             })
+            ->whereRaw("SUBSTR(email, 1, 1) != '_'")
+            ->where('email', 'not like', 'docente1@%')
+            ->where('email', 'not like', 'test%')
             ->withCount([
                 'entrevistas as total_agendadas' => fn($q) => $q->where('school_id', $schoolId)->where($dateClosure),
                 'entrevistas as total_realizadas' => fn($q) => $q->where('school_id', $schoolId)->where('estado', 'realizada')->where($dateClosure),
@@ -261,8 +264,8 @@ new #[Title('Módulo de Reportes')] class extends Component {
             ], ';');
 
             foreach ($data as $docente) {
-                $roles = $docente->active_roles;
-                $rolesTexto = !empty($roles) ? implode(', ', array_map('ucfirst', $roles)) : 'Docente';
+                $displayRoles = array_diff($docente->active_roles, ['superadmin', 'externo']);
+                $rolesTexto = !empty($displayRoles) ? implode(', ', array_map('ucfirst', $displayRoles)) : 'Docente';
                 $tasa = $docente->total_agendadas > 0
                     ? round(($docente->total_realizadas / $docente->total_agendadas) * 100) . '%'
                     : '0%';
@@ -458,19 +461,18 @@ new #[Title('Módulo de Reportes')] class extends Component {
                                             'recepcion' => ['label' => 'Recepción', 'color' => 'emerald'],
                                             'directivo' => ['label' => 'Directivo', 'color' => 'violet'],
                                             'administrador' => ['label' => 'Administrador', 'color' => 'rose'],
-                                            'superadmin' => ['label' => 'Superadmin', 'color' => 'red'],
-                                            'externo' => ['label' => 'Pendiente', 'color' => 'orange'],
                                             'solicitante_adquisiciones' => ['label' => 'Solicitante Adq.', 'color' => 'amber'],
                                             'ti' => ['label' => 'Personal TI', 'color' => 'sky'],
                                         ];
+                                        $displayRoles = array_diff($funcionario->active_roles, ['superadmin', 'externo']);
                                     @endphp
-                                    @forelse ($funcionario->active_roles as $role)
+                                    @forelse ($displayRoles as $role)
                                         @php
                                             $info = $roleLabels[$role] ?? ['label' => ucfirst($role), 'color' => 'zinc'];
                                         @endphp
                                         <flux:badge size="sm" :color="$info['color']">{{ $info['label'] }}</flux:badge>
                                     @empty
-                                        <flux:badge size="sm" color="zinc">Docente</flux:badge>
+                                        <flux:badge size="sm" color="blue">Docente</flux:badge>
                                     @endforelse
                                 </div>
                             </flux:table.cell>

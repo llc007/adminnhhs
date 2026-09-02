@@ -65,6 +65,9 @@ class ReportesPrintController extends Controller
                 $q->where('roles.team_id', $schoolId)
                     ->where('roles.name', 'estudiante');
             })
+            ->whereRaw("SUBSTR(email, 1, 1) != '_'")
+            ->where('email', 'not like', 'docente1@%')
+            ->where('email', 'not like', 'test%')
             ->withCount([
                 'entrevistas as total_agendadas' => fn ($q) => $q->where('school_id', $schoolId)->where($dateClosure),
                 'entrevistas as total_realizadas' => fn ($q) => $q->where('school_id', $schoolId)->where('estado', 'realizada')->where($dateClosure),

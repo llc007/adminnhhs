@@ -180,14 +180,22 @@ class ReportesPrintController extends Controller
             ],
         };
 
-        // Categorías activas
+        // Categorías activas (excluyendo 'Otro' para no duplicar la columna fija final)
         $categorias = CategoriaEntrevista::where('school_id', $schoolId)
             ->where('activo', true)
-            ->orderBy('nombre', 'asc')
+            ->where('nombre', '!=', 'Otro')
+            ->orderBy('id', 'asc')
             ->get();
 
         if ($categorias->isEmpty()) {
-            $nombresDefault = ['Rendimiento Académico', 'Conducta y Convivencia', 'Asistencia y Puntualidad', 'Asunto Personal / Familiar', 'Evaluación Psicopedagógica', 'Otro'];
+            $nombresDefault = [
+                'Rendimiento Académico',
+                'Conducta y Convivencia',
+                'Asistencia y Puntualidad',
+                'Asunto Personal / Familiar',
+                'Evaluación Psicopedagógica',
+                'Situación Médica',
+            ];
             $categorias = collect($nombresDefault)->map(fn ($n, $i) => (object) ['id' => $i + 1, 'nombre' => $n]);
         }
 

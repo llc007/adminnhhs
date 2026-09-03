@@ -2,6 +2,7 @@
 
 use App\Models\TiTask;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
@@ -103,7 +104,7 @@ test('completing a recurring daily task creates the next occurrence for tomorrow
     expect($siguiente->fecha_programada->format('Y-m-d'))->toBe(now()->addDay()->format('Y-m-d'));
 });
 
-test('filtering tasks by frequency tab works', function () {
+test('filtering tasks by frequency tab and calendar date works', function () {
     $user = User::factory()->create();
     $schoolId = DB::table('schools')->insertGetId([
         'name' => 'Test School',
@@ -115,12 +116,14 @@ test('filtering tasks by frequency tab works', function () {
     $user->syncRolesForSchool($schoolId, ['ti']);
     $this->actingAs($user);
 
+    $todayStr = now('America/Santiago')->toDateString();
+
     $diaria = TiTask::create([
         'titulo' => 'Tarea Diaria X',
         'frecuencia' => 'diaria',
         'prioridad' => 'media',
         'estado' => 'pendiente',
-        'fecha_programada' => now()->format('Y-m-d'),
+        'fecha_programada' => $todayStr,
         'creado_por' => $user->id,
     ]);
 
@@ -129,13 +132,11 @@ test('filtering tasks by frequency tab works', function () {
         'frecuencia' => 'semestral',
         'prioridad' => 'alta',
         'estado' => 'pendiente',
-        'fecha_programada' => now()->format('Y-m-d'),
+        'fecha_programada' => $todayStr,
         'creado_por' => $user->id,
     ]);
 
     Livewire::test('pages::ti.tareas.index')
-        ->assertSee('Tarea Diaria X')
-        ->assertSee('Mantenimiento Semestral Proyectores')
         ->set('frecuenciaTab', 'diaria')
         ->assertSee('Tarea Diaria X')
         ->assertDontSee('Mantenimiento Semestral Proyectores')
@@ -144,7 +145,7 @@ test('filtering tasks by frequency tab works', function () {
         ->assertDontSee('Tarea Diaria X');
 });
 
-test('switching between active and archived views works and reopening an archived task moves it back to active', function () {
+test('selecting calendar date filters tasks for that date and reopening completed tasks works', function () {
     $user = User::factory()->create();
     $schoolId = DB::table('schools')->insertGetId([
         'name' => 'Test School',
@@ -156,38 +157,38 @@ test('switching between active and archived views works and reopening an archive
     $user->syncRolesForSchool($schoolId, ['ti']);
     $this->actingAs($user);
 
-    $activa = TiTask::create([
-        'titulo' => 'Tarea Activa Pendiente',
+    $todayStr = now('America/Santiago')->toDateString();
+    $pastDateStr = now('America/Santiago')->subDays(5)->toDateString();
+
+    $taskHoy = TiTask::create([
+        'titulo' => 'Tarea de Hoy',
         'frecuencia' => 'diaria',
         'estado' => 'pendiente',
-        'fecha_programada' => now()->format('Y-m-d'),
+        'fecha_programada' => $todayStr,
         'creado_por' => $user->id,
     ]);
 
-    $completada = TiTask::create([
-        'titulo' => 'Tarea Ya Finalizada',
-        'frecuencia' => 'semanal',
+    $taskPasada = TiTask::create([
+        'titulo' => 'Tarea de Hace 5 Dias',
+        'frecuencia' => 'diaria',
         'estado' => 'completada',
+        'fecha_programada' => $pastDateStr,
         'fecha_completada' => now(),
         'notas_cierre' => 'Revisión efectuada',
         'creado_por' => $user->id,
+        'es_recurrente' => false,
     ]);
 
     Livewire::test('pages::ti.tareas.index')
-        ->assertSet('vista', 'activas')
-        ->assertSee('Tarea Activa Pendiente')
-        ->assertDontSee('Tarea Ya Finalizada')
-        ->set('vista', 'archivadas')
-        ->assertSee('Tarea Ya Finalizada')
-        ->assertSee('Revisión efectuada')
-        ->assertDontSee('Tarea Activa Pendiente')
-        ->call('reabrirTarea', $completada->id)
-        ->assertSet('vista', 'archivadas')
-        ->assertDontSee('Tarea Ya Finalizada')
-        ->set('vista', 'activas')
-        ->assertSee('Tarea Ya Finalizada');
+        ->set('fechaSeleccionada', $todayStr)
+        ->assertSee('Tarea de Hoy')
+        ->assertDontSee('Tarea de Hace 5 Dias')
+        ->set('fechaSeleccionada', $pastDateStr)
+        ->assertSee('Tarea de Hace 5 Dias')
+        ->assertDontSee('Tarea de Hoy')
+        ->call('reabrirTarea', $taskPasada->id);
 
-    expect($completada->refresh()->estado)->toBe('pendiente');
+    expect($taskPasada->refresh()->estado)->toBe('pendiente');
 });
 
 test('ti staff can save progress notes on an active task without completing or archiving it', function () {
@@ -202,11 +203,13 @@ test('ti staff can save progress notes on an active task without completing or a
     $user->syncRolesForSchool($schoolId, ['ti']);
     $this->actingAs($user);
 
+    $todayStr = now('America/Santiago')->toDateString();
+
     $task = TiTask::create([
         'titulo' => 'Mantenimiento Servidor BD',
         'frecuencia' => 'semanal',
         'estado' => 'pendiente',
-        'fecha_programada' => now()->format('Y-m-d'),
+        'fecha_programada' => $todayStr,
         'creado_por' => $user->id,
     ]);
 
@@ -234,11 +237,13 @@ test('completing a task requires a non-empty closing note', function () {
     $user->syncRolesForSchool($schoolId, ['ti']);
     $this->actingAs($user);
 
+    $todayStr = now('America/Santiago')->toDateString();
+
     $task = TiTask::create([
         'titulo' => 'Revisión Servidor Web',
         'frecuencia' => 'diaria',
         'estado' => 'pendiente',
-        'fecha_programada' => now()->format('Y-m-d'),
+        'fecha_programada' => $todayStr,
         'creado_por' => $user->id,
     ]);
 
@@ -261,18 +266,139 @@ test('clicking task title opens modal with full task details', function () {
     $user->syncRolesForSchool($schoolId, ['ti']);
     $this->actingAs($user);
 
+    $todayStr = now('America/Santiago')->toDateString();
+
     $task = TiTask::create([
         'titulo' => 'Revisión Wifi Ed Básaica Extensa',
         'descripcion' => 'Esta es una descripción extremadamente larga que supera los 50 caracteres para probar el truncado y la visualización completa dentro del modal.',
         'frecuencia' => 'diaria',
         'estado' => 'pendiente',
-        'fecha_programada' => now()->format('Y-m-d'),
+        'fecha_programada' => $todayStr,
         'creado_por' => $user->id,
     ]);
 
     Livewire::test('pages::ti.tareas.index')
         ->call('verDetalle', $task->id)
-        ->assertSet('showModalDetalle', true)
-        ->assertSet('selectedTaskForDetail.id', $task->id)
+        ->assertSet('showModalUnificado', true)
+        ->assertSet('selectedTask.id', $task->id)
         ->assertSee('Esta es una descripción extremadamente larga');
+});
+
+test('uncompleted past recurring tasks automatically project instances up to today', function () {
+    $user = User::factory()->create();
+    $schoolId = DB::table('schools')->insertGetId([
+        'name' => 'Test School',
+        'domain' => 'test.com',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    $user->update(['current_school_id' => $schoolId]);
+    $user->syncRolesForSchool($schoolId, ['ti']);
+    $this->actingAs($user);
+
+    $pastDateStr = now('America/Santiago')->subDays(7)->startOfWeek()->toDateString();
+    $todayStr = now('America/Santiago')->toDateString();
+
+    // Create a daily task scheduled 4 days ago that was never completed
+    $task = TiTask::create([
+        'titulo' => 'Revisión Servidor NAS Recurrente',
+        'frecuencia' => 'diaria',
+        'prioridad' => 'media',
+        'estado' => 'pendiente',
+        'fecha_programada' => $pastDateStr,
+        'creado_por' => $user->id,
+        'es_recurrente' => true,
+    ]);
+
+    // Mount livewire component for today's date
+    Livewire::test('pages::ti.tareas.index')
+        ->set('fechaSeleccionada', $todayStr)
+        ->assertSee('Revisión Servidor NAS Recurrente');
+
+    // Verify today's instance was created automatically
+    $todayTask = TiTask::where('titulo', 'Revisión Servidor NAS Recurrente')
+        ->whereDate('fecha_programada', $todayStr)
+        ->first();
+
+    expect($todayTask)->not->toBeNull();
+    expect($todayTask->estado)->toBe('pendiente');
+});
+
+test('completing yesterday task does not create duplicate if today instance already exists', function () {
+    $user = User::factory()->create();
+    $schoolId = DB::table('schools')->insertGetId([
+        'name' => 'Test School',
+        'domain' => 'test.com',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    $user->update(['current_school_id' => $schoolId]);
+    $user->syncRolesForSchool($schoolId, ['ti']);
+    $this->actingAs($user);
+
+    $yesterdayStr = now('America/Santiago')->subDay()->toDateString();
+    $todayStr = now('America/Santiago')->toDateString();
+
+    $taskAyer = TiTask::create([
+        'titulo' => 'Revisión CCTV Diaria',
+        'frecuencia' => 'diaria',
+        'prioridad' => 'media',
+        'estado' => 'pendiente',
+        'fecha_programada' => $yesterdayStr,
+        'creado_por' => $user->id,
+        'es_recurrente' => true,
+    ]);
+
+    $taskHoy = TiTask::create([
+        'titulo' => 'Revisión CCTV Diaria',
+        'frecuencia' => 'diaria',
+        'prioridad' => 'media',
+        'estado' => 'pendiente',
+        'fecha_programada' => $todayStr,
+        'creado_por' => $user->id,
+        'parent_id' => $taskAyer->id,
+        'es_recurrente' => true,
+    ]);
+
+    // Complete yesterday task
+    $taskAyer->completar('OK ayer');
+
+    // Count today instances
+    $countToday = TiTask::where('titulo', 'Revisión CCTV Diaria')
+        ->whereDate('fecha_programada', $todayStr)
+        ->count();
+
+    expect($countToday)->toBe(1);
+});
+
+test('completing a Friday daily task schedules next instance for Monday skipping weekend', function () {
+    $user = User::factory()->create();
+    $schoolId = DB::table('schools')->insertGetId([
+        'name' => 'Test School',
+        'domain' => 'test.com',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    $user->update(['current_school_id' => $schoolId]);
+    $user->syncRolesForSchool($schoolId, ['ti']);
+    $this->actingAs($user);
+
+    // Find next Friday
+    $friday = now('America/Santiago')->next(Carbon::FRIDAY);
+    $monday = $friday->copy()->addDays(3);
+
+    $taskViernes = TiTask::create([
+        'titulo' => 'Revisión Servidor Viernes',
+        'frecuencia' => 'diaria',
+        'prioridad' => 'media',
+        'estado' => 'pendiente',
+        'fecha_programada' => $friday->toDateString(),
+        'creado_por' => $user->id,
+        'es_recurrente' => true,
+    ]);
+
+    $siguiente = $taskViernes->completar('OK viernes');
+
+    expect($siguiente)->not->toBeNull();
+    expect($siguiente->fecha_programada->toDateString())->toBe($monday->toDateString());
 });

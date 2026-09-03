@@ -121,11 +121,20 @@ new #[Title('Módulo de Reportes')] class extends Component {
         $schoolId = auth()->user()->current_school_id;
         $cats = \App\Models\CategoriaEntrevista::where('school_id', $schoolId)
             ->where('activo', true)
-            ->orderBy('nombre', 'asc')
+            ->where('nombre', '!=', 'Otro')
+            ->orderBy('id', 'asc')
             ->get();
 
         if ($cats->isEmpty()) {
-            $nombresDefault = ['Rendimiento Académico', 'Conducta y Convivencia', 'Asistencia y Puntualidad', 'Asunto Personal / Familiar', 'Evaluación Psicopedagógica', 'Otro'];
+            $nombresDefault = [
+                'Rendimiento Académico',
+                'Conducta y Convivencia',
+                'Asistencia y Puntualidad',
+                'Asunto Personal / Familiar',
+                'Evaluación Psicopedagógica',
+                'Situación Médica',
+            ];
+
             return collect($nombresDefault)->map(fn ($n, $i) => (object) ['id' => $i + 1, 'nombre' => $n]);
         }
 

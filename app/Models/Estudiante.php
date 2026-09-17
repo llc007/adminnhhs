@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
 #[Fillable([
@@ -144,5 +145,26 @@ class Estudiante extends Model
             $q->where('estado', 'activo')
                 ->orWhereNull('estado');
         });
+    }
+
+    /**
+     * Get all atrasos for this student.
+     */
+    public function atrasos(): HasMany
+    {
+        return $this->hasMany(Atraso::class);
+    }
+
+    /**
+     * Get the count of atrasos in the current month.
+     */
+    public function atrasosMesActualCount(): int
+    {
+        $now = now('America/Santiago');
+
+        return $this->atrasos()
+            ->whereYear('fecha', $now->year)
+            ->whereMonth('fecha', $now->month)
+            ->count();
     }
 }

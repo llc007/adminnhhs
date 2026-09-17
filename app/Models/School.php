@@ -23,6 +23,7 @@ class School extends Model
         $defaults = [
             'entrevistas' => true,
             'estudiantes' => true,
+            'atrasos' => true,
             'adquisiciones' => true,
             'prestamos' => true,
             'envio_correos' => true,

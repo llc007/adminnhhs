@@ -170,6 +170,16 @@ new #[Title('Módulos Publicados')] class extends Component {
                     <flux:separator variant="subtle" />
 
                     <flux:field variant="inline">
+                        <flux:switch wire:model="modulos.atrasos" />
+                        <div>
+                            <flux:label class="font-bold">{{ __('Módulo de Atrasos') }}</flux:label>
+                            <flux:description>{{ __('Permite el registro rápido matutino de atrasos y control de reincidencias.') }}</flux:description>
+                        </div>
+                    </flux:field>
+
+                    <flux:separator variant="subtle" />
+
+                    <flux:field variant="inline">
                         <flux:switch wire:model="modulos.adquisiciones" />
                         <div>
                             <flux:label class="font-bold">{{ __('Adquisiciones') }}</flux:label>

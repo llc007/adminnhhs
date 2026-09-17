@@ -4,6 +4,7 @@
     $modulos = is_array($school?->modulos_publicados) ? $school->modulos_publicados : [];
     $modulosEntrevistas = $modulos['entrevistas'] ?? true;
     $modulosEstudiantes = $modulos['estudiantes'] ?? true;
+    $modulosAtrasos = $modulos['atrasos'] ?? true;
     $modulosAdquisiciones = $modulos['adquisiciones'] ?? true;
     $modulosPrestamos = $modulos['prestamos'] ?? true;
     $isAdmin = $user ? $user->hasRole(['administrador', 'directivo', 'superadmin']) : false;
@@ -73,6 +74,13 @@
                         <flux:sidebar.item icon="users" :href="route('estudiantes.index')"
                             :current="request()->routeIs('estudiantes.index') || request()->routeIs('estudiantes.ficha')" wire:navigate>
                             {{ __('Estudiantes') }}
+                        </flux:sidebar.item>
+                    @endif
+
+                    @if ((auth()->user()->hasRole(['superadmin', 'administrador', 'directivo', 'inspector', 'recepcion']) || auth()->user()->can('registrar-atrasos')) && ($isAdmin || $modulosAtrasos))
+                        <flux:sidebar.item icon="clock" :href="route('atrasos.index')"
+                            :current="request()->routeIs('atrasos.*')" wire:navigate>
+                            {{ __('Atrasos') }}
                         </flux:sidebar.item>
                     @endif
 

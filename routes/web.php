@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AtrasoPrintController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\MailWebhookController;
 use App\Http\Controllers\ReportesPrintController;
@@ -60,6 +61,12 @@ Route::livewire('/entrevistas/confirmacion/{token}', 'pages::entrevistas.confirm
 Route::middleware(['auth', 'verified', 'role_or_permission:superadmin|ver-estudiantes'])->group(function () {
     Route::livewire('/estudiantes', 'pages::usuarios.estudiantes.index')->name('estudiantes.index');
     Route::livewire('/estudiantes/ficha/{id}', 'pages::usuarios.estudiantes.ficha')->name('estudiantes.ficha');
+});
+
+// Control de Atrasos — Inspectores, Recepción, Administradores, Directivos
+Route::middleware(['auth', 'verified', 'role_or_permission:superadmin|administrador|directivo|inspector|recepcion|registrar-atrasos'])->group(function () {
+    Route::livewire('/atrasos', 'pages::atrasos.index')->name('atrasos.index');
+    Route::get('/atrasos/ticket/{atraso}', [AtrasoPrintController::class, 'ticket'])->name('atrasos.ticket');
 });
 
 // Gestión de Funcionarios — requiere permiso gestionar-funcionarios o superadmin

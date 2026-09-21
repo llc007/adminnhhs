@@ -69,8 +69,8 @@ Route::middleware(['auth', 'verified', 'role_or_permission:superadmin|ver-estudi
     Route::livewire('/estudiantes/ficha/{id}', 'pages::usuarios.estudiantes.ficha')->name('estudiantes.ficha');
 });
 
-// Control de Atrasos — Inspectores, Recepción, Administradores, Directivos
-Route::middleware(['auth', 'verified', 'role_or_permission:superadmin|administrador|directivo|inspector|recepcion|registrar-atrasos'])->group(function () {
+// Control de Atrasos — Inspectores, Recepción, Administradores, Directivos o permiso ingresar-atrasos
+Route::middleware(['auth', 'verified', 'role_or_permission:superadmin|administrador|directivo|inspector|recepcion|ingresar-atrasos|registrar-atrasos'])->group(function () {
     Route::livewire('/atrasos', 'pages::atrasos.index')->name('atrasos.index');
     Route::get('/atrasos/ticket/{atraso}', [AtrasoPrintController::class, 'ticket'])->name('atrasos.ticket');
 });

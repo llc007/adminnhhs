@@ -5,6 +5,7 @@ use App\Models\Estudiante;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -138,4 +139,26 @@ test('can view thermal ticket page', function () {
         ->assertOk()
         ->assertSee('PASE DE INGRESO')
         ->assertSee('JUAN PEREZ GONZALEZ');
+});
+
+test('user with ingresar-atrasos permission can access atrasos index page', function () {
+    [$user, $schoolId] = setupAtrasosEnvironment('docente'); // docente does not have atrasos access by default
+    app(PermissionRegistrar::class)->setPermissionsTeamId($schoolId);
+    Permission::findOrCreate('ingresar-atrasos', 'web');
+    $user->givePermissionTo('ingresar-atrasos');
+
+    $this->actingAs($user)
+        ->get(route('atrasos.index'))
+        ->assertOk();
+});
+
+test('user with ver-atrasos permission alone cannot access registrar atrasos module', function () {
+    [$user, $schoolId] = setupAtrasosEnvironment('docente');
+    app(PermissionRegistrar::class)->setPermissionsTeamId($schoolId);
+    Permission::findOrCreate('ver-atrasos', 'web');
+    $user->givePermissionTo('ver-atrasos');
+
+    $this->actingAs($user)
+        ->get(route('atrasos.index'))
+        ->assertForbidden();
 });

@@ -13,7 +13,7 @@ class AtrasoPrintController extends Controller
     public function ticket(Request $request, Atraso $atraso)
     {
         $user = auth()->user();
-        if (! $user->hasRole(['superadmin', 'administrador', 'directivo', 'inspector', 'recepcion']) && ! $user->can('registrar-atrasos')) {
+        if (! $user->hasRole(['superadmin', 'administrador', 'directivo', 'inspector', 'recepcion']) && ! $user->can('ingresar-atrasos') && ! $user->can('registrar-atrasos')) {
             abort(403, 'No tienes permiso para imprimir este ticket.');
         }
 

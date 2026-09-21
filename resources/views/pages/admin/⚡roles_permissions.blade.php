@@ -29,6 +29,11 @@ new #[Title('Roles y Permisos')] class extends Component
             'crear-entrevistas-confidenciales' => 'Crear entrevistas confidenciales / privadas (Equipo Psicosocial)',
             'escribir-mensajes-agenda' => 'Escribir mensajes y publicar en la sección Anuncios de la Agenda',
         ],
+        'Atrasos' => [
+            'ingresar-atrasos' => 'Registrar atrasos de estudiantes en el módulo de Atrasos',
+            'ver-atrasos' => 'Ver y consultar reportes e historial de atrasos (reportes futuros)',
+            'ver-mis-atrasos' => 'Ver atrasos propios (para estudiantes en el futuro)',
+        ],
         'Estudiantes' => [
             'ver-estudiantes' => 'Ver lista e información de estudiantes',
             'editar-estudiantes' => 'Editar fichas de estudiantes',
@@ -66,7 +71,7 @@ new #[Title('Roles y Permisos')] class extends Component
             app(PermissionRegistrar::class)->setPermissionsTeamId($schoolId);
 
             // Pre-create standard roles if they do not exist
-            $standardRoles = ['superadmin', 'administrador', 'directivo', 'docente', 'inspector', 'asistente', 'psicosocial', 'recepcion', 'solicitante_adquisiciones', 'ti'];
+            $standardRoles = ['superadmin', 'administrador', 'directivo', 'docente', 'inspector', 'asistente', 'psicosocial', 'recepcion', 'solicitante_adquisiciones', 'ti', 'gerencia', 'rectoria'];
             foreach ($standardRoles as $roleName) {
                 Role::findOrCreate($roleName, 'web');
             }

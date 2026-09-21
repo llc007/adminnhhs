@@ -47,6 +47,10 @@ class SyncPermissions extends Command
             'eliminar-entrevistas',
             'ingresar-apoderado',
             'ver-recepcion',
+            // Atrasos
+            'ingresar-atrasos',
+            'ver-atrasos',
+            'ver-mis-atrasos',
             // Estudiantes
             'ver-estudiantes',
             'editar-estudiantes',
@@ -92,6 +96,8 @@ class SyncPermissions extends Command
                 'crear-entrevistas',
                 'cancelar-entrevistas',
                 'ingresar-apoderado',
+                'ingresar-atrasos',
+                'ver-atrasos',
                 'ver-estudiantes',
                 'editar-estudiantes',
                 'importar-estudiantes',
@@ -108,12 +114,15 @@ class SyncPermissions extends Command
             ],
             'inspector' => [
                 'ingresar-apoderado',
+                'ingresar-atrasos',
+                'ver-atrasos',
                 'ver-entrevistas-general',
                 'ver-estudiantes',
                 'ver-prestamos-propios',
             ],
             'recepcion' => [
                 'ingresar-apoderado',
+                'ingresar-atrasos',
                 'ver-prestamos-propios',
             ],
             'psicosocial' => [
@@ -140,6 +149,7 @@ class SyncPermissions extends Command
                 'ver-reportes-entrevistas',
                 'ver-entrevistas-general',
                 'ver-estudiantes',
+                'ver-atrasos',
             ],
             'rectoria' => [
                 'ver-dashboard-gerencia',
@@ -148,9 +158,12 @@ class SyncPermissions extends Command
                 'ver-entrevistas-propias',
                 'ver-bitacoras',
                 'ver-estudiantes',
+                'ver-atrasos',
                 'crear-requerimientos',
             ],
-            'estudiante' => [],
+            'estudiante' => [
+                'ver-mis-atrasos',
+            ],
         ];
 
         foreach ($schools as $school) {

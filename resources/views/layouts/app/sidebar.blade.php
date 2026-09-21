@@ -116,21 +116,29 @@
                         </flux:sidebar.item>
                     @endif
 
-                    @if (
-                        (auth()->user()->hasRole(['superadmin', 'administrador', 'directivo', 'inspector', 'recepcion']) ||
-                            auth()->user()->can('registrar-atrasos')) &&
-                            ($isAdmin || $modulosAtrasos))
-                        <flux:sidebar.item icon="clock" :href="route('atrasos.index')"
-                            :current="request()->routeIs('atrasos.*')" wire:navigate>
-                            {{ __('Atrasos') }}
-                        </flux:sidebar.item>
-                    @endif
-
                     @if (auth()->user()->hasRole('superadmin') || auth()->user()->can('gestionar-funcionarios'))
                         <flux:sidebar.item icon="briefcase" :href="route('funcionarios.index')"
                             :current="request()->routeIs('funcionarios.index') || request()->routeIs('funcionarios.ficha') || request()->routeIs('funcionarios.carga_masiva')"
                             wire:navigate>
                             {{ __('Funcionarios') }}
+                        </flux:sidebar.item>
+                    @endif
+                </flux:sidebar.group>
+            @endif
+
+            @if (
+                (auth()->user()->hasRole(['superadmin', 'administrador', 'directivo', 'inspector', 'recepcion']) ||
+                    auth()->user()->canAny(['ingresar-atrasos', 'ver-atrasos', 'ver-mis-atrasos'])) &&
+                    ($isAdmin || $modulosAtrasos))
+                <flux:sidebar.group :heading="__('Atrasos')" class="grid mt-4">
+                    @if (
+                        (auth()->user()->hasRole(['superadmin', 'administrador', 'directivo', 'inspector', 'recepcion']) ||
+                            auth()->user()->can('ingresar-atrasos') ||
+                            auth()->user()->can('registrar-atrasos')) &&
+                            ($isAdmin || $modulosAtrasos))
+                        <flux:sidebar.item icon="clock" :href="route('atrasos.index')"
+                            :current="request()->routeIs('atrasos.*')" wire:navigate>
+                            {{ __('Registrar Atrasos') }}
                         </flux:sidebar.item>
                     @endif
                 </flux:sidebar.group>

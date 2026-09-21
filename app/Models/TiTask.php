@@ -157,47 +157,83 @@ class TiTask extends Model
     }
 
     /**
-     * Garantiza la creación de tareas diarias pendientes para el día actual.
+     * Garantiza la creación de tareas recurrentes (diarias, semanales, semestrales, anuales) para el periodo actual.
      */
-    public static function generarTareasDelDia(Carbon|string $fechaInput): void
+    public static function generarTareasPeriodicas(Carbon|string $fechaInput): void
     {
         self::limpiarDuplicados();
 
         $targetDate = Carbon::parse($fechaInput)->startOfDay();
+        $todayStr = $targetDate->toDateString();
 
-        // No generar tareas diarias en fines de semana (sábado y domingo)
-        if ($targetDate->isWeekend()) {
-            return;
+        // 1. Tareas DIARIAS (solo en días hábiles)
+        if (! $targetDate->isWeekend()) {
+            $tasksDiarias = self::where('es_recurrente', true)
+                ->where('frecuencia', 'diaria')
+                ->whereDoesntHave('children')
+                ->get();
+
+            foreach ($tasksDiarias as $latestTask) {
+                $lastDateStr = $latestTask->fecha_programada ? $latestTask->fecha_programada->toDateString() : null;
+
+                if ($lastDateStr && $lastDateStr < $todayStr) {
+                    $existeHoy = self::where('parent_id', $latestTask->id)
+                        ->orWhere(function ($q) use ($latestTask, $todayStr) {
+                            $q->where('titulo', $latestTask->titulo)
+                                ->where('frecuencia', 'diaria')
+                                ->whereDate('fecha_programada', $todayStr);
+                        })->exists();
+
+                    if (! $existeHoy) {
+                        self::create([
+                            'titulo' => $latestTask->titulo,
+                            'descripcion' => $latestTask->descripcion,
+                            'frecuencia' => 'diaria',
+                            'prioridad' => $latestTask->prioridad,
+                            'categoria' => $latestTask->categoria,
+                            'estado' => 'pendiente',
+                            'fecha_programada' => $todayStr,
+                            'fecha_vencimiento' => $todayStr,
+                            'asignado_a' => $latestTask->asignado_a,
+                            'creado_por' => $latestTask->creado_por,
+                            'parent_id' => $latestTask->id,
+                            'es_recurrente' => true,
+                        ]);
+                    }
+                }
+            }
         }
 
-        $targetDateStr = $targetDate->toDateString();
+        // 2. Tareas SEMANALES (se programan al inicio de la semana actual)
+        $inicioSemanaStr = $targetDate->copy()->startOfWeek()->toDateString();
+        $finSemanaStr = $targetDate->copy()->endOfWeek()->toDateString();
 
-        $tasksRecurrentes = self::where('es_recurrente', true)
-            ->where('frecuencia', 'diaria')
+        $tasksSemanales = self::where('es_recurrente', true)
+            ->where('frecuencia', 'semanal')
             ->whereDoesntHave('children')
             ->get();
 
-        foreach ($tasksRecurrentes as $latestTask) {
+        foreach ($tasksSemanales as $latestTask) {
             $lastDateStr = $latestTask->fecha_programada ? $latestTask->fecha_programada->toDateString() : null;
 
-            if ($lastDateStr && $lastDateStr < $targetDateStr) {
-                $existeHoy = self::where('parent_id', $latestTask->id)
-                    ->orWhere(function ($q) use ($latestTask, $targetDateStr) {
+            if ($lastDateStr && $lastDateStr < $inicioSemanaStr) {
+                $existeEstaSemana = self::where('parent_id', $latestTask->id)
+                    ->orWhere(function ($q) use ($latestTask, $inicioSemanaStr, $finSemanaStr) {
                         $q->where('titulo', $latestTask->titulo)
-                            ->where('frecuencia', 'diaria')
-                            ->whereDate('fecha_programada', $targetDateStr);
+                            ->where('frecuencia', 'semanal')
+                            ->whereBetween('fecha_programada', [$inicioSemanaStr, $finSemanaStr]);
                     })->exists();
 
-                if (! $existeHoy) {
+                if (! $existeEstaSemana) {
                     self::create([
                         'titulo' => $latestTask->titulo,
                         'descripcion' => $latestTask->descripcion,
-                        'frecuencia' => 'diaria',
+                        'frecuencia' => 'semanal',
                         'prioridad' => $latestTask->prioridad,
                         'categoria' => $latestTask->categoria,
                         'estado' => 'pendiente',
-                        'fecha_programada' => $targetDateStr,
-                        'fecha_vencimiento' => $targetDateStr,
+                        'fecha_programada' => $inicioSemanaStr,
+                        'fecha_vencimiento' => $finSemanaStr,
                         'asignado_a' => $latestTask->asignado_a,
                         'creado_por' => $latestTask->creado_por,
                         'parent_id' => $latestTask->id,
@@ -206,6 +242,94 @@ class TiTask extends Model
                 }
             }
         }
+
+        // 3. Tareas SEMESTRALES
+        $mes = $targetDate->month;
+        $year = $targetDate->year;
+        $inicioSemestreStr = $mes <= 6 ? "$year-01-01" : "$year-07-01";
+        $finSemestreStr = $mes <= 6 ? "$year-06-30" : "$year-12-31";
+
+        $tasksSemestrales = self::where('es_recurrente', true)
+            ->where('frecuencia', 'semestral')
+            ->whereDoesntHave('children')
+            ->get();
+
+        foreach ($tasksSemestrales as $latestTask) {
+            $lastDateStr = $latestTask->fecha_programada ? $latestTask->fecha_programada->toDateString() : null;
+
+            if ($lastDateStr && $lastDateStr < $inicioSemestreStr) {
+                $existeEsteSemestre = self::where('parent_id', $latestTask->id)
+                    ->orWhere(function ($q) use ($latestTask, $inicioSemestreStr, $finSemestreStr) {
+                        $q->where('titulo', $latestTask->titulo)
+                            ->where('frecuencia', 'semestral')
+                            ->whereBetween('fecha_programada', [$inicioSemestreStr, $finSemestreStr]);
+                    })->exists();
+
+                if (! $existeEsteSemestre) {
+                    self::create([
+                        'titulo' => $latestTask->titulo,
+                        'descripcion' => $latestTask->descripcion,
+                        'frecuencia' => 'semestral',
+                        'prioridad' => $latestTask->prioridad,
+                        'categoria' => $latestTask->categoria,
+                        'estado' => 'pendiente',
+                        'fecha_programada' => $inicioSemestreStr,
+                        'fecha_vencimiento' => $finSemestreStr,
+                        'asignado_a' => $latestTask->asignado_a,
+                        'creado_por' => $latestTask->creado_por,
+                        'parent_id' => $latestTask->id,
+                        'es_recurrente' => true,
+                    ]);
+                }
+            }
+        }
+
+        // 4. Tareas ANUALES
+        $inicioAnioStr = "$year-01-01";
+        $finAnioStr = "$year-12-31";
+
+        $tasksAnuales = self::where('es_recurrente', true)
+            ->where('frecuencia', 'anual')
+            ->whereDoesntHave('children')
+            ->get();
+
+        foreach ($tasksAnuales as $latestTask) {
+            $lastDateStr = $latestTask->fecha_programada ? $latestTask->fecha_programada->toDateString() : null;
+
+            if ($lastDateStr && $lastDateStr < $inicioAnioStr) {
+                $existeEsteAnio = self::where('parent_id', $latestTask->id)
+                    ->orWhere(function ($q) use ($latestTask, $year) {
+                        $q->where('titulo', $latestTask->titulo)
+                            ->where('frecuencia', 'anual')
+                            ->whereYear('fecha_programada', $year);
+                    })->exists();
+
+                if (! $existeEsteAnio) {
+                    self::create([
+                        'titulo' => $latestTask->titulo,
+                        'descripcion' => $latestTask->descripcion,
+                        'frecuencia' => 'anual',
+                        'prioridad' => $latestTask->prioridad,
+                        'categoria' => $latestTask->categoria,
+                        'estado' => 'pendiente',
+                        'fecha_programada' => $inicioAnioStr,
+                        'fecha_vencimiento' => $finAnioStr,
+                        'asignado_a' => $latestTask->asignado_a,
+                        'creado_por' => $latestTask->creado_por,
+                        'parent_id' => $latestTask->id,
+                        'es_recurrente' => true,
+                    ]);
+                }
+            }
+        }
+    }
+
+    /**
+     * Alias de retrocompatibilidad.
+     */
+    public static function generarTareasDelDia(Carbon|string $fechaInput): void
+    {
+        self::generarTareasPeriodicas($fechaInput);
     }
 
     /**

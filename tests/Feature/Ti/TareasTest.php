@@ -402,3 +402,43 @@ test('completing a Friday daily task schedules next instance for Monday skipping
     expect($siguiente)->not->toBeNull();
     expect($siguiente->fecha_programada->toDateString())->toBe($monday->toDateString());
 });
+
+test('uncompleted weekly task in previous week automatically generates instance for current week', function () {
+    $user = User::factory()->create();
+    $schoolId = DB::table('schools')->insertGetId([
+        'name' => 'Test School',
+        'domain' => 'test.com',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    $user->update(['current_school_id' => $schoolId]);
+    $user->syncRolesForSchool($schoolId, ['ti']);
+    $this->actingAs($user);
+
+    $lastWeekStartStr = now('America/Santiago')->subWeek()->startOfWeek()->toDateString();
+    $currentWeekStartStr = now('America/Santiago')->startOfWeek()->toDateString();
+
+    // Create a weekly task scheduled last week that was never completed
+    $task = TiTask::create([
+        'titulo' => 'Revisión Semanal de Servidores Backup',
+        'frecuencia' => 'semanal',
+        'prioridad' => 'alta',
+        'estado' => 'pendiente',
+        'fecha_programada' => $lastWeekStartStr,
+        'creado_por' => $user->id,
+        'es_recurrente' => true,
+    ]);
+
+    // Mount livewire component for today
+    Livewire::test('pages::ti.tareas.index')
+        ->set('frecuenciaTab', 'semanal')
+        ->assertSee('Revisión Semanal de Servidores Backup');
+
+    // Verify current week instance was created automatically
+    $currentWeekTask = TiTask::where('titulo', 'Revisión Semanal de Servidores Backup')
+        ->whereDate('fecha_programada', $currentWeekStartStr)
+        ->first();
+
+    expect($currentWeekTask)->not->toBeNull();
+    expect($currentWeekTask->estado)->toBe('pendiente');
+});

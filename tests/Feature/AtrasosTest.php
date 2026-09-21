@@ -40,8 +40,13 @@ function setupAtrasosEnvironment(string $role = 'inspector')
 
     $user->update(['current_school_id' => $schoolId]);
     app(PermissionRegistrar::class)->setPermissionsTeamId($schoolId);
-    Role::findOrCreate($role, 'web');
+    $roleModel = Role::findOrCreate($role, 'web');
     $user->syncRolesForSchool($schoolId, [$role]);
+
+    $perm = Permission::findOrCreate('ingresar-atrasos', 'web');
+    if ($role !== 'docente') {
+        $roleModel->givePermissionTo($perm);
+    }
 
     $estudiante = Estudiante::create([
         'school_id' => $schoolId,
@@ -160,5 +165,20 @@ test('user with ver-atrasos permission alone cannot access registrar atrasos mod
 
     $this->actingAs($user)
         ->get(route('atrasos.index'))
+        ->assertForbidden();
+});
+
+test('directivo role without ingresar-atrasos permission cannot access atrasos module', function () {
+    [$user, $schoolId] = setupAtrasosEnvironment('directivo');
+    app(PermissionRegistrar::class)->setPermissionsTeamId($schoolId);
+    $roleModel = Role::where('name', 'directivo')->where('team_id', $schoolId)->first();
+    $roleModel->revokePermissionTo('ingresar-atrasos');
+
+    $this->actingAs($user)
+        ->get(route('atrasos.index'))
+        ->assertForbidden();
+
+    $this->actingAs($user);
+    Livewire::test('pages::atrasos.index')
         ->assertForbidden();
 });

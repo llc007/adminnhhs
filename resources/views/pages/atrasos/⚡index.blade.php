@@ -29,6 +29,10 @@ new #[Title('Registro de Atrasos')] class extends Component {
 
     public function mount(): void
     {
+        if (! auth()->user()->hasRole('superadmin') && ! auth()->user()->can('ingresar-atrasos')) {
+            abort(403, 'No tienes permiso para ingresar atrasos.');
+        }
+
         $this->fecha = now('America/Santiago')->format('Y-m-d');
     }
 

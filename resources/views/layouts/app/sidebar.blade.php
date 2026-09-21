@@ -127,14 +127,13 @@
             @endif
 
             @if (
-                (auth()->user()->hasRole(['superadmin', 'administrador', 'directivo', 'inspector', 'recepcion']) ||
+                (auth()->user()->hasRole('superadmin') ||
                     auth()->user()->canAny(['ingresar-atrasos', 'ver-atrasos', 'ver-mis-atrasos'])) &&
                     ($isAdmin || $modulosAtrasos))
                 <flux:sidebar.group :heading="__('Atrasos')" class="grid mt-4">
                     @if (
-                        (auth()->user()->hasRole(['superadmin', 'administrador', 'directivo', 'inspector', 'recepcion']) ||
-                            auth()->user()->can('ingresar-atrasos') ||
-                            auth()->user()->can('registrar-atrasos')) &&
+                        (auth()->user()->hasRole('superadmin') ||
+                            auth()->user()->can('ingresar-atrasos')) &&
                             ($isAdmin || $modulosAtrasos))
                         <flux:sidebar.item icon="clock" :href="route('atrasos.index')"
                             :current="request()->routeIs('atrasos.*')" wire:navigate>

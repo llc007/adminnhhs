@@ -22,6 +22,11 @@ new #[Title('Registro de Atrasos')] class extends Component {
     public string $editarMotivo = '';
     public string $editarObservaciones = '';
 
+    // Modal estético de confirmación para eliminar/anular
+    public bool $modalEliminar = false;
+    public ?int $atrasoAEliminarId = null;
+    public string $estudianteAEliminarNombre = '';
+
     public function mount(): void
     {
         $this->fecha = now('America/Santiago')->format('Y-m-d');
@@ -300,16 +305,40 @@ new #[Title('Registro de Atrasos')] class extends Component {
     }
 
     /**
-     * Eliminar registro de atraso por equivocación.
+     * Abrir modal de confirmación estética para anular atraso.
      */
-    public function eliminarAtraso(int $atrasoId): void
+    public function confirmarEliminacion(int $atrasoId): void
     {
         $atraso = Atraso::where('school_id', $this->school?->id)->find($atrasoId);
+        if (! $atraso) {
+            return;
+        }
+
+        $this->atrasoAEliminarId = $atraso->id;
+        $this->estudianteAEliminarNombre = $atraso->estudiante?->nombreCompleto() ?? 'este estudiante';
+        $this->modalEliminar = true;
+    }
+
+    /**
+     * Eliminar registro de atraso tras confirmación.
+     */
+    public function eliminarAtraso(?int $atrasoId = null): void
+    {
+        $id = $atrasoId ?? $this->atrasoAEliminarId;
+        if (! $id) {
+            return;
+        }
+
+        $atraso = Atraso::where('school_id', $this->school?->id)->find($id);
         if ($atraso) {
             $nombre = $atraso->estudiante?->nombreCompleto() ?? 'Estudiante';
             $atraso->delete();
             Flux::toast(heading: 'Registro Anulado', text: "Se eliminó el atraso de {$nombre}.", variant: 'warning');
         }
+
+        $this->modalEliminar = false;
+        $this->atrasoAEliminarId = null;
+        $this->estudianteAEliminarNombre = '';
     }
 }; ?>
 
@@ -713,13 +742,12 @@ new #[Title('Registro de Atrasos')] class extends Component {
                                 <span>Pase</span>
                             </a>
 
-                            {{-- Botón Anular / Eliminar --}}
+                            {{-- Botón Anular / Eliminar (Modal estético) --}}
                             <button 
                                 type="button" 
-                                wire:click="eliminarAtraso({{ $atraso->id }})" 
-                                wire:confirm="¿Seguro que deseas anular este atraso?"
-                                class="p-1 rounded text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400"
-                                title="Eliminar registro"
+                                wire:click="confirmarEliminacion({{ $atraso->id }})" 
+                                class="p-1 rounded text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
+                                title="Anular o eliminar registro"
                             >
                                 <flux:icon.trash class="size-4" />
                             </button>
@@ -765,6 +793,34 @@ new #[Title('Registro de Atrasos')] class extends Component {
         <div class="flex justify-end gap-2 pt-2">
             <flux:button wire:click="$set('modalEdicion', false)">Cancelar</flux:button>
             <flux:button variant="primary" wire:click="guardarEdicion">Guardar Cambios</flux:button>
+        </div>
+    </flux:modal>
+
+    {{-- Modal Estético para Anular / Eliminar Registro --}}
+    <flux:modal wire:model="modalEliminar" class="md:w-96">
+        <div class="space-y-5">
+            <div class="flex items-start gap-4">
+                <div class="size-11 rounded-2xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+                    <flux:icon.trash class="size-6" />
+                </div>
+                <div>
+                    <flux:heading size="lg" class="text-zinc-900 dark:text-zinc-100 font-black">
+                        Anular Registro de Atraso
+                    </flux:heading>
+                    <flux:subheading class="text-xs text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
+                        ¿Estás seguro de que deseas anular el atraso de <span class="font-bold text-zinc-800 dark:text-zinc-200">{{ $estudianteAEliminarNombre }}</span>? El registro será eliminado permanentemente.
+                    </flux:subheading>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2.5 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                <flux:button variant="ghost" wire:click="$set('modalEliminar', false)">
+                    Cancelar
+                </flux:button>
+                <flux:button variant="danger" wire:click="eliminarAtraso">
+                    Sí, Anular Atraso
+                </flux:button>
+            </div>
         </div>
     </flux:modal>
 </div>

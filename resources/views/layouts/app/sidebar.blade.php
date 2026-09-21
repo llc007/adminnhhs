@@ -19,7 +19,16 @@
 <body class="min-h-screen bg-white dark:bg-zinc-800">
     <flux:sidebar sticky collapsible class="border-e border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900">
         <flux:sidebar.header>
-            <x-app-logo :sidebar="true" :href="$user ? ($user->hasRole(['superadmin', 'administrador', 'directivo']) || $user->can('ver-dashboard-entrevistas') ? route('dashboard') : ($user->can('ver-entrevistas-propias') ? route('entrevistas.agenda') : route('entrevistas.index'))) : route('login')" wire:navigate />
+            <x-app-logo :sidebar="true" :href="$user
+                ? ($user->hasRole(['superadmin', 'administrador', 'directivo']) ||
+                $user->can('ver-dashboard-entrevistas')
+                    ? route('dashboard')
+                    : ($user->hasRole(['gerencia', 'rectoria'])
+                        ? route('gerencia.dashboard')
+                        : ($user->can('ver-entrevistas-propias')
+                            ? route('entrevistas.agenda')
+                            : route('entrevistas.index'))))
+                : route('login')" wire:navigate />
             <flux:sidebar.collapse
                 class="in-data-flux-sidebar-on-desktop:not-in-data-flux-sidebar-collapsed-desktop:-mr-2" />
         </flux:sidebar.header>
@@ -27,7 +36,27 @@
         <livewire:admin.seleccionar-colegio />
 
         <flux:sidebar.nav>
-            @if ((auth()->user()->hasRole(['superadmin', 'estudiante']) || auth()->user()->canAny(['ver-entrevistas-propias', 'ver-entrevistas-general', 'crear-entrevistas', 'cancelar-entrevistas', 'ingresar-apoderado', 'ver-recepcion'])) && ($isAdmin || $modulosEntrevistas))
+            @if (auth()->user()->hasRole(['superadmin', 'administrador', 'directivo', 'gerencia', 'rectoria']) ||
+                    auth()->user()->can('ver-dashboard-gerencia'))
+                <flux:sidebar.group class="grid mb-2" :heading="__('Direccion & Rectoria')">
+                    <flux:sidebar.item icon="presentation-chart-line" :href="route('gerencia.dashboard')"
+                        :current="request()->routeIs('gerencia.dashboard')" wire:navigate>
+                        {{ __('Reporte Entrevistas') }}
+                    </flux:sidebar.item>
+                </flux:sidebar.group>
+            @endif
+
+            @if (
+                (auth()->user()->hasRole(['superadmin', 'estudiante']) ||
+                    auth()->user()->canAny([
+                            'ver-entrevistas-propias',
+                            'ver-entrevistas-general',
+                            'crear-entrevistas',
+                            'cancelar-entrevistas',
+                            'ingresar-apoderado',
+                            'ver-recepcion',
+                        ])) &&
+                    ($isAdmin || $modulosEntrevistas))
                 <flux:sidebar.group :heading="__('Entrevistas')" class="grid">
                     @if (auth()->user()->hasRole(['superadmin', 'administrador', 'directivo']) || auth()->user()->can('ver-dashboard-entrevistas'))
                         <flux:sidebar.item icon="home" :href="route('dashboard')"
@@ -36,7 +65,8 @@
                         </flux:sidebar.item>
                     @endif
 
-                    @if (auth()->user()->hasRole(['superadmin', 'administrador', 'directivo']) || auth()->user()->can('ver-reportes-entrevistas'))
+                    @if (auth()->user()->hasRole(['superadmin', 'administrador', 'directivo', 'gerencia', 'rectoria']) ||
+                            auth()->user()->can('ver-reportes-entrevistas'))
                         <flux:sidebar.item icon="chart-bar" :href="route('reportes.index')"
                             :current="request()->routeIs('reportes.index')" wire:navigate>
                             {{ __('Reportes') }}
@@ -50,7 +80,8 @@
                         </flux:sidebar.item>
                     @endif
 
-                    @if ((auth()->user()->hasRole('superadmin') || auth()->user()->can('ver-entrevistas-propias')) &&
+                    @if (
+                        (auth()->user()->hasRole('superadmin') || auth()->user()->can('ver-entrevistas-propias')) &&
                             ($isAdmin || $modulosEntrevistas))
                         <flux:sidebar.item icon="calendar-days" :href="route('entrevistas.agenda')"
                             :current="request()->routeIs('entrevistas.agenda')" wire:navigate>
@@ -58,7 +89,9 @@
                         </flux:sidebar.item>
                     @endif
 
-                    @if ((auth()->user()->hasRole(['superadmin', 'estudiante']) || auth()->user()->canAny(['ver-entrevistas-propias', 'ver-entrevistas-general'])) &&
+                    @if (
+                        (auth()->user()->hasRole(['superadmin', 'estudiante']) ||
+                            auth()->user()->canAny(['ver-entrevistas-propias', 'ver-entrevistas-general'])) &&
                             ($isAdmin || $modulosEntrevistas))
                         <flux:sidebar.item icon="table-cells" :href="route('entrevistas.index')"
                             :current="request()->routeIs('entrevistas.index')" wire:navigate>
@@ -68,16 +101,25 @@
                 </flux:sidebar.group>
             @endif
 
-            @if ((auth()->user()->hasRole('superadmin') || auth()->user()->canAny(['ver-estudiantes', 'gestionar-funcionarios'])) && ($isAdmin || $modulosEstudiantes))
+            @if (
+                (auth()->user()->hasRole('superadmin') ||
+                    auth()->user()->canAny(['ver-estudiantes', 'gestionar-funcionarios'])) &&
+                    ($isAdmin || $modulosEstudiantes))
                 <flux:sidebar.group :heading="__('Gestión Académica')" class="grid mt-4">
-                    @if ((auth()->user()->hasRole('superadmin') || auth()->user()->can('ver-estudiantes')) && ($isAdmin || $modulosEstudiantes))
+                    @if (
+                        (auth()->user()->hasRole('superadmin') || auth()->user()->can('ver-estudiantes')) &&
+                            ($isAdmin || $modulosEstudiantes))
                         <flux:sidebar.item icon="users" :href="route('estudiantes.index')"
-                            :current="request()->routeIs('estudiantes.index') || request()->routeIs('estudiantes.ficha')" wire:navigate>
+                            :current="request()->routeIs('estudiantes.index') || request()->routeIs('estudiantes.ficha')"
+                            wire:navigate>
                             {{ __('Estudiantes') }}
                         </flux:sidebar.item>
                     @endif
 
-                    @if ((auth()->user()->hasRole(['superadmin', 'administrador', 'directivo', 'inspector', 'recepcion']) || auth()->user()->can('registrar-atrasos')) && ($isAdmin || $modulosAtrasos))
+                    @if (
+                        (auth()->user()->hasRole(['superadmin', 'administrador', 'directivo', 'inspector', 'recepcion']) ||
+                            auth()->user()->can('registrar-atrasos')) &&
+                            ($isAdmin || $modulosAtrasos))
                         <flux:sidebar.item icon="clock" :href="route('atrasos.index')"
                             :current="request()->routeIs('atrasos.*')" wire:navigate>
                             {{ __('Atrasos') }}
@@ -96,7 +138,8 @@
 
             @if (auth()->user()->hasRole(['administrador', 'superadmin']))
                 <flux:sidebar.group :heading="__('Administración')" class="grid mt-4">
-                    <flux:sidebar.item icon="arrow-path-rounded-square" :href="route('estudiantes.sincronizar_correos')"
+                    <flux:sidebar.item icon="arrow-path-rounded-square"
+                        :href="route('estudiantes.sincronizar_correos')"
                         :current="request()->routeIs('estudiantes.sincronizar_correos')" wire:navigate>
                         {{ __('Sincronizar Correos') }}
                     </flux:sidebar.item>
@@ -123,11 +166,18 @@
 
 
             @php
-                $canSeeAdquisicionesGroup = auth()->user()->hasRole(['solicitante_adquisiciones', 'administrador', 'superadmin', 'ti']) || auth()->user()->canAny(['crear-requerimientos', 'aprobar-requerimientos', 'ver-requerimientos-general']);
+                $canSeeAdquisicionesGroup =
+                    auth()
+                        ->user()
+                        ->hasRole(['solicitante_adquisiciones', 'administrador', 'superadmin', 'ti']) ||
+                    auth()
+                        ->user()
+                        ->canAny(['crear-requerimientos', 'aprobar-requerimientos', 'ver-requerimientos-general']);
             @endphp
             @if ($canSeeAdquisicionesGroup && ($isAdmin || $modulosAdquisiciones))
                 <flux:sidebar.group :heading="__('Adquisiciones e Inventario')" class="grid mt-4">
-                    @if (auth()->user()->hasRole(['solicitante_adquisiciones', 'administrador', 'superadmin']) || auth()->user()->can('crear-requerimientos'))
+                    @if (auth()->user()->hasRole(['solicitante_adquisiciones', 'administrador', 'superadmin']) ||
+                            auth()->user()->can('crear-requerimientos'))
                         <flux:sidebar.item icon="document-text" :href="route('adquisiciones.crear')"
                             :current="request()->routeIs('adquisiciones.crear')" wire:navigate>
                             {{ __('Solicitar Adquisición') }}
@@ -156,10 +206,12 @@
             @endif
 
             @php
-                $isTI = auth()
-                    ->user()
-                    ->hasRole(['ti', 'administrador', 'superadmin']) || auth()->user()->can('gestionar-prestamos');
-                $canSeePrestamosGroup = ($isTI || auth()->user()->can('ver-prestamos-propios')) && ($isAdmin || $modulosPrestamos);
+                $isTI =
+                    auth()
+                        ->user()
+                        ->hasRole(['ti', 'administrador', 'superadmin']) || auth()->user()->can('gestionar-prestamos');
+                $canSeePrestamosGroup =
+                    ($isTI || auth()->user()->can('ver-prestamos-propios')) && ($isAdmin || $modulosPrestamos);
             @endphp
             @if ($canSeePrestamosGroup)
                 <flux:sidebar.group :heading="__('Informática')" class="grid mt-4">
@@ -246,7 +298,8 @@
 
     {{-- Indicador de tamaño de pantalla para depuración --}}
     @if (app()->isLocal())
-        <div class="fixed bottom-4 right-4 z-50 flex items-center gap-1.5 rounded-full bg-zinc-900/90 dark:bg-zinc-100/90 px-3 py-1 font-mono text-[10px] font-bold text-zinc-100 dark:text-zinc-900 shadow-lg border border-zinc-700/50 dark:border-zinc-300/50 pointer-events-none">
+        <div
+            class="fixed bottom-4 right-4 z-50 flex items-center gap-1.5 rounded-full bg-zinc-900/90 dark:bg-zinc-100/90 px-3 py-1 font-mono text-[10px] font-bold text-zinc-100 dark:text-zinc-900 shadow-lg border border-zinc-700/50 dark:border-zinc-300/50 pointer-events-none">
             <span>Pantalla:</span>
             <span class="sm:hidden">XS (&lt; 640px)</span>
             <span class="hidden sm:inline md:hidden">SM (&gt;= 640px)</span>
@@ -264,12 +317,19 @@
     @fluxScripts
     <script>
         document.addEventListener('livewire:init', () => {
-            Livewire.hook('request', ({ fail }) => {
-                fail(({ status, content, preventDefault }) => {
+            Livewire.hook('request', ({
+                fail
+            }) => {
+                fail(({
+                    status,
+                    content,
+                    preventDefault
+                }) => {
                     // Manejar silenciosamente problemas de red/servidor (502, 503, 504) y expiración de sesión (419)
                     // durante el polling en segundo plano para evitar modales molestos al usuario.
                     if ([419, 502, 503, 504].includes(status)) {
-                        console.warn('Livewire: error de conexión temporal (' + status + '). Reintentando...');
+                        console.warn('Livewire: error de conexión temporal (' + status +
+                            '). Reintentando...');
                         preventDefault();
                     }
                 });

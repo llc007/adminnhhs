@@ -27,7 +27,7 @@ class CheckRole
 
         // If the user has ONLY the default 'externo' role (newly registered and unauthorized),
         // redirect them to the access request page rather than showing a static 403 error.
-        if ($request->user()->hasRole(['externo']) && ! $request->user()->hasRole(['docente', 'inspector', 'administrador', 'directivo', 'superadmin', 'asistente', 'psicosocial', 'recepcion', 'estudiante', 'ti', 'solicitante_adquisiciones'])) {
+        if ($request->user()->hasRole(['externo']) && ! $request->user()->hasRole(['docente', 'inspector', 'administrador', 'directivo', 'superadmin', 'asistente', 'psicosocial', 'recepcion', 'estudiante', 'ti', 'solicitante_adquisiciones', 'gerencia', 'rectoria'])) {
             return redirect()->route('sin-permiso');
         }
 
@@ -41,6 +41,9 @@ class CheckRole
             // If they are attempting to visit the dashboard but are an inspector or receptionist,
             // redirect them to their respective functional home route instead of throwing a 403.
             if ($request->routeIs('dashboard') || $request->routeIs('entrevistas.dashboard')) {
+                if ($request->user()->hasRole(['gerencia', 'rectoria'])) {
+                    return redirect()->route('gerencia.dashboard');
+                }
                 if ($request->user()->hasRole(['inspector', 'recepcion'])) {
                     return redirect()->route('entrevistas.recepcion');
                 }

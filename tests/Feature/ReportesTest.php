@@ -348,3 +348,57 @@ test('teacher agenda displays warning banner for expired unclosed interviews and
         ->assertSee('Reunión Familiar')
         ->assertSee('Abierta (Sin Cerrar)');
 });
+
+test('reporte entrevistas por profesor only includes docente, directivo, and psicosocial roles', function () {
+    [$admin, $docente, $schoolId] = setupReportesEnvironment();
+
+    $directivo = User::factory()->create([
+        'current_school_id' => $schoolId,
+        'email' => 'directora@reportestest.cl',
+        'nombres' => 'ANDREA',
+        'apellido_pat' => 'DIRECTORA',
+    ]);
+    $directivo->syncRolesForSchool($schoolId, ['directivo']);
+
+    $psico = User::factory()->create([
+        'current_school_id' => $schoolId,
+        'email' => 'psico@reportestest.cl',
+        'nombres' => 'CARLA',
+        'apellido_pat' => 'PSICOLOGA',
+    ]);
+    $psico->syncRolesForSchool($schoolId, ['psicosocial']);
+
+    $inspector = User::factory()->create([
+        'current_school_id' => $schoolId,
+        'email' => 'inspector@reportestest.cl',
+        'nombres' => 'MIGUEL',
+        'apellido_pat' => 'INSPECTOR',
+    ]);
+    $inspector->syncRolesForSchool($schoolId, ['inspector']);
+
+    $asistente = User::factory()->create([
+        'current_school_id' => $schoolId,
+        'email' => 'asistente@reportestest.cl',
+        'nombres' => 'LUCIA',
+        'apellido_pat' => 'ASISTENTE',
+    ]);
+    $asistente->syncRolesForSchool($schoolId, ['asistente']);
+
+    $this->actingAs($admin);
+
+    Livewire::test('pages::reportes.index')
+        ->assertOk()
+        ->assertSee('JUAN PABLO PEREZ')
+        ->assertSee('ANDREA DIRECTORA')
+        ->assertSee('CARLA PSICOLOGA')
+        ->assertDontSee('MIGUEL INSPECTOR')
+        ->assertDontSee('LUCIA ASISTENTE')
+        ->set('cargo', 'directivo')
+        ->assertSee('ANDREA DIRECTORA')
+        ->assertDontSee('JUAN PABLO PEREZ')
+        ->assertDontSee('CARLA PSICOLOGA')
+        ->set('cargo', 'psicosocial')
+        ->assertSee('CARLA PSICOLOGA')
+        ->assertDontSee('ANDREA DIRECTORA')
+        ->assertDontSee('JUAN PABLO PEREZ');
+});

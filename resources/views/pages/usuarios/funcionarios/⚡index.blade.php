@@ -339,6 +339,8 @@ new class extends Component {
                                             'psicosocial' => ['label' => 'Psicosocial', 'color' => 'cyan'],
                                             'recepcion' => ['label' => 'Recepción', 'color' => 'emerald'],
                                             'directivo' => ['label' => 'Directivo', 'color' => 'violet'],
+                                            'gerencia' => ['label' => 'Gerencia', 'color' => 'purple'],
+                                            'rectoria' => ['label' => 'Rectoría', 'color' => 'indigo'],
                                             'administrador' => ['label' => 'Administrador', 'color' => 'rose'],
                                             'superadmin' => ['label' => 'Superadmin', 'color' => 'red'],
                                             'externo' => ['label' => 'Pendiente', 'color' => 'orange'],
@@ -446,6 +448,8 @@ new class extends Component {
                         <flux:checkbox wire:model="roles" value="psicosocial" :label="__('Psicosocial')" />
                         <flux:checkbox wire:model="roles" value="recepcion" :label="__('Recepción')" />
                         <flux:checkbox wire:model="roles" value="directivo" :label="__('Directivo')" />
+                        <flux:checkbox wire:model="roles" value="gerencia" :label="__('Gerencia')" />
+                        <flux:checkbox wire:model="roles" value="rectoria" :label="__('Rectoría')" />
                         <flux:checkbox wire:model="roles" value="administrador" :label="__('Administrador')" />
                         <flux:checkbox wire:model="roles" value="solicitante_adquisiciones" :label="__('Solicitante Adq.')" />
                         <flux:checkbox wire:model="roles" value="ti" :label="__('Personal de TI')" />

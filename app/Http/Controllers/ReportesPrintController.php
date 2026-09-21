@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\Modalidad;
 use App\Models\CategoriaEntrevista;
 use App\Models\Curso;
 use App\Models\Entrevista;
@@ -13,7 +14,7 @@ class ReportesPrintController extends Controller
     public function entrevistasProfesor(Request $request)
     {
         $user = auth()->user();
-        if (! $user->hasRole(['superadmin', 'administrador', 'directivo']) && ! $user->can('ver-reportes-entrevistas')) {
+        if (! $user->hasRole(['superadmin', 'administrador', 'directivo', 'gerencia', 'rectoria']) && ! $user->can('ver-reportes-entrevistas')) {
             abort(403, 'No tienes permiso para acceder a este reporte.');
         }
 
@@ -65,9 +66,9 @@ class ReportesPrintController extends Controller
 
         $query = User::query()
             ->whereHas('schools', fn ($q) => $q->where('schools.id', $schoolId))
-            ->whereDoesntHave('roles', function ($q) use ($schoolId) {
+            ->whereHas('roles', function ($q) use ($schoolId) {
                 $q->where('roles.team_id', $schoolId)
-                    ->where('roles.name', 'estudiante');
+                    ->whereIn('roles.name', ['docente', 'directivo', 'psicosocial']);
             })
             ->whereRaw("SUBSTR(email, 1, 1) != '_'")
             ->where('email', 'not like', 'docente1@%')
@@ -80,7 +81,7 @@ class ReportesPrintController extends Controller
                 'entrevistas as total_abiertas' => fn ($q) => $q->where('school_id', $schoolId)->whereIn('estado', ['pendiente', 'ingresada', 'abierta'])->where('fecha', '<', $today)->where($dateClosure),
             ]);
 
-        if ($cargo !== 'todos') {
+        if ($cargo !== 'todos' && in_array($cargo, ['docente', 'directivo', 'psicosocial'])) {
             $query->whereHas('roles', function ($q) use ($schoolId, $cargo) {
                 $q->where('roles.team_id', $schoolId)
                     ->where('roles.name', $cargo);
@@ -337,6 +338,193 @@ class ReportesPrintController extends Controller
             'topCatGlobal',
             'topCatGlobalPct',
             'topCurso'
+        ));
+    }
+
+    public function resumenEjecutivo(Request $request)
+    {
+        $user = auth()->user();
+        if (! $user->hasRole(['superadmin', 'administrador', 'directivo', 'gerencia', 'rectoria']) && ! $user->can('ver-dashboard-gerencia')) {
+            abort(403, 'No tienes permiso para acceder a este reporte.');
+        }
+
+        $school = $user->currentSchool;
+        $schoolId = $school?->id;
+
+        $periodo = $request->get('periodo', 'ano_actual');
+        $ciclo = $request->get('ciclo', 'todos');
+
+        $now = now('America/Santiago');
+        $currentYear = $now->year;
+
+        [$startDate, $endDate, $periodoLabel] = match ($periodo) {
+            'mes_actual' => [
+                $now->copy()->startOfMonth()->format('Y-m-d'),
+                $now->copy()->endOfMonth()->format('Y-m-d'),
+                'Mes Actual ('.$now->translatedFormat('F Y').')',
+            ],
+            'primer_semestre' => [
+                "{$currentYear}-01-01",
+                "{$currentYear}-06-30",
+                "Primer Semestre {$currentYear} (Ene - Jun)",
+            ],
+            'segundo_semestre' => [
+                "{$currentYear}-07-01",
+                "{$currentYear}-12-31",
+                "Segundo Semestre {$currentYear} (Jul - Dic)",
+            ],
+            'todo' => [
+                null,
+                null,
+                'Todo el Historial Registrado',
+            ],
+            default => [
+                "{$currentYear}-01-01",
+                "{$currentYear}-12-31",
+                "Año Escolar {$currentYear}",
+            ],
+        };
+
+        // Query base
+        $query = Entrevista::with(['estudiante.curso', 'user'])
+            ->where('school_id', $schoolId);
+
+        if ($startDate && $endDate) {
+            $query->whereBetween('fecha', [$startDate, $endDate]);
+        }
+
+        if ($ciclo !== 'todos') {
+            $query->whereHas('estudiante.curso', fn ($q) => $q->where('modalidad', $ciclo));
+        }
+
+        $entrevistas = $query->get();
+
+        $totalAgendadas = $entrevistas->count();
+        $realizadas = $entrevistas->where('estado', 'realizada')->count();
+        $ausentes = $entrevistas->where('estado', 'ausente')->count();
+        $canceladas = $entrevistas->where('estado', 'cancelada')->count();
+        $noConcretadas = $ausentes + $canceladas;
+        $pendientes = $entrevistas->whereIn('estado', ['pendiente', 'ingresada', 'abierta'])->where('fecha', '>=', $now->toDateString())->count();
+        $abiertas = $entrevistas->whereIn('estado', ['pendiente', 'ingresada', 'abierta'])->where('fecha', '<', $now->toDateString())->count();
+
+        $tasaConcrecion = $totalAgendadas > 0 ? round(($realizadas / $totalAgendadas) * 100, 1) : 0;
+        $tasaInasistencia = $totalAgendadas > 0 ? round(($noConcretadas / $totalAgendadas) * 100, 1) : 0;
+
+        // Docentes
+        $docentesColegio = User::where('current_school_id', $schoolId)
+            ->whereHas('roles', fn ($q) => $q->where('name', 'docente')->where('roles.team_id', $schoolId))
+            ->count();
+        $docentesActivos = $entrevistas->where('estado', 'realizada')->pluck('user_id')->filter()->unique()->count();
+        $coberturaDocente = $docentesColegio > 0 ? round(($docentesActivos / $docentesColegio) * 100, 1) : 0;
+
+        // Radiografía de Problemáticas
+        $conteoProblematicas = [
+            'Rendimiento Académico' => 0,
+            'Conducta y Convivencia' => 0,
+            'Asistencia y Puntualidad' => 0,
+            'Asunto Personal / Familiar' => 0,
+            'Evaluación Psicopedagógica' => 0,
+            'Situación Médica' => 0,
+            'Otro' => 0,
+        ];
+
+        foreach ($entrevistas as $e) {
+            $cat = Entrevista::normalizarCategoria($e->motivo);
+            if (isset($conteoProblematicas[$cat])) {
+                $conteoProblematicas[$cat]++;
+            } else {
+                $conteoProblematicas['Otro']++;
+            }
+        }
+
+        // Causa Dominante Global
+        arsort($conteoProblematicas);
+        $topProblematica = key($conteoProblematicas);
+        $topProblematicaCant = current($conteoProblematicas);
+        $topProblematicaPct = $totalAgendadas > 0 ? round(($topProblematicaCant / $totalAgendadas) * 100, 1) : 0;
+
+        // Comparativa Ciclos
+        $citasBasica = $entrevistas->filter(fn ($e) => $e->estudiante?->curso?->modalidad === Modalidad::Basica || (is_string($e->estudiante?->curso?->modalidad) && $e->estudiante?->curso?->modalidad === 'basica'));
+        $citasMedia = $entrevistas->filter(fn ($e) => $e->estudiante?->curso?->modalidad === Modalidad::Media || (is_string($e->estudiante?->curso?->modalidad) && $e->estudiante?->curso?->modalidad === 'media'));
+
+        $totalBasica = $citasBasica->count();
+        $realizadasBasica = $citasBasica->where('estado', 'realizada')->count();
+        $tasaBasica = $totalBasica > 0 ? round(($realizadasBasica / $totalBasica) * 100, 1) : 0;
+
+        $totalMedia = $citasMedia->count();
+        $realizadasMedia = $citasMedia->where('estado', 'realizada')->count();
+        $tasaMedia = $totalMedia > 0 ? round(($realizadasMedia / $totalMedia) * 100, 1) : 0;
+
+        // Top 5 Cursos
+        $cursosAgrupados = $entrevistas->groupBy(fn ($e) => $e->estudiante?->curso_id)->filter(fn ($group, $cursoId) => ! empty($cursoId));
+        $topCursos = [];
+        foreach ($cursosAgrupados as $cursoId => $citas) {
+            $curso = $citas->first()->estudiante?->curso;
+            if (! $curso) {
+                continue;
+            }
+
+            $mots = [];
+            foreach ($citas as $c) {
+                $norm = Entrevista::normalizarCategoria($c->motivo);
+                $mots[$norm] = ($mots[$norm] ?? 0) + 1;
+            }
+            arsort($mots);
+
+            $topCursos[] = (object) [
+                'curso' => $curso,
+                'total' => $citas->count(),
+                'realizadas' => $citas->where('estado', 'realizada')->count(),
+                'causa_dominante' => ! empty($mots) ? key($mots) : 'General',
+            ];
+        }
+        $topCursos = collect($topCursos)->sortByDesc('total')->take(5)->values();
+
+        // Top 5 Docentes
+        $docentesAgrupados = $entrevistas->groupBy('user_id')->filter(fn ($group, $uid) => ! empty($uid));
+        $topDocentes = [];
+        foreach ($docentesAgrupados as $uid => $citas) {
+            $prof = $citas->first()->user;
+            if (! $prof) {
+                continue;
+            }
+
+            $topDocentes[] = (object) [
+                'user' => $prof,
+                'total' => $citas->count(),
+                'realizadas' => $citas->where('estado', 'realizada')->count(),
+            ];
+        }
+        $topDocentes = collect($topDocentes)->sortByDesc('realizadas')->take(5)->values();
+
+        return view('pages.gerencia.print_resumen_ejecutivo', compact(
+            'school',
+            'user',
+            'periodoLabel',
+            'ciclo',
+            'totalAgendadas',
+            'realizadas',
+            'ausentes',
+            'canceladas',
+            'pendientes',
+            'abiertas',
+            'tasaConcrecion',
+            'tasaInasistencia',
+            'docentesColegio',
+            'docentesActivos',
+            'coberturaDocente',
+            'conteoProblematicas',
+            'topProblematica',
+            'topProblematicaCant',
+            'topProblematicaPct',
+            'totalBasica',
+            'realizadasBasica',
+            'tasaBasica',
+            'totalMedia',
+            'realizadasMedia',
+            'tasaMedia',
+            'topCursos',
+            'topDocentes'
         ));
     }
 }

@@ -77,6 +77,7 @@ test('modules configuration can be updated by superadmin', function () {
     expect($school->modulos_publicados)->toEqual([
         'entrevistas' => false,
         'estudiantes' => true,
+        'atrasos' => true,
         'adquisiciones' => false,
         'prestamos' => true,
         'envio_correos' => false,

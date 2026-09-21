@@ -37,6 +37,7 @@ class SyncPermissions extends Command
         $allPermissions = [
             // Entrevistas
             'ver-dashboard-entrevistas',
+            'ver-dashboard-gerencia',
             'ver-reportes-entrevistas',
             'ver-entrevistas-propias',
             'ver-entrevistas-general',
@@ -133,6 +134,21 @@ class SyncPermissions extends Command
             'solicitante_adquisiciones' => [
                 'crear-requerimientos',
                 'ver-prestamos-propios',
+            ],
+            'gerencia' => [
+                'ver-dashboard-gerencia',
+                'ver-reportes-entrevistas',
+                'ver-entrevistas-general',
+                'ver-estudiantes',
+            ],
+            'rectoria' => [
+                'ver-dashboard-gerencia',
+                'ver-reportes-entrevistas',
+                'ver-entrevistas-general',
+                'ver-entrevistas-propias',
+                'ver-bitacoras',
+                'ver-estudiantes',
+                'crear-requerimientos',
             ],
             'estudiante' => [],
         ];

@@ -3,12 +3,14 @@
 use Livewire\Component;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Url;
 use Livewire\WithPagination;
 
 new #[Title('Módulo de Reportes')] class extends Component {
     use WithPagination;
 
     // Tipo de reporte seleccionado
+    #[Url]
     public string $tipoReporte = 'entrevistas_profesor';
 
     // Filtros interactivos comunes y específicos
@@ -34,8 +36,13 @@ new #[Title('Módulo de Reportes')] class extends Component {
     public function mount(): void
     {
         $user = auth()->user();
-        if (! $user->hasRole(['superadmin', 'administrador', 'directivo']) && ! $user->can('ver-reportes-entrevistas')) {
+        if (! $user->hasRole(['superadmin', 'administrador', 'directivo', 'gerencia', 'rectoria']) && ! $user->can('ver-reportes-entrevistas')) {
             abort(403, 'No tienes permiso para acceder a la sección de reportes.');
+        }
+
+        if ($this->tipoReporte === 'problematicas_curso' && $this->sortBy === 'nombres') {
+            $this->sortBy = 'curso';
+            $this->sortDirection = 'asc';
         }
     }
 
@@ -160,9 +167,9 @@ new #[Title('Módulo de Reportes')] class extends Component {
 
         $query = \App\Models\User::query()
             ->whereHas('schools', fn($q) => $q->where('schools.id', $schoolId))
-            ->whereDoesntHave('roles', function ($q) use ($schoolId) {
+            ->whereHas('roles', function ($q) use ($schoolId) {
                 $q->where('roles.team_id', $schoolId)
-                    ->where('roles.name', 'estudiante');
+                    ->whereIn('roles.name', ['docente', 'directivo', 'psicosocial']);
             })
             ->whereRaw("SUBSTR(email, 1, 1) != '_'")
             ->where('email', 'not like', 'docente1@%')
@@ -175,7 +182,7 @@ new #[Title('Módulo de Reportes')] class extends Component {
                 'entrevistas as total_abiertas' => fn($q) => $q->where('school_id', $schoolId)->whereIn('estado', ['pendiente', 'ingresada', 'abierta'])->where('fecha', '<', $today)->where($dateClosure),
             ]);
 
-        if ($this->cargo !== 'todos') {
+        if ($this->cargo !== 'todos' && in_array($this->cargo, ['docente', 'directivo', 'psicosocial'])) {
             $query->whereHas('roles', function ($q) use ($schoolId) {
                 $q->where('roles.team_id', $schoolId)
                     ->where('roles.name', $this->cargo);
@@ -224,7 +231,19 @@ new #[Title('Módulo de Reportes')] class extends Component {
         [$startDate, $endDate] = $this->getPeriodoDates();
         $today = now('America/Santiago')->toDateString();
 
-        $citasQuery = \App\Models\Entrevista::where('school_id', $schoolId);
+        $citasQuery = \App\Models\Entrevista::where('school_id', $schoolId)
+            ->whereHas('user.roles', function ($q) use ($schoolId) {
+                $q->where('roles.team_id', $schoolId)
+                    ->whereIn('roles.name', ['docente', 'directivo', 'psicosocial']);
+            });
+
+        if ($this->cargo !== 'todos' && in_array($this->cargo, ['docente', 'directivo', 'psicosocial'])) {
+            $citasQuery->whereHas('user.roles', function ($q) use ($schoolId) {
+                $q->where('roles.team_id', $schoolId)
+                    ->where('roles.name', $this->cargo);
+            });
+        }
+
         if ($startDate && $endDate) {
             $citasQuery->whereBetween('fecha', [$startDate, $endDate]);
         }
@@ -837,12 +856,10 @@ new #[Title('Módulo de Reportes')] class extends Component {
                                     {{ __('Cargo (Rol)') }}
                                 </flux:label>
                                 <flux:select wire:model.live="cargo">
-                                    <flux:select.option value="todos">{{ __('Todos los Cargos') }}</flux:select.option>
+                                    <flux:select.option value="todos">{{ __('Todos (Docentes/Directivos/Psicosocial)') }}</flux:select.option>
                                     <flux:select.option value="docente">{{ __('Docentes') }}</flux:select.option>
                                     <flux:select.option value="directivo">{{ __('Directivos') }}</flux:select.option>
                                     <flux:select.option value="psicosocial">{{ __('Psicosocial') }}</flux:select.option>
-                                    <flux:select.option value="inspector">{{ __('Inspectores') }}</flux:select.option>
-                                    <flux:select.option value="asistente">{{ __('Asistentes') }}</flux:select.option>
                                 </flux:select>
                             </flux:field>
                         </div>

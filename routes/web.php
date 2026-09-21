@@ -19,8 +19,14 @@ Route::middleware(['auth', 'verified', 'role:administrador,directivo,superadmin'
     Route::livewire('/entrevistas/dashboard', 'pages::entrevistas.dashboard')->name('entrevistas.dashboard');
 });
 
-// Reportes Estadísticos — Administradores, Directivos y usuarios con permiso
-Route::middleware(['auth', 'verified', 'role_or_permission:superadmin|administrador|directivo|ver-reportes-entrevistas'])->group(function () {
+// Dashboard Dirección & Rectoría — Gerencia, Rectoría, Directivos, Administradores y Superadmin
+Route::middleware(['auth', 'verified', 'role_or_permission:superadmin|administrador|directivo|gerencia|rectoria|ver-dashboard-gerencia'])->group(function () {
+    Route::livewire('/gerencia/dashboard', 'pages::gerencia.dashboard')->name('gerencia.dashboard');
+    Route::get('/gerencia/imprimir/resumen-ejecutivo', [ReportesPrintController::class, 'resumenEjecutivo'])->name('gerencia.imprimir.resumen');
+});
+
+// Reportes Estadísticos — Administradores, Directivos, Gerencia, Rectoría y usuarios con permiso
+Route::middleware(['auth', 'verified', 'role_or_permission:superadmin|administrador|directivo|gerencia|rectoria|ver-reportes-entrevistas'])->group(function () {
     Route::livewire('/reportes', 'pages::reportes.index')->name('reportes.index');
     Route::get('/reportes/imprimir/entrevistas-profesor', [ReportesPrintController::class, 'entrevistasProfesor'])->name('reportes.imprimir.profesores');
     Route::get('/reportes/imprimir/problematicas-curso', [ReportesPrintController::class, 'problematicasCurso'])->name('reportes.imprimir.problematicas');

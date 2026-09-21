@@ -2,9 +2,14 @@
 
 <div class="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
     <div>
-        <flux:heading size="xl" class="text-[#00376e] dark:text-blue-400 font-extrabold">
-            {{ $titulo }}
-        </flux:heading>
+        <div class="flex items-center gap-2.5">
+            <flux:heading size="xl" class="text-[#00376e] dark:text-blue-400 font-extrabold">
+                {{ $titulo }}
+            </flux:heading>
+            @if(isset($badge))
+                {{ $badge }}
+            @endif
+        </div>
         <p class="hidden md:flex text-zinc-500 text-sm mt-1 items-center gap-2">
             <flux:icon name="{{ $icono }}" class="size-4" />
             {{ $subtitulo }}

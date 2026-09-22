@@ -202,3 +202,177 @@ test('directivo role without ingresar-atrasos permission cannot access atrasos m
     Livewire::test('pages::atrasos.index')
         ->assertForbidden();
 });
+
+test('user with ver-atrasos permission can access atrasos historial page', function () {
+    [$user, $schoolId] = setupAtrasosEnvironment('docente');
+    app(PermissionRegistrar::class)->setPermissionsTeamId($schoolId);
+    Permission::findOrCreate('ver-atrasos', 'web');
+    $user->givePermissionTo('ver-atrasos');
+
+    $this->actingAs($user)
+        ->get(route('atrasos.historial'))
+        ->assertOk();
+});
+
+test('user without permissions cannot access atrasos historial page', function () {
+    [$user, $schoolId] = setupAtrasosEnvironment('docente');
+    app(PermissionRegistrar::class)->setPermissionsTeamId($schoolId);
+
+    $this->actingAs($user)
+        ->get(route('atrasos.historial'))
+        ->assertForbidden();
+});
+
+test('can filter atrasos by temporal period and search in historial', function () {
+    [$user, $schoolId, $cursoId, $estudiante] = setupAtrasosEnvironment('inspector');
+    $this->actingAs($user);
+
+    $hoy = now('America/Santiago')->toDateString();
+
+    Atraso::create([
+        'school_id' => $schoolId,
+        'estudiante_id' => $estudiante->id,
+        'curso_id' => $cursoId,
+        'registrado_por_user_id' => $user->id,
+        'fecha' => $hoy,
+        'hora' => '08:10:00',
+        'minutos_atraso' => 10,
+        'estado' => 'injustificado',
+    ]);
+
+    Livewire::test('pages::atrasos.historial')
+        ->set('fecha', $hoy)
+        ->set('filtroTemporal', 'dia')
+        ->assertSee('JUAN PEREZ GONZALEZ')
+        ->set('search', 'NONEXISTENT')
+        ->assertDontSee('JUAN PEREZ GONZALEZ')
+        ->set('search', '21444555')
+        ->assertSee('JUAN PEREZ GONZALEZ');
+});
+
+test('can open student history modal and view past atrasos', function () {
+    [$user, $schoolId, $cursoId, $estudiante] = setupAtrasosEnvironment('inspector');
+    $this->actingAs($user);
+
+    Atraso::create([
+        'school_id' => $schoolId,
+        'estudiante_id' => $estudiante->id,
+        'curso_id' => $cursoId,
+        'registrado_por_user_id' => $user->id,
+        'fecha' => now('America/Santiago')->toDateString(),
+        'hora' => '08:20:00',
+        'minutos_atraso' => 20,
+        'estado' => 'injustificado',
+    ]);
+
+    Livewire::test('pages::atrasos.historial')
+        ->call('verHistorialEstudiante', $estudiante->id)
+        ->assertSet('modalDetalleEstudiante', true)
+        ->assertSet('estudianteSeleccionadoId', $estudiante->id)
+        ->assertSee('JUAN PEREZ GONZALEZ')
+        ->assertSee('Cronograma de Atrasos Registrados');
+});
+
+test('can toggle justificado and edit atraso in historial', function () {
+    [$user, $schoolId, $cursoId, $estudiante] = setupAtrasosEnvironment('inspector');
+    $this->actingAs($user);
+
+    $atraso = Atraso::create([
+        'school_id' => $schoolId,
+        'estudiante_id' => $estudiante->id,
+        'curso_id' => $cursoId,
+        'registrado_por_user_id' => $user->id,
+        'fecha' => now('America/Santiago')->toDateString(),
+        'hora' => '08:15:00',
+        'minutos_atraso' => 15,
+        'estado' => 'injustificado',
+    ]);
+
+    Livewire::test('pages::atrasos.historial')
+        ->call('toggleJustificado', $atraso->id);
+
+    expect($atraso->fresh()->estado)->toBe('justificado');
+
+    Livewire::test('pages::atrasos.historial')
+        ->call('abrirModalEdicion', $atraso->id)
+        ->assertSet('modalEdicion', true)
+        ->set('editarMotivo', 'Certificado médico')
+        ->call('guardarEdicion');
+
+    expect($atraso->fresh()->motivo)->toBe('Certificado médico');
+});
+
+test('can delete atraso in historial', function () {
+    [$user, $schoolId, $cursoId, $estudiante] = setupAtrasosEnvironment('inspector');
+    $this->actingAs($user);
+
+    $atraso = Atraso::create([
+        'school_id' => $schoolId,
+        'estudiante_id' => $estudiante->id,
+        'curso_id' => $cursoId,
+        'registrado_por_user_id' => $user->id,
+        'fecha' => now('America/Santiago')->toDateString(),
+        'hora' => '08:15:00',
+        'minutos_atraso' => 15,
+        'estado' => 'injustificado',
+    ]);
+
+    Livewire::test('pages::atrasos.historial')
+        ->call('confirmarEliminacion', $atraso->id)
+        ->assertSet('modalEliminar', true)
+        ->call('eliminarAtraso');
+
+    expect(Atraso::find($atraso->id))->toBeNull();
+});
+
+test('can export atrasos to csv from historial', function () {
+    [$user, $schoolId, $cursoId, $estudiante] = setupAtrasosEnvironment('inspector');
+    $this->actingAs($user);
+
+    Atraso::create([
+        'school_id' => $schoolId,
+        'estudiante_id' => $estudiante->id,
+        'curso_id' => $cursoId,
+        'registrado_por_user_id' => $user->id,
+        'fecha' => now('America/Santiago')->toDateString(),
+        'hora' => '08:15:00',
+        'minutos_atraso' => 15,
+        'estado' => 'injustificado',
+    ]);
+
+    Livewire::test('pages::atrasos.historial')
+        ->call('exportarCsv')
+        ->assertFileDownloaded();
+});
+
+test('historial updates in real-time when a new atraso is registered and supports autoRefresh toggle', function () {
+    [$user, $schoolId, $cursoId, $estudiante] = setupAtrasosEnvironment('inspector');
+    $this->actingAs($user);
+
+    $component = Livewire::test('pages::atrasos.historial');
+    $component->assertSee('En vivo')
+        ->assertSet('autoRefresh', true)
+        ->assertDontSee('JUAN PEREZ GONZALEZ');
+
+    // Simulate another user / inspector registering an atraso in database
+    Atraso::create([
+        'school_id' => $schoolId,
+        'estudiante_id' => $estudiante->id,
+        'curso_id' => $cursoId,
+        'registrado_por_user_id' => $user->id,
+        'fecha' => now('America/Santiago')->toDateString(),
+        'hora' => '08:05:00',
+        'minutos_atraso' => 5,
+        'estado' => 'injustificado',
+    ]);
+
+    // Livewire poll refreshes component
+    $component->call('$refresh')
+        ->assertSee('JUAN PEREZ GONZALEZ')
+        ->assertSee('+5 min');
+
+    // Toggle autoRefresh
+    $component->call('toggleAutoRefresh')
+        ->assertSet('autoRefresh', false)
+        ->assertSee('En vivo pausado');
+});

@@ -136,8 +136,17 @@
                             auth()->user()->can('ingresar-atrasos')) &&
                             ($isAdmin || $modulosAtrasos))
                         <flux:sidebar.item icon="clock" :href="route('atrasos.index')"
-                            :current="request()->routeIs('atrasos.*')" wire:navigate>
+                            :current="request()->routeIs('atrasos.index')" wire:navigate>
                             {{ __('Registrar Atrasos') }}
+                        </flux:sidebar.item>
+                    @endif
+                    @if (
+                        (auth()->user()->hasRole('superadmin') ||
+                            auth()->user()->canAny(['ver-atrasos', 'ingresar-atrasos'])) &&
+                            ($isAdmin || $modulosAtrasos))
+                        <flux:sidebar.item icon="table-cells" :href="route('atrasos.historial')"
+                            :current="request()->routeIs('atrasos.historial')" wire:navigate>
+                            {{ __('Historial General') }}
                         </flux:sidebar.item>
                     @endif
                 </flux:sidebar.group>

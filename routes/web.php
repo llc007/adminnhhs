@@ -72,6 +72,11 @@ Route::middleware(['auth', 'verified', 'role_or_permission:superadmin|ver-estudi
 // Control de Atrasos — Requiere permiso ingresar-atrasos o superadmin
 Route::middleware(['auth', 'verified', 'role_or_permission:superadmin|ingresar-atrasos'])->group(function () {
     Route::livewire('/atrasos', 'pages::atrasos.index')->name('atrasos.index');
+});
+
+// Historial y Tickets de Atrasos — Requiere permiso ver-atrasos, ingresar-atrasos o superadmin
+Route::middleware(['auth', 'verified', 'role_or_permission:superadmin|ver-atrasos|ingresar-atrasos'])->group(function () {
+    Route::livewire('/atrasos/historial', 'pages::atrasos.historial')->name('atrasos.historial');
     Route::get('/atrasos/ticket/{atraso}', [AtrasoPrintController::class, 'ticket'])->name('atrasos.ticket');
 });
 

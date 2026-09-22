@@ -68,6 +68,26 @@ test('authorized users can access the atrasos index page', function () {
         ->assertOk();
 });
 
+test('can request confirmation and then register an atraso for a student via livewire', function () {
+    [$user, $schoolId, $cursoId, $estudiante] = setupAtrasosEnvironment('inspector');
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::atrasos.index')
+        ->call('solicitarConfirmacionIngreso', $estudiante->id)
+        ->assertSet('modalConfirmarIngreso', true)
+        ->assertSet('estudianteAIngresarNombre', $estudiante->nombreCompleto())
+        ->call('registrarAtraso')
+        ->assertSet('modalConfirmarIngreso', false);
+
+    expect(Atraso::where('school_id', $schoolId)->where('estudiante_id', $estudiante->id)->count())->toBe(1);
+
+    $atraso = Atraso::where('estudiante_id', $estudiante->id)->first();
+    expect($atraso->estado)->toBe('injustificado')
+        ->and($atraso->curso_id)->toBe($cursoId)
+        ->and($atraso->registrado_por_user_id)->toBe($user->id);
+});
+
 test('can register an atraso for a student via livewire', function () {
     [$user, $schoolId, $cursoId, $estudiante] = setupAtrasosEnvironment('inspector');
 

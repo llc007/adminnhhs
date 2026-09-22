@@ -27,6 +27,14 @@ new #[Title('Registro de Atrasos')] class extends Component {
     public ?int $atrasoAEliminarId = null;
     public string $estudianteAEliminarNombre = '';
 
+    // Modal estético de confirmación antes de ingresar atraso
+    public bool $modalConfirmarIngreso = false;
+    public ?int $estudianteAIngresarId = null;
+    public string $estudianteAIngresarNombre = '';
+    public string $estudianteAIngresarCurso = '';
+    public string $estudianteAIngresarRut = '';
+    public string $horaLlegadaConfirmacion = '';
+
     public function mount(): void
     {
         if (! auth()->user()->hasRole('superadmin') && ! auth()->user()->can('ingresar-atrasos')) {
@@ -163,9 +171,9 @@ new #[Title('Registro de Atrasos')] class extends Component {
     }
 
     /**
-     * Registrar atraso inmediato de un estudiante.
+     * Solicitar confirmación antes de registrar atraso.
      */
-    public function registrarAtraso(int $estudianteId): void
+    public function solicitarConfirmacionIngreso(int $estudianteId): void
     {
         $school = $this->school;
         if (! $school) {
@@ -174,6 +182,53 @@ new #[Title('Registro de Atrasos')] class extends Component {
         }
 
         $estudiante = Estudiante::where('school_id', $school->id)->find($estudianteId);
+        if (! $estudiante) {
+            Flux::toast(heading: 'Error', text: 'Estudiante no encontrado.', variant: 'danger');
+            return;
+        }
+
+        // Control previo de duplicados en el mismo día
+        $yaRegistrado = Atraso::where('school_id', $school->id)
+            ->where('estudiante_id', $estudiante->id)
+            ->whereDate('fecha', $this->fecha)
+            ->first();
+
+        if ($yaRegistrado) {
+            $horaRegistrada = Carbon::parse($yaRegistrado->hora)->format('H:i');
+            Flux::toast(
+                heading: 'Estudiante ya registrado',
+                text: "{$estudiante->nombreCompleto()} ya fue ingresado hoy a las {$horaRegistrada} hrs.",
+                variant: 'warning'
+            );
+            $this->search = '';
+            return;
+        }
+
+        $this->estudianteAIngresarId = $estudiante->id;
+        $this->estudianteAIngresarNombre = $estudiante->nombreCompleto();
+        $this->estudianteAIngresarCurso = $estudiante->curso?->nombreCompleto() ?? 'Sin Curso';
+        $this->estudianteAIngresarRut = $estudiante->rutCompleto() ?? '';
+        $this->horaLlegadaConfirmacion = now('America/Santiago')->format('H:i');
+        $this->modalConfirmarIngreso = true;
+    }
+
+    /**
+     * Registrar atraso de un estudiante (tras confirmar o directo).
+     */
+    public function registrarAtraso(?int $estudianteId = null): void
+    {
+        $id = $estudianteId ?? $this->estudianteAIngresarId;
+        if (! $id) {
+            return;
+        }
+
+        $school = $this->school;
+        if (! $school) {
+            Flux::toast(heading: 'Error', text: 'No tienes un colegio activo seleccionado.', variant: 'danger');
+            return;
+        }
+
+        $estudiante = Estudiante::where('school_id', $school->id)->find($id);
         if (! $estudiante) {
             Flux::toast(heading: 'Error', text: 'Estudiante no encontrado.', variant: 'danger');
             return;
@@ -193,6 +248,8 @@ new #[Title('Registro de Atrasos')] class extends Component {
                 variant: 'warning'
             );
             $this->search = '';
+            $this->modalConfirmarIngreso = false;
+            $this->estudianteAIngresarId = null;
             return;
         }
 
@@ -223,6 +280,8 @@ new #[Title('Registro de Atrasos')] class extends Component {
         ]);
 
         $this->search = '';
+        $this->modalConfirmarIngreso = false;
+        $this->estudianteAIngresarId = null;
 
         // Contar atrasos en el mes
         $totalMes = $estudiante->atrasosMesActualCount();
@@ -456,7 +515,7 @@ new #[Title('Registro de Atrasos')] class extends Component {
                             @endphp
                             <button 
                                 type="button" 
-                                wire:click="registrarAtraso({{ $res->id }})"
+                                wire:click="solicitarConfirmacionIngreso({{ $res->id }})"
                                 @class([
                                     'w-full text-left p-2.5 rounded-xl border transition-all flex items-center justify-between gap-2 group',
                                     'bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-800/60' => $yaRegistrado,
@@ -609,7 +668,7 @@ new #[Title('Registro de Atrasos')] class extends Component {
                     @endphp
                     <button 
                         type="button" 
-                        wire:click="registrarAtraso({{ $est->id }})"
+                        wire:click="solicitarConfirmacionIngreso({{ $est->id }})"
                         @class([
                             'p-3 rounded-xl border text-left transition-all flex items-center justify-between gap-2 group',
                             'bg-emerald-50/80 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800 shadow-inner' => $yaRegistrado,
@@ -823,6 +882,66 @@ new #[Title('Registro de Atrasos')] class extends Component {
                 </flux:button>
                 <flux:button variant="danger" wire:click="eliminarAtraso">
                     Sí, Anular Atraso
+                </flux:button>
+            </div>
+        </div>
+    </flux:modal>
+
+    {{-- Modal Estético de Confirmación Antes de Registrar Atraso --}}
+    <flux:modal wire:model="modalConfirmarIngreso" class="md:w-[420px]">
+        <div class="space-y-5">
+            <div class="flex items-start gap-3.5">
+                <div class="size-12 rounded-2xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 shadow-inner">
+                    <flux:icon.clock class="size-6" />
+                </div>
+                <div>
+                    <flux:heading size="lg" class="text-zinc-900 dark:text-zinc-100 font-black tracking-tight">
+                        Confirmar Ingreso de Atraso
+                    </flux:heading>
+                    <flux:subheading class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                        Verifica los datos del alumno antes de registrar su llegada.
+                    </flux:subheading>
+                </div>
+            </div>
+
+            {{-- Ficha resumida del estudiante y hora --}}
+            <div class="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/80 space-y-2.5">
+                <div>
+                    <span class="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">Estudiante</span>
+                    <span class="text-sm font-black text-zinc-900 dark:text-zinc-100 leading-snug">
+                        {{ $estudianteAIngresarNombre }}
+                    </span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-200/70 dark:border-zinc-700/60 text-xs">
+                    <div>
+                        <span class="block text-[10px] font-bold uppercase text-zinc-400">Curso</span>
+                        <span class="font-bold text-blue-600 dark:text-blue-400">{{ $estudianteAIngresarCurso }}</span>
+                    </div>
+                    @if($estudianteAIngresarRut)
+                        <div>
+                            <span class="block text-[10px] font-bold uppercase text-zinc-400">RUT</span>
+                            <span class="font-mono font-semibold text-zinc-700 dark:text-zinc-300">{{ $estudianteAIngresarRut }}</span>
+                        </div>
+                    @endif
+                </div>
+
+                <div class="pt-2 border-t border-zinc-200/70 dark:border-zinc-700/60 flex items-center justify-between">
+                    <span class="text-xs font-bold text-zinc-600 dark:text-zinc-400">Hora de llegada estimada:</span>
+                    <span class="inline-flex items-center gap-1.5 font-mono text-sm font-black text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1 rounded-lg border border-blue-200 dark:border-blue-900">
+                        <flux:icon.clock class="size-3.5" />
+                        {{ $horaLlegadaConfirmacion }} hrs
+                    </span>
+                </div>
+            </div>
+
+            {{-- Botones Aceptar o Cancelar --}}
+            <div class="flex justify-end gap-2.5 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                <flux:button variant="ghost" wire:click="$set('modalConfirmarIngreso', false)">
+                    Cancelar
+                </flux:button>
+                <flux:button variant="primary" wire:click="registrarAtraso">
+                    Aceptar y Registrar
                 </flux:button>
             </div>
         </div>

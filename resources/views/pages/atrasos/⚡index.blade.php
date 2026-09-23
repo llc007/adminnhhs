@@ -27,6 +27,33 @@ new #[Title('Registro de Atrasos')] class extends Component {
     public ?int $atrasoAEliminarId = null;
     public string $estudianteAEliminarNombre = '';
 
+    // Manejo de jornada (auto, manana, tarde)
+    public string $jornadaManual = '';
+    public string $filtroFeedJornada = 'todas'; // 'todas', 'manana', 'tarde'
+
+    public function setJornada(string $jornada): void
+    {
+        $this->jornadaManual = in_array($jornada, ['manana', 'tarde']) ? $jornada : '';
+    }
+
+    #[Computed]
+    public function jornadaActiva(): string
+    {
+        if (! empty($this->jornadaManual)) {
+            return $this->jornadaManual;
+        }
+
+        $horaActual = now('America/Santiago')->format('H:i');
+
+        return $horaActual >= '13:30' ? 'tarde' : 'manana';
+    }
+
+    #[Computed]
+    public function horaEntradaEsperada(): string
+    {
+        return $this->jornadaActiva === 'tarde' ? '13:30' : '08:00';
+    }
+
     public function mount(): void
     {
         if (! auth()->user()->hasRole('superadmin') && ! auth()->user()->can('ingresar-atrasos')) {
@@ -97,6 +124,7 @@ new #[Title('Registro de Atrasos')] class extends Component {
         ])
             ->where('school_id', $this->school->id)
             ->whereDate('fecha', $this->fecha)
+            ->when($this->filtroFeedJornada !== 'todas', fn ($q) => $q->where('jornada', $this->filtroFeedJornada))
             ->orderBy('hora', 'desc')
             ->orderBy('id', 'desc')
             ->get();
@@ -105,7 +133,14 @@ new #[Title('Registro de Atrasos')] class extends Component {
     #[Computed]
     public function idsEstudiantesAtrasadosHoy(): array
     {
-        return $this->atrasosHoy->pluck('estudiante_id')->toArray();
+        if (! $this->school) {
+            return [];
+        }
+
+        return Atraso::where('school_id', $this->school->id)
+            ->whereDate('fecha', $this->fecha)
+            ->pluck('estudiante_id')
+            ->toArray();
     }
 
     #[Computed]
@@ -149,16 +184,28 @@ new #[Title('Registro de Atrasos')] class extends Component {
     }
 
     #[Computed]
-    public function metricas()
+    public function metricas(): array
     {
-        $total = $this->atrasosHoy->count();
-        $justificados = $this->atrasosHoy->where('estado', 'justificado')->count();
-        $injustificados = $this->atrasosHoy->where('estado', 'injustificado')->count();
+        if (! $this->school) {
+            return [
+                'total' => 0,
+                'manana' => 0,
+                'tarde' => 0,
+                'justificados' => 0,
+                'injustificados' => 0,
+            ];
+        }
+
+        $todos = Atraso::where('school_id', $this->school->id)
+            ->whereDate('fecha', $this->fecha)
+            ->get(['estado', 'jornada']);
 
         return [
-            'total' => $total,
-            'justificados' => $justificados,
-            'injustificados' => $injustificados,
+            'total' => $todos->count(),
+            'manana' => $todos->where('jornada', 'manana')->count(),
+            'tarde' => $todos->where('jornada', 'tarde')->count(),
+            'justificados' => $todos->where('estado', 'justificado')->count(),
+            'injustificados' => $todos->where('estado', 'injustificado')->count(),
         ];
     }
 
@@ -248,10 +295,12 @@ new #[Title('Registro de Atrasos')] class extends Component {
             return;
         }
 
-        // Calcular hora y minutos de atraso (referencia 08:00 hrs)
+        // Calcular hora y minutos de atraso según jornada activa (08:00 o 13:30)
         $now = now('America/Santiago');
         $horaActual = $now->format('H:i:s');
-        $horaLimite = Carbon::parse($this->fecha . ' 08:00:00', 'America/Santiago');
+        $jornada = $this->jornadaActiva;
+        $horaOficial = $jornada === 'tarde' ? '13:30:00' : '08:00:00';
+        $horaLimite = Carbon::parse($this->fecha . ' ' . $horaOficial, 'America/Santiago');
         $momentoIngreso = Carbon::parse($this->fecha . ' ' . $horaActual, 'America/Santiago');
 
         $minutosAtraso = 0;
@@ -267,6 +316,7 @@ new #[Title('Registro de Atrasos')] class extends Component {
             'registrado_por_user_id' => auth()->id(),
             'fecha' => $this->fecha,
             'hora' => $horaActual,
+            'jornada' => $jornada,
             'minutos_atraso' => $minutosAtraso,
             'estado' => 'injustificado',
             'motivo' => null,
@@ -515,7 +565,7 @@ new #[Title('Registro de Atrasos')] class extends Component {
                 @endif
             </div>
 
-            {{-- Derecha: Fecha + Jornada + Tarjetas de Métricas Reducidas --}}
+            {{-- Derecha: Fecha + Selector de Jornada + Métricas --}}
             <div class="flex flex-wrap items-center gap-2">
                 {{-- Selector de Fecha --}}
                 <div class="flex items-center gap-1.5 bg-zinc-50 dark:bg-zinc-800/80 px-2 py-1 rounded-lg border border-zinc-200 dark:border-zinc-700">
@@ -523,11 +573,37 @@ new #[Title('Registro de Atrasos')] class extends Component {
                     <input type="date" wire:model.live="fecha" class="bg-transparent text-xs font-semibold text-zinc-800 dark:text-zinc-200 border-none focus:outline-none focus:ring-0 p-0 cursor-pointer" />
                 </div>
 
-                @if($fecha === now('America/Santiago')->format('Y-m-d'))
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                        Jornada de Hoy
-                    </span>
-                @else
+                {{-- Selector de Jornada (Mañana / Tarde) --}}
+                <div class="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                    <button 
+                        type="button" 
+                        wire:click="setJornada('manana')"
+                        @class([
+                            'px-2 py-1 text-[11px] font-bold rounded-md transition-all flex items-center gap-1 cursor-pointer',
+                            'bg-[#00376e] text-white shadow-xs' => $this->jornadaActiva === 'manana',
+                            'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200' => $this->jornadaActiva !== 'manana',
+                        ])
+                        title="Jornada de la Mañana (Entrada oficial: 08:00 hrs)"
+                    >
+                        <span>☀️ Mañana</span>
+                        <span class="text-[9px] opacity-75 font-mono">08:00</span>
+                    </button>
+                    <button 
+                        type="button" 
+                        wire:click="setJornada('tarde')"
+                        @class([
+                            'px-2 py-1 text-[11px] font-bold rounded-md transition-all flex items-center gap-1 cursor-pointer',
+                            'bg-[#00376e] text-white shadow-xs' => $this->jornadaActiva === 'tarde',
+                            'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200' => $this->jornadaActiva !== 'tarde',
+                        ])
+                        title="Jornada de la Tarde (Entrada oficial: 13:30 hrs)"
+                    >
+                        <span>🌙 Tarde</span>
+                        <span class="text-[9px] opacity-75 font-mono">13:30</span>
+                    </button>
+                </div>
+
+                @if($fecha !== now('America/Santiago')->format('Y-m-d'))
                     <button 
                         type="button" 
                         wire:click="$set('fecha', '{{ now('America/Santiago')->format('Y-m-d') }}')" 
@@ -537,17 +613,20 @@ new #[Title('Registro de Atrasos')] class extends Component {
                     </button>
                 @endif
 
-                {{-- Métricas Compactas --}}
+                {{-- Métricas Compactas con desglose --}}
                 <div class="flex items-center gap-1.5">
-                    <div class="px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-center min-w-[55px]">
+                    <div class="px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-center min-w-[65px]" title="Total hoy: {{ $this->metricas['total'] }} (Mañana: {{ $this->metricas['manana'] }} | Tarde: {{ $this->metricas['tarde'] }})">
                         <span class="text-[9px] uppercase font-bold text-zinc-500 block leading-tight">Total</span>
-                        <span class="text-xs font-black text-zinc-900 dark:text-zinc-100 leading-tight">{{ $this->metricas['total'] }}</span>
+                        <span class="text-xs font-black text-zinc-900 dark:text-zinc-100 leading-tight">
+                            {{ $this->metricas['total'] }}
+                            <span class="text-[9px] font-medium text-zinc-400">({{ $this->metricas['manana'] }}m/{{ $this->metricas['tarde'] }}t)</span>
+                        </span>
                     </div>
-                    <div class="px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-center min-w-[55px]">
+                    <div class="px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-center min-w-[50px]">
                         <span class="text-[9px] uppercase font-bold text-rose-600 dark:text-rose-400 block leading-tight">Injust.</span>
                         <span class="text-xs font-black text-rose-700 dark:text-rose-300 leading-tight">{{ $this->metricas['injustificados'] }}</span>
                     </div>
-                    <div class="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50 text-center min-w-[55px]">
+                    <div class="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50 text-center min-w-[50px]">
                         <span class="text-[9px] uppercase font-bold text-emerald-600 dark:text-emerald-400 block leading-tight">Justif.</span>
                         <span class="text-xs font-black text-emerald-700 dark:text-emerald-300 leading-tight">{{ $this->metricas['justificados'] }}</span>
                     </div>
@@ -748,16 +827,25 @@ new #[Title('Registro de Atrasos')] class extends Component {
 
     {{-- SECCIÓN INFERIOR: INGRESOS DE HOY (Debajo del cuadro de cursos) --}}
     <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3.5 sm:p-4 shadow-xs space-y-3">
-        <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-2.5">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-100 dark:border-zinc-800 pb-2.5">
             <div>
                 <h2 class="text-sm font-black text-zinc-900 dark:text-zinc-100 tracking-tight">
                     Ingresos Registrados Hoy ({{ $this->atrasosHoy->count() }})
                 </h2>
                 <p class="text-[11px] text-zinc-500">Ordenados cronológicamente desde la llegada más reciente</p>
             </div>
-            <span class="text-xs font-mono font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-md">
-                {{ \Carbon\Carbon::parse($fecha)->format('d/m/Y') }}
-            </span>
+            <div class="flex items-center gap-2">
+                {{-- Filtro de Jornada para el feed --}}
+                <div class="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-[10px]">
+                    <button type="button" wire:click="$set('filtroFeedJornada', 'todas')" class="px-2 py-0.5 rounded font-bold cursor-pointer {{ $filtroFeedJornada === 'todas' ? 'bg-[#00376e] text-white shadow-xs' : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400' }}">Todas</button>
+                    <button type="button" wire:click="$set('filtroFeedJornada', 'manana')" class="px-2 py-0.5 rounded font-bold cursor-pointer {{ $filtroFeedJornada === 'manana' ? 'bg-[#00376e] text-white shadow-xs' : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400' }}">☀️ Mañana</button>
+                    <button type="button" wire:click="$set('filtroFeedJornada', 'tarde')" class="px-2 py-0.5 rounded font-bold cursor-pointer {{ $filtroFeedJornada === 'tarde' ? 'bg-[#00376e] text-white shadow-xs' : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400' }}">🌙 Tarde</button>
+                </div>
+
+                <span class="text-xs font-mono font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-md">
+                    {{ \Carbon\Carbon::parse($fecha)->format('d/m/Y') }}
+                </span>
+            </div>
         </div>
 
         {{-- Grilla de Ingresos de Hoy Compacta --}}
@@ -780,6 +868,9 @@ new #[Title('Registro de Atrasos')] class extends Component {
                                 <span>•</span>
                                 <span class="font-mono font-bold text-blue-600 dark:text-blue-400">
                                     {{ \Carbon\Carbon::parse($atraso->hora)->format('H:i') }} hrs
+                                </span>
+                                <span class="inline-flex items-center px-1 rounded text-[8.5px] font-bold {{ $atraso->isTarde() ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300' : 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300' }}">
+                                    {{ $atraso->isTarde() ? '🌙 Tarde' : '☀️ Mañana' }}
                                 </span>
                                 @if($atraso->minutos_atraso > 0)
                                     <span class="text-rose-600 dark:text-rose-400 font-semibold">(+{{ $atraso->minutos_atraso }}m)</span>

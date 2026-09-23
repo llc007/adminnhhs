@@ -3,6 +3,7 @@
 use App\Models\Atraso;
 use App\Models\Estudiante;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
@@ -547,4 +548,96 @@ test('historial can sort table by monthly late arrivals count', function () {
     $atrasosAsc = $component->viewData('atrasos');
     expect($atrasosAsc->first()->estudiante_id)->toBe($estudiante1->id)
         ->and($atrasosAsc->first()->atrasos_mes_count)->toBe(1);
+});
+
+test('can register afternoon shift atraso and calculates minutes against 13:30', function () {
+    [$user, $schoolId, $cursoId, $estudiante] = setupAtrasosEnvironment('inspector');
+
+    Carbon::setTestNow(Carbon::parse('2026-09-23 13:45:00', 'America/Santiago'));
+
+    $this->actingAs($user);
+
+    $component = Livewire::test('pages::atrasos.index');
+
+    // Auto-detection sets jornadaActiva to 'tarde' because current time >= 13:30
+    expect($component->get('jornadaActiva'))->toBe('tarde');
+
+    // Also verify manual toggle works
+    $component->call('setJornada', 'tarde')
+        ->assertSet('jornadaManual', 'tarde');
+
+    // Register atraso at 13:45 (15 minutes after 13:30)
+    $component->call('registrarAtraso', $estudiante->id);
+
+    $atraso = Atraso::where('estudiante_id', $estudiante->id)->first();
+    expect($atraso)->not->toBeNull()
+        ->and($atraso->jornada)->toBe('tarde')
+        ->and($atraso->minutos_atraso)->toBe(15)
+        ->and($atraso->horaEntradaEsperada())->toBe('13:30');
+
+    Carbon::setTestNow(); // Reset test now
+});
+
+test('can filter historial by jornada', function () {
+    [$user, $schoolId, $cursoId, $estudiante1] = setupAtrasosEnvironment('inspector');
+
+    $estudiante2 = Estudiante::create([
+        'school_id' => $schoolId,
+        'curso_id' => $cursoId,
+        'nombres_csv' => 'MARIA LOPEZ PEREZ',
+        'rut_numero' => '22555666',
+        'rut_dv' => '9',
+        'estado' => 'activo',
+    ]);
+
+    $today = now('America/Santiago')->toDateString();
+
+    $atrasoManana = Atraso::create([
+        'school_id' => $schoolId,
+        'estudiante_id' => $estudiante1->id,
+        'curso_id' => $cursoId,
+        'registrado_por_user_id' => $user->id,
+        'fecha' => $today,
+        'hora' => '08:15:00',
+        'minutos_atraso' => 15,
+        'jornada' => 'manana',
+        'estado' => 'injustificado',
+    ]);
+
+    $atrasoTarde = Atraso::create([
+        'school_id' => $schoolId,
+        'estudiante_id' => $estudiante2->id,
+        'curso_id' => $cursoId,
+        'registrado_por_user_id' => $user->id,
+        'fecha' => $today,
+        'hora' => '13:40:00',
+        'minutos_atraso' => 10,
+        'jornada' => 'tarde',
+        'estado' => 'injustificado',
+    ]);
+
+    $this->actingAs($user);
+
+    // Filter by 'tarde'
+    $componentTarde = Livewire::test('pages::atrasos.historial')
+        ->set('jornada', 'tarde');
+
+    $recordsTarde = $componentTarde->viewData('atrasos');
+    expect($recordsTarde->total())->toBe(1)
+        ->and($recordsTarde->first()->id)->toBe($atrasoTarde->id);
+
+    // Filter by 'manana'
+    $componentManana = Livewire::test('pages::atrasos.historial')
+        ->set('jornada', 'manana');
+
+    $recordsManana = $componentManana->viewData('atrasos');
+    expect($recordsManana->total())->toBe(1)
+        ->and($recordsManana->first()->id)->toBe($atrasoManana->id);
+
+    // Clear filter
+    $componentAll = Livewire::test('pages::atrasos.historial')
+        ->set('jornada', '');
+
+    $recordsAll = $componentAll->viewData('atrasos');
+    expect($recordsAll->total())->toBe(2);
 });

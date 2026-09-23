@@ -123,6 +123,10 @@
             <span class="value">{{ \Carbon\Carbon::parse($atraso->fecha)->format('d/m/Y') }}</span>
         </div>
         <div class="row">
+            <span class="label">Jornada:</span>
+            <span class="value">{{ $atraso->jornadaLabel() }} (Entrada {{ $atraso->horaEntradaEsperada() }})</span>
+        </div>
+        <div class="row">
             <span class="label">Hora de Llegada:</span>
             <span class="value">{{ \Carbon\Carbon::parse($atraso->hora)->format('H:i') }} hrs</span>
         </div>

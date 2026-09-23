@@ -31,6 +31,9 @@ new #[Title('Historial de Atrasos')] class extends Component {
     public string $estado = ''; // '', 'injustificado', 'justificado', 'pendiente'
 
     #[Url]
+    public string $jornada = ''; // '', 'manana', 'tarde'
+
+    #[Url]
     public string $filtroAtrasosMes = ''; // '', '1', '2', '3', '3+', '4+'
 
     #[Url]
@@ -110,7 +113,7 @@ new #[Title('Historial de Atrasos')] class extends Component {
 
     public function updating($field): void
     {
-        if (in_array($field, ['search', 'curso_id', 'fecha', 'filtroTemporal', 'estado', 'filtroAtrasosMes', 'sortBy', 'sortDirection'])) {
+        if (in_array($field, ['search', 'curso_id', 'fecha', 'filtroTemporal', 'estado', 'jornada', 'filtroAtrasosMes', 'sortBy', 'sortDirection'])) {
             $this->resetPage();
         }
     }
@@ -145,7 +148,7 @@ new #[Title('Historial de Atrasos')] class extends Component {
 
     public function clearFilters(): void
     {
-        $this->reset(['search', 'curso_id', 'estado', 'filtroAtrasosMes']);
+        $this->reset(['search', 'curso_id', 'estado', 'jornada', 'filtroAtrasosMes']);
         $this->filtroTemporal = 'dia';
         $this->fecha = now('America/Santiago')->toDateString();
         $this->sortBy = 'fecha';
@@ -235,6 +238,10 @@ new #[Title('Historial de Atrasos')] class extends Component {
 
         if (! empty($this->estado)) {
             $query->where('estado', $this->estado);
+        }
+
+        if (! empty($this->jornada)) {
+            $query->where('jornada', $this->jornada);
         }
 
         if (! empty($this->filtroAtrasosMes)) {
@@ -392,7 +399,7 @@ new #[Title('Historial de Atrasos')] class extends Component {
             'Expires' => '0',
         ];
 
-        $columns = ['ID', 'Fecha', 'Hora', 'Estudiante', 'RUT', 'Curso', 'Minutos Atraso', 'Atrasos Mes', 'Estado', 'Motivo', 'Registrado Por', 'Observaciones'];
+        $columns = ['ID', 'Fecha', 'Hora', 'Jornada', 'Estudiante', 'RUT', 'Curso', 'Minutos Atraso', 'Atrasos Mes', 'Estado', 'Motivo', 'Registrado Por', 'Observaciones'];
 
         $callback = function () use ($atrasos, $columns) {
             $file = fopen('php://output', 'w');
@@ -405,6 +412,7 @@ new #[Title('Historial de Atrasos')] class extends Component {
                     $a->id,
                     $a->fecha ? Carbon::parse($a->fecha)->format('d/m/Y') : '',
                     $a->hora ? Carbon::parse($a->hora)->format('H:i') : '',
+                    $a->jornadaLabel(),
                     $a->estudiante?->nombreCompleto() ?? 'N/A',
                     $a->estudiante?->rutCompleto() ?? '',
                     $a->curso?->nombreCompleto() ?? $a->estudiante?->curso?->nombreCompleto() ?? 'N/A',
@@ -416,7 +424,6 @@ new #[Title('Historial de Atrasos')] class extends Component {
                     $a->observaciones ?? '',
                 ], ';');
             }
-
             fclose($file);
         };
 
@@ -509,15 +516,15 @@ new #[Title('Historial de Atrasos')] class extends Component {
             @endif
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-12 gap-3 items-end">
             {{-- Buscar Estudiante por nombre o RUT --}}
-            <flux:field class="lg:col-span-3">
+            <flux:field class="lg:col-span-4">
                 <flux:label class="text-[11px]">Buscar Estudiante</flux:label>
                 <flux:input size="sm" class="!text-xs" wire:model.live.debounce.300ms="search" placeholder="Nombre, apellido o RUT..." />
             </flux:field>
 
             {{-- Filtrar por Curso --}}
-            <flux:field class="lg:col-span-2">
+            <flux:field class="lg:col-span-4">
                 <flux:label class="text-[11px]">Curso</flux:label>
                 <flux:select size="sm" class="!text-xs" wire:model.live="curso_id">
                     <flux:select.option value="">Todos los cursos</flux:select.option>
@@ -528,7 +535,7 @@ new #[Title('Historial de Atrasos')] class extends Component {
             </flux:field>
 
             {{-- Filtro Temporal: Día, Semana, Mes, Todos --}}
-            <flux:field class="lg:col-span-3">
+            <flux:field class="lg:col-span-4">
                 <flux:label class="text-[11px]">
                     Periodo <span class="text-[10px] text-zinc-400 font-normal">({{ ucfirst($filtroTemporal) }})</span>
                 </flux:label>
@@ -564,8 +571,18 @@ new #[Title('Historial de Atrasos')] class extends Component {
                 </div>
             </flux:field>
 
+            {{-- Filtrar por Jornada --}}
+            <flux:field class="lg:col-span-4">
+                <flux:label class="text-[11px]">Jornada</flux:label>
+                <flux:select size="sm" class="!text-xs" wire:model.live="jornada">
+                    <flux:select.option value="">Todas las jornadas</flux:select.option>
+                    <flux:select.option value="manana">☀️ Mañana (08:00)</flux:select.option>
+                    <flux:select.option value="tarde">🌙 Tarde (13:30)</flux:select.option>
+                </flux:select>
+            </flux:field>
+
             {{-- Filtrar por Atrasos Mes --}}
-            <flux:field class="lg:col-span-2">
+            <flux:field class="lg:col-span-4">
                 <flux:label class="text-[11px]">Atrasos Mes</flux:label>
                 <flux:select size="sm" class="!text-xs" wire:model.live="filtroAtrasosMes">
                     <flux:select.option value="">Todos</flux:select.option>
@@ -578,7 +595,7 @@ new #[Title('Historial de Atrasos')] class extends Component {
             </flux:field>
 
             {{-- Filtrar por Estado --}}
-            <flux:field class="lg:col-span-2">
+            <flux:field class="lg:col-span-4">
                 <flux:label class="text-[11px]">Estado</flux:label>
                 <flux:select size="sm" class="!text-xs" wire:model.live="estado">
                     <flux:select.option value="">Todos</flux:select.option>
@@ -675,12 +692,21 @@ new #[Title('Historial de Atrasos')] class extends Component {
 
                             {{-- Fecha y Hora --}}
                             <flux:table.cell class="py-2.5">
-                                <div class="flex items-center gap-1.5 text-xs font-semibold text-zinc-900 dark:text-zinc-100">
+                                <div class="flex items-center gap-1.5 text-xs font-semibold text-zinc-900 dark:text-zinc-100 flex-wrap">
                                     <flux:icon.calendar class="size-3.5 text-zinc-400 shrink-0" />
                                     <span>{{ Carbon::parse($atraso->fecha)->format('d/m/Y') }}</span>
                                     <span class="font-mono font-bold text-blue-600 dark:text-blue-400 ml-1">
                                         {{ Carbon::parse($atraso->hora)->format('H:i') }} hrs
                                     </span>
+                                    @if($atraso->isTarde())
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800" title="Jornada Tarde (13:30)">
+                                            🌙 Tarde
+                                        </span>
+                                    @else
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800" title="Jornada Mañana (08:00)">
+                                            ☀️ Mañana
+                                        </span>
+                                    @endif
                                 </div>
                             </flux:table.cell>
 

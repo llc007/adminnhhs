@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'fecha',
     'hora',
     'minutos_atraso',
+    'jornada',
     'estado',
     'motivo',
     'observaciones',
@@ -88,5 +89,25 @@ class Atraso extends Model
         $targetDate = $fecha ?? now('America/Santiago')->format('Y-m-d');
 
         return $query->whereDate('fecha', $targetDate);
+    }
+
+    public function isManana(): bool
+    {
+        return ($this->jornada ?? 'manana') === 'manana';
+    }
+
+    public function isTarde(): bool
+    {
+        return ($this->jornada ?? '') === 'tarde';
+    }
+
+    public function jornadaLabel(): string
+    {
+        return $this->isTarde() ? 'Tarde (13:30)' : 'Mañana (08:00)';
+    }
+
+    public function horaEntradaEsperada(): string
+    {
+        return $this->isTarde() ? '13:30' : '08:00';
     }
 }

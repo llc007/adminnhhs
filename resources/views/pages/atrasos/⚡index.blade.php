@@ -27,14 +27,6 @@ new #[Title('Registro de Atrasos')] class extends Component {
     public ?int $atrasoAEliminarId = null;
     public string $estudianteAEliminarNombre = '';
 
-    // Modal estético de confirmación antes de ingresar atraso
-    public bool $modalConfirmarIngreso = false;
-    public ?int $estudianteAIngresarId = null;
-    public string $estudianteAIngresarNombre = '';
-    public string $estudianteAIngresarCurso = '';
-    public string $estudianteAIngresarRut = '';
-    public string $horaLlegadaConfirmacion = '';
-
     public function mount(): void
     {
         if (! auth()->user()->hasRole('superadmin') && ! auth()->user()->can('ingresar-atrasos')) {
@@ -92,7 +84,17 @@ new #[Title('Registro de Atrasos')] class extends Component {
             return collect();
         }
 
-        return Atraso::with(['estudiante.curso', 'curso', 'registradoPor'])
+        $now = now('America/Santiago');
+
+        return Atraso::with([
+            'estudiante' => fn ($q) => $q->withCount([
+                'atrasos as atrasos_mes_actual_count' => fn ($sq) => $sq
+                    ->whereYear('fecha', $now->year)
+                    ->whereMonth('fecha', $now->month),
+            ])->with('curso'),
+            'curso',
+            'registradoPor',
+        ])
             ->where('school_id', $this->school->id)
             ->whereDate('fecha', $this->fecha)
             ->orderBy('hora', 'desc')
@@ -139,6 +141,7 @@ new #[Title('Registro de Atrasos')] class extends Component {
         }
 
         return Estudiante::activos()
+            ->select(['id', 'school_id', 'curso_id', 'nombres_csv', 'rut_numero', 'rut_dv'])
             ->where('school_id', $this->school->id)
             ->where('curso_id', $this->selectedCursoId)
             ->orderBy('nombres_csv')
@@ -171,9 +174,11 @@ new #[Title('Registro de Atrasos')] class extends Component {
     }
 
     /**
-     * Solicitar confirmación antes de registrar atraso.
+     * Clic sobre un estudiante:
+     * - Si no está registrado hoy: se registra inmediatamente (sin modal previo).
+     * - Si ya está registrado hoy: abre confirmación para "Anular atraso".
      */
-    public function solicitarConfirmacionIngreso(int $estudianteId): void
+    public function clickEstudiante(int $estudianteId): void
     {
         $school = $this->school;
         if (! $school) {
@@ -187,38 +192,36 @@ new #[Title('Registro de Atrasos')] class extends Component {
             return;
         }
 
-        // Control previo de duplicados en el mismo día
         $yaRegistrado = Atraso::where('school_id', $school->id)
             ->where('estudiante_id', $estudiante->id)
             ->whereDate('fecha', $this->fecha)
             ->first();
 
         if ($yaRegistrado) {
-            $horaRegistrada = Carbon::parse($yaRegistrado->hora)->format('H:i');
-            Flux::toast(
-                heading: 'Estudiante ya registrado',
-                text: "{$estudiante->nombreCompleto()} ya fue ingresado hoy a las {$horaRegistrada} hrs.",
-                variant: 'warning'
-            );
-            $this->search = '';
+            $this->confirmarEliminacion($yaRegistrado->id);
             return;
         }
 
-        $this->estudianteAIngresarId = $estudiante->id;
-        $this->estudianteAIngresarNombre = $estudiante->nombreCompleto();
-        $this->estudianteAIngresarCurso = $estudiante->curso?->nombreCompleto() ?? 'Sin Curso';
-        $this->estudianteAIngresarRut = $estudiante->rutCompleto() ?? '';
-        $this->horaLlegadaConfirmacion = now('America/Santiago')->format('H:i');
-        $this->modalConfirmarIngreso = true;
+        $this->registrarAtraso($estudiante->id);
     }
 
     /**
-     * Registrar atraso de un estudiante (tras confirmar o directo).
+     * Registrar el primer resultado de búsqueda (al presionar ENTER).
+     */
+    public function registrarPrimerResultado(): void
+    {
+        $primerResultado = $this->searchResults->first();
+        if ($primerResultado) {
+            $this->clickEstudiante($primerResultado->id);
+        }
+    }
+
+    /**
+     * Registrar atraso de un estudiante de forma directa e inmediata.
      */
     public function registrarAtraso(?int $estudianteId = null): void
     {
-        $id = $estudianteId ?? $this->estudianteAIngresarId;
-        if (! $id) {
+        if (! $estudianteId) {
             return;
         }
 
@@ -228,32 +231,24 @@ new #[Title('Registro de Atrasos')] class extends Component {
             return;
         }
 
-        $estudiante = Estudiante::where('school_id', $school->id)->find($id);
+        $estudiante = Estudiante::where('school_id', $school->id)->find($estudianteId);
         if (! $estudiante) {
             Flux::toast(heading: 'Error', text: 'Estudiante no encontrado.', variant: 'danger');
             return;
         }
 
-        // 1. Control de duplicados en el mismo día
+        // Control de duplicados en el mismo día
         $yaRegistrado = Atraso::where('school_id', $school->id)
             ->where('estudiante_id', $estudiante->id)
             ->whereDate('fecha', $this->fecha)
             ->first();
 
         if ($yaRegistrado) {
-            $horaRegistrada = Carbon::parse($yaRegistrado->hora)->format('H:i');
-            Flux::toast(
-                heading: 'Estudiante ya registrado',
-                text: "{$estudiante->nombreCompleto()} ya fue ingresado hoy a las {$horaRegistrada} hrs.",
-                variant: 'warning'
-            );
-            $this->search = '';
-            $this->modalConfirmarIngreso = false;
-            $this->estudianteAIngresarId = null;
+            $this->confirmarEliminacion($yaRegistrado->id);
             return;
         }
 
-        // 2. Calcular hora y minutos de atraso (referencia 08:00 hrs)
+        // Calcular hora y minutos de atraso (referencia 08:00 hrs)
         $now = now('America/Santiago');
         $horaActual = $now->format('H:i:s');
         $horaLimite = Carbon::parse($this->fecha . ' 08:00:00', 'America/Santiago');
@@ -264,7 +259,6 @@ new #[Title('Registro de Atrasos')] class extends Component {
             $minutosAtraso = (int) $horaLimite->diffInMinutes($momentoIngreso);
         }
 
-        // 3. Crear el registro
         Atraso::create([
             'school_id' => $school->id,
             'academic_year_id' => $this->academicYear?->id,
@@ -280,22 +274,19 @@ new #[Title('Registro de Atrasos')] class extends Component {
         ]);
 
         $this->search = '';
-        $this->modalConfirmarIngreso = false;
-        $this->estudianteAIngresarId = null;
 
-        // Contar atrasos en el mes
         $totalMes = $estudiante->atrasosMesActualCount();
 
         if ($totalMes >= 3) {
             Flux::toast(
-                heading: '⚠️ ALERTA: Citación de Apoderado',
+                heading: '⚠️ Citación de Apoderado',
                 text: "{$estudiante->nombreCompleto()} acumula {$totalMes} atrasos este mes.",
                 variant: 'danger'
             );
         } else {
             Flux::toast(
                 heading: 'Atraso Registrado',
-                text: "{$estudiante->nombreCompleto()} ingresó a las " . Carbon::parse($horaActual)->format('H:i') . " hrs (Atraso #{$totalMes} del mes).",
+                text: "{$estudiante->nombreCompleto()} ingresó a las " . Carbon::parse($horaActual)->format('H:i') . " hrs (#{$totalMes} del mes).",
                 variant: 'success'
             );
         }
@@ -405,14 +396,14 @@ new #[Title('Registro de Atrasos')] class extends Component {
     }
 }; ?>
 
-<div class="space-y-6">
-    {{-- Header Estándar de la Plataforma --}}
+<div class="space-y-4">
+    {{-- Header Estándar de la Plataforma (Compacto) --}}
     <x-header 
         titulo="Control de Atrasos" 
-        subtitulo="Registro ágil de llegadas tarde, control de reincidencias e impresión de pases a sala." 
+        subtitulo="Registro ágil de llegadas tarde e impresión de pases a sala." 
         icono="clock"
     >
-        {{-- Reloj en tiempo real con Alpine.js (cero peticiones al servidor, rendimiento puro) --}}
+        {{-- Reloj en tiempo real con Alpine.js --}}
         <div 
             x-data="{
                 time: '',
@@ -422,152 +413,168 @@ new #[Title('Registro de Atrasos')] class extends Component {
                 }
             }" 
             x-init="updateTime(); setInterval(() => updateTime(), 1000)"
-            class="flex items-center gap-2.5 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/40 dark:to-indigo-950/30 px-3.5 py-1.5 rounded-xl border border-blue-200/70 dark:border-blue-800/60 shadow-sm"
+            class="flex items-center gap-2 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/40 dark:to-indigo-950/30 px-3 py-1 rounded-xl border border-blue-200/70 dark:border-blue-800/60 shadow-2xs"
         >
-            <span class="relative flex h-2.5 w-2.5">
+            <span class="relative flex h-2 w-2">
                 <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
-            <div class="flex flex-col">
-                <span class="text-[9px] uppercase font-black tracking-wider text-blue-700 dark:text-blue-300 leading-none">Hora Oficial</span>
-                <span class="font-mono text-base font-black text-zinc-900 dark:text-zinc-100 tracking-tight leading-tight" x-text="time">--:--:--</span>
+            <div class="flex items-baseline gap-1.5">
+                <span class="text-[9px] uppercase font-black tracking-wider text-blue-700 dark:text-blue-300 leading-none">Hora:</span>
+                <span class="font-mono text-sm font-black text-zinc-900 dark:text-zinc-100 tracking-tight leading-none" x-text="time">--:--:--</span>
             </div>
         </div>
     </x-header>
 
-    {{-- Barra de Control Rápido: Selector de Fecha y Tarjetas de Métricas del Día --}}
-    <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 shadow-sm">
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div class="flex items-center gap-3">
-                <div class="flex items-center gap-2 bg-zinc-50 dark:bg-zinc-800/80 px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700">
-                    <flux:icon.calendar class="size-4 text-zinc-500" />
-                    <label class="text-[11px] font-bold uppercase text-zinc-500">Fecha de Registro:</label>
-                    <input type="date" wire:model.live="fecha" class="bg-transparent text-xs font-bold text-zinc-800 dark:text-zinc-200 border-none focus:outline-none focus:ring-0 p-0 cursor-pointer" />
-                </div>
-                @if($fecha === now('America/Santiago')->format('Y-m-d'))
-                    <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                        Jornada de Hoy
-                    </span>
-                @else
-                    <button 
-                        type="button" 
-                        wire:click="$set('fecha', '{{ now('America/Santiago')->format('Y-m-d') }}')" 
-                        class="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline"
-                    >
-                        Volver a Hoy
-                    </button>
-                @endif
-            </div>
-
-            <div class="flex items-center gap-2.5">
-                <div class="px-3.5 py-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-center min-w-[75px]">
-                    <span class="block text-[10px] uppercase font-bold text-zinc-500">Total Hoy</span>
-                    <span class="text-base font-black text-zinc-900 dark:text-zinc-100">{{ $this->metricas['total'] }}</span>
-                </div>
-                <div class="px-3.5 py-1.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-center min-w-[85px]">
-                    <span class="block text-[10px] uppercase font-bold text-rose-600 dark:text-rose-400">Injustificados</span>
-                    <span class="text-base font-black text-rose-700 dark:text-rose-300">{{ $this->metricas['injustificados'] }}</span>
-                </div>
-                <div class="px-3.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50 text-center min-w-[80px]">
-                    <span class="block text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400">Justificados</span>
-                    <span class="text-base font-black text-emerald-700 dark:text-emerald-300">{{ $this->metricas['justificados'] }}</span>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    {{-- Buscador Predictivo Rápido (Fast Lane) --}}
-    <div class="bg-white dark:bg-zinc-900 border-2 border-blue-500/60 dark:border-blue-500/40 rounded-2xl p-4 shadow-md">
-        <div class="relative">
-            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-400">
-                <flux:icon.magnifying-glass class="size-5" />
-            </div>
-            <input 
-                type="text" 
-                wire:model.live.debounce.150ms="search" 
-                autofocus 
-                placeholder="Escribe apellido, nombre o RUT (o escanea con la pistola lectora)..." 
-                class="w-full pl-11 pr-24 py-3 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-medium text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-            />
-            <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                <span class="text-[10px] font-mono font-bold bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 px-2 py-0.5 rounded">
-                    ENTER ↵
-                </span>
-            </div>
-        </div>
-
-        {{-- Resultados de Búsqueda Predictiva --}}
-        @if(mb_strlen(trim($search)) >= 2)
-            <div class="mt-3 border-t border-zinc-100 dark:border-zinc-800 pt-3">
-                <div class="text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-2">
-                    Resultados de Búsqueda ({{ $this->searchResults->count() }})
-                </div>
-
-                @if($this->searchResults->isEmpty())
-                    <div class="p-4 text-center text-xs text-zinc-500 bg-zinc-50 dark:bg-zinc-800/40 rounded-xl">
-                        No se encontraron estudiantes activos con "<span class="font-semibold">{{ $search }}</span>".
+    {{-- BARRA UNIFICADA: Buscador Rápido (Izquierda) + Información y Métricas (Derecha) --}}
+    <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2.5 sm:p-3 shadow-xs">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            
+            {{-- Izquierda: Buscador Rápido Más Pequeño --}}
+            <div class="relative w-full lg:w-80 xl:w-96">
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-zinc-400">
+                        <flux:icon.magnifying-glass class="size-4" />
                     </div>
-                @else
-                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 max-h-80 overflow-y-auto pr-1">
-                        @foreach($this->searchResults as $res)
+                    <input 
+                        type="text" 
+                        wire:model.live.debounce.150ms="search" 
+                        wire:keydown.enter="registrarPrimerResultado"
+                        autofocus 
+                        placeholder="Buscar alumno o RUT (o pistola)..." 
+                        class="w-full pl-8 pr-14 py-1.5 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-medium text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all shadow-2xs"
+                    />
+                    <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
+                        <span class="text-[9px] font-mono font-bold bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 px-1.5 py-0.5 rounded">
+                            ↵
+                        </span>
+                    </div>
+                </div>
+
+                {{-- Menú flotante de resultados predictivos --}}
+                @if(mb_strlen(trim($search)) >= 2)
+                    <div class="absolute left-0 top-full mt-1.5 w-full sm:w-[440px] z-30 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-xl p-2 max-h-80 overflow-y-auto space-y-1">
+                        <div class="flex items-center justify-between px-1.5 py-1 text-[10px] font-bold uppercase text-zinc-400 border-b border-zinc-100 dark:border-zinc-800">
+                            <span>Resultados ({{ $this->searchResults->count() }})</span>
+                            <span class="text-[9px] text-zinc-400 lowercase">ENTER para el primero</span>
+                        </div>
+
+                        @forelse($this->searchResults as $res)
                             @php
                                 $yaRegistrado = in_array($res->id, $this->idsEstudiantesAtrasadosHoy);
+                                $atrasoRegistrado = $yaRegistrado ? $this->atrasosHoy->firstWhere('estudiante_id', $res->id) : null;
                             @endphp
-                            <button 
-                                type="button" 
-                                wire:click="solicitarConfirmacionIngreso({{ $res->id }})"
+                            <div 
+                                wire:click="clickEstudiante({{ $res->id }})"
                                 @class([
-                                    'w-full text-left p-2.5 rounded-xl border transition-all flex items-center justify-between gap-2 group',
-                                    'bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-800/60' => $yaRegistrado,
-                                    'bg-zinc-50 hover:bg-blue-50/80 dark:bg-zinc-800/60 dark:hover:bg-blue-950/40 border-zinc-200 dark:border-zinc-700 hover:border-blue-300' => ! $yaRegistrado,
+                                    'w-full text-left p-2 rounded-lg border transition-all flex items-center justify-between gap-2 cursor-pointer select-none',
+                                    'bg-emerald-50/90 dark:bg-emerald-950/40 border-2 border-emerald-500 text-emerald-950 dark:text-emerald-100 shadow-2xs' => $yaRegistrado,
+                                    'bg-zinc-50 hover:bg-blue-50/80 dark:bg-zinc-800/60 dark:hover:bg-blue-950/40 border-zinc-200 dark:border-zinc-700 hover:border-blue-400' => ! $yaRegistrado,
                                 ])
+                                title="{{ $yaRegistrado ? 'Haga clic para anular atraso' : 'Haga clic para registrar atraso' }}"
                             >
                                 <div class="min-w-0 flex-1">
-                                    <div class="font-bold text-xs text-zinc-900 dark:text-zinc-100 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                                    <div class="font-bold text-[11px] leading-tight line-clamp-2 break-words" title="{{ $res->nombreCompleto() }}">
                                         {{ $res->nombreCompleto() }}
                                     </div>
-                                    <div class="flex items-center gap-1.5 mt-0.5 text-[11px] text-zinc-500">
+                                    <div class="flex items-center gap-1.5 text-[9.5px] text-zinc-500">
                                         <span class="font-semibold text-blue-600 dark:text-blue-400">{{ $res->curso?->nombreAbreviado() ?? 'S/C' }}</span>
                                         <span>•</span>
                                         <span>{{ $res->rutCompleto() ?? 'Sin RUT' }}</span>
                                     </div>
                                 </div>
 
-                                @if($yaRegistrado)
-                                    <span class="shrink-0 size-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs">
-                                        ✓
-                                    </span>
+                                @if($yaRegistrado && $atrasoRegistrado)
+                                    <div class="flex items-center gap-1 shrink-0">
+                                        <a 
+                                            href="{{ route('atrasos.ticket', $atrasoRegistrado->id) }}" 
+                                            target="_blank" 
+                                            @click.stop 
+                                            class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-600 shadow-2xs hover:bg-zinc-100"
+                                            title="Imprimir Pase Térmico"
+                                        >
+                                            <flux:icon.printer class="size-3 text-zinc-500" />
+                                            <span>Pase</span>
+                                        </a>
+                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-600 text-white" title="Clic para anular">
+                                            ✓ Llegó {{ \Carbon\Carbon::parse($atrasoRegistrado->hora)->format('H:i') }}
+                                        </span>
+                                    </div>
                                 @else
-                                    <span class="shrink-0 text-[10px] font-bold px-2 py-1 rounded-lg bg-blue-600 text-white opacity-90 group-hover:opacity-100 transition-opacity">
+                                    <span class="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded bg-blue-600 text-white hover:bg-blue-700">
                                         Registrar +
                                     </span>
                                 @endif
-                            </button>
-                        @endforeach
+                            </div>
+                        @empty
+                            <div class="p-3 text-center text-xs text-zinc-400">
+                                No se encontraron estudiantes con "{{ $search }}".
+                            </div>
+                        @endforelse
                     </div>
                 @endif
             </div>
-        @endif
+
+            {{-- Derecha: Fecha + Jornada + Tarjetas de Métricas Reducidas --}}
+            <div class="flex flex-wrap items-center gap-2">
+                {{-- Selector de Fecha --}}
+                <div class="flex items-center gap-1.5 bg-zinc-50 dark:bg-zinc-800/80 px-2 py-1 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                    <flux:icon.calendar class="size-3.5 text-zinc-400" />
+                    <input type="date" wire:model.live="fecha" class="bg-transparent text-xs font-semibold text-zinc-800 dark:text-zinc-200 border-none focus:outline-none focus:ring-0 p-0 cursor-pointer" />
+                </div>
+
+                @if($fecha === now('America/Santiago')->format('Y-m-d'))
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                        Jornada de Hoy
+                    </span>
+                @else
+                    <button 
+                        type="button" 
+                        wire:click="$set('fecha', '{{ now('America/Santiago')->format('Y-m-d') }}')" 
+                        class="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline px-1"
+                    >
+                        Volver a Hoy
+                    </button>
+                @endif
+
+                {{-- Métricas Compactas --}}
+                <div class="flex items-center gap-1.5">
+                    <div class="px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-center min-w-[55px]">
+                        <span class="text-[9px] uppercase font-bold text-zinc-500 block leading-tight">Total</span>
+                        <span class="text-xs font-black text-zinc-900 dark:text-zinc-100 leading-tight">{{ $this->metricas['total'] }}</span>
+                    </div>
+                    <div class="px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-center min-w-[55px]">
+                        <span class="text-[9px] uppercase font-bold text-rose-600 dark:text-rose-400 block leading-tight">Injust.</span>
+                        <span class="text-xs font-black text-rose-700 dark:text-rose-300 leading-tight">{{ $this->metricas['injustificados'] }}</span>
+                    </div>
+                    <div class="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50 text-center min-w-[55px]">
+                        <span class="text-[9px] uppercase font-bold text-emerald-600 dark:text-emerald-400 block leading-tight">Justif.</span>
+                        <span class="text-xs font-black text-emerald-700 dark:text-emerald-300 leading-tight">{{ $this->metricas['justificados'] }}</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
     </div>
 
     {{-- SECCIÓN INTERCAMBIABLE: Botonera de Cursos O Lista de Estudiantes del Curso --}}
-    <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm space-y-4">
+    <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3.5 sm:p-4 shadow-xs space-y-3">
         @if(! $selectedCursoId)
             {{-- VISTA 1: BOTONERA DE CURSOS --}}
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-100 dark:border-zinc-800 pb-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-zinc-100 dark:border-zinc-800 pb-2.5">
                 <div>
-                    <h2 class="text-base font-black text-zinc-900 dark:text-zinc-100 tracking-tight">Botonera por Cursos</h2>
-                    <p class="text-xs text-zinc-500">Selecciona el curso para ver sus estudiantes</p>
+                    <h2 class="text-sm font-black text-zinc-900 dark:text-zinc-100 tracking-tight">Botonera por Cursos</h2>
+                    <p class="text-[11px] text-zinc-500">Selecciona el curso para registrar atrasos</p>
                 </div>
 
-                {{-- Botones para escoger Básica - Media - Todos --}}
-                <div class="inline-flex p-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700">
+                {{-- Botones Básica - Media - Todos (Reducidos) --}}
+                <div class="inline-flex p-0.5 bg-zinc-100 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
                     <button 
                         type="button" 
                         wire:click="setFiltroCiclo('basica')" 
                         @class([
-                            'px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all',
-                            'bg-white dark:bg-zinc-700 text-blue-700 dark:text-blue-300 shadow-sm' => $filtroCiclo === 'basica',
+                            'px-2.5 py-1 text-[11px] font-bold rounded-md transition-all',
+                            'bg-white dark:bg-zinc-700 text-blue-700 dark:text-blue-300 shadow-2xs' => $filtroCiclo === 'basica',
                             'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200' => $filtroCiclo !== 'basica',
                         ])
                     >
@@ -577,8 +584,8 @@ new #[Title('Registro de Atrasos')] class extends Component {
                         type="button" 
                         wire:click="setFiltroCiclo('media')" 
                         @class([
-                            'px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all',
-                            'bg-white dark:bg-zinc-700 text-blue-700 dark:text-blue-300 shadow-sm' => $filtroCiclo === 'media',
+                            'px-2.5 py-1 text-[11px] font-bold rounded-md transition-all',
+                            'bg-white dark:bg-zinc-700 text-blue-700 dark:text-blue-300 shadow-2xs' => $filtroCiclo === 'media',
                             'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200' => $filtroCiclo !== 'media',
                         ])
                     >
@@ -588,8 +595,8 @@ new #[Title('Registro de Atrasos')] class extends Component {
                         type="button" 
                         wire:click="setFiltroCiclo('todos')" 
                         @class([
-                            'px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all',
-                            'bg-white dark:bg-zinc-700 text-blue-700 dark:text-blue-300 shadow-sm' => $filtroCiclo === 'todos',
+                            'px-2.5 py-1 text-[11px] font-bold rounded-md transition-all',
+                            'bg-white dark:bg-zinc-700 text-blue-700 dark:text-blue-300 shadow-2xs' => $filtroCiclo === 'todos',
                             'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200' => $filtroCiclo !== 'todos',
                         ])
                     >
@@ -598,8 +605,8 @@ new #[Title('Registro de Atrasos')] class extends Component {
                 </div>
             </div>
 
-            {{-- Grilla de Cursos con fuente más grande y sin segunda línea redundante --}}
-            <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2.5">
+            {{-- Grilla de Cursos Compacta --}}
+            <div class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2">
                 @forelse($this->cursos as $curso)
                     @php
                         $atrasadosCursoCount = $this->atrasosHoy->where('curso_id', $curso->id)->count();
@@ -607,45 +614,63 @@ new #[Title('Registro de Atrasos')] class extends Component {
                     <button 
                         type="button" 
                         wire:click="selectCurso({{ $curso->id }})"
-                        class="relative p-3.5 rounded-xl border text-center transition-all flex items-center justify-center bg-zinc-50 hover:bg-blue-50/80 dark:bg-zinc-800/80 dark:hover:bg-blue-950/40 border-zinc-200 dark:border-zinc-700 hover:border-blue-400 group shadow-sm hover:shadow"
+                        wire:loading.class="opacity-60 pointer-events-none"
+                        wire:target="selectCurso({{ $curso->id }})"
+                        class="relative p-2.5 rounded-lg border text-center transition-all flex items-center justify-center bg-zinc-50 hover:bg-blue-50/80 dark:bg-zinc-800/80 dark:hover:bg-blue-950/40 border-zinc-200 dark:border-zinc-700 hover:border-blue-400 group shadow-2xs hover:shadow-xs"
                     >
-                        <span class="text-base font-black tracking-tight text-zinc-900 dark:text-zinc-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                        <span 
+                            wire:loading.remove 
+                            wire:target="selectCurso({{ $curso->id }})"
+                            class="text-sm font-black tracking-tight text-zinc-900 dark:text-zinc-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors"
+                        >
                             {{ $curso->nombreAbreviado() }}
                         </span>
 
+                        <span 
+                            wire:loading 
+                            wire:target="selectCurso({{ $curso->id }})"
+                            class="text-xs font-bold text-blue-600 dark:text-blue-400 flex items-center justify-center"
+                        >
+                            <flux:icon.arrow-path class="size-3.5 animate-spin" />
+                        </span>
+
                         @if($atrasadosCursoCount > 0)
-                            <span class="absolute -top-1.5 -right-1.5 size-5 rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center shadow">
+                            <span 
+                                wire:loading.remove 
+                                wire:target="selectCurso({{ $curso->id }})"
+                                class="absolute -top-1 -right-1 size-4 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center shadow-xs"
+                            >
                                 {{ $atrasadosCursoCount }}
                             </span>
                         @endif
                     </button>
                 @empty
-                    <div class="col-span-full text-center py-8 text-xs text-zinc-500">
+                    <div class="col-span-full text-center py-6 text-xs text-zinc-400">
                         No hay cursos disponibles para el ciclo seleccionado.
                     </div>
                 @endforelse
             </div>
         @else
-            {{-- VISTA 2: LISTA DE ESTUDIANTES DEL CURSO SELECCIONADO (Reemplaza la botonera) --}}
+            {{-- VISTA 2: LISTA DE ESTUDIANTES DEL CURSO SELECCIONADO --}}
             @php
                 $cursoActivo = Curso::find($selectedCursoId);
             @endphp
-            <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
-                <div class="flex items-center gap-3">
+            <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-2.5">
+                <div class="flex items-center gap-2.5">
                     <button 
                         type="button" 
                         wire:click="$set('selectedCursoId', null)" 
-                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-bold transition-colors"
+                        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-bold transition-colors"
                     >
-                        <flux:icon.arrow-left class="size-4" />
+                        <flux:icon.arrow-left class="size-3.5" />
                         <span>Volver a Cursos</span>
                     </button>
                     <div>
-                        <h2 class="text-lg font-black text-blue-700 dark:text-blue-400 tracking-tight">
+                        <h2 class="text-base font-black text-blue-700 dark:text-blue-400 tracking-tight leading-tight">
                             {{ $cursoActivo?->nombreCompleto() }}
                         </h2>
-                        <p class="text-xs text-zinc-500">
-                            {{ $this->estudiantesDelCurso->count() }} alumnos matriculados • Clic para registrar atraso
+                        <p class="text-[11px] text-zinc-500 leading-tight">
+                            {{ $this->estudiantesDelCurso->count() }} alumnos • Clic en alumno para registrar (o anular si ya llegó)
                         </p>
                     </div>
                 </div>
@@ -659,27 +684,27 @@ new #[Title('Registro de Atrasos')] class extends Component {
                 </button>
             </div>
 
-            {{-- Grilla de Estudiantes --}}
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 max-h-[460px] overflow-y-auto pr-1">
+            {{-- Grilla de Estudiantes (Sin scroll interno: todos los alumnos visibles en pantalla) --}}
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
                 @forelse($this->estudiantesDelCurso as $est)
                     @php
                         $yaRegistrado = in_array($est->id, $this->idsEstudiantesAtrasadosHoy);
                         $atrasoRegistrado = $yaRegistrado ? $this->atrasosHoy->firstWhere('estudiante_id', $est->id) : null;
                     @endphp
-                    <button 
-                        type="button" 
-                        wire:click="solicitarConfirmacionIngreso({{ $est->id }})"
+                    <div 
+                        wire:click="clickEstudiante({{ $est->id }})"
                         @class([
-                            'p-3 rounded-xl border text-left transition-all flex items-center justify-between gap-2 group',
-                            'bg-emerald-50/80 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800 shadow-inner' => $yaRegistrado,
-                            'bg-white dark:bg-zinc-800/60 hover:bg-blue-50 dark:hover:bg-blue-950/40 border-zinc-200 dark:border-zinc-700 hover:border-blue-400 shadow-sm' => ! $yaRegistrado,
+                            'p-2 sm:p-2.5 rounded-xl border text-left transition-all flex items-center justify-between gap-1.5 cursor-pointer select-none group',
+                            'bg-emerald-50/90 dark:bg-emerald-950/40 border-2 border-emerald-500 shadow-xs text-emerald-950 dark:text-emerald-100 hover:border-emerald-600' => $yaRegistrado,
+                            'bg-white dark:bg-zinc-800/60 hover:bg-blue-50 dark:hover:bg-blue-950/40 border-zinc-200 dark:border-zinc-700 hover:border-blue-400 shadow-2xs' => ! $yaRegistrado,
                         ])
+                        title="{{ $yaRegistrado ? 'Haga clic para anular atraso' : 'Haga clic para registrar atraso' }}"
                     >
                         <div class="min-w-0 flex-1">
-                            <div class="font-bold text-xs text-zinc-900 dark:text-zinc-100 truncate group-hover:text-blue-600">
+                            <div class="font-bold text-[11px] leading-tight line-clamp-2 break-words group-hover:text-blue-600 dark:group-hover:text-blue-400" title="{{ $est->nombreCompleto() }}">
                                 {{ $est->nombreCompleto() }}
                             </div>
-                            <div class="text-[11px] text-zinc-500 mt-0.5">
+                            <div class="text-[9.5px] text-zinc-500 mt-0.5 flex items-center gap-1.5">
                                 @if($yaRegistrado && $atrasoRegistrado)
                                     <span class="text-emerald-700 dark:text-emerald-300 font-bold">Llegó {{ \Carbon\Carbon::parse($atrasoRegistrado->hora)->format('H:i') }} hrs</span>
                                 @else
@@ -688,18 +713,32 @@ new #[Title('Registro de Atrasos')] class extends Component {
                             </div>
                         </div>
 
-                        @if($yaRegistrado)
-                            <span class="shrink-0 size-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-black">
-                                ✓
-                            </span>
+                        @if($yaRegistrado && $atrasoRegistrado)
+                            <div class="flex items-center gap-1 shrink-0">
+                                {{-- Pase Térmico --}}
+                                <a 
+                                    href="{{ route('atrasos.ticket', $atrasoRegistrado->id) }}" 
+                                    target="_blank" 
+                                    @click.stop 
+                                    class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9.5px] font-bold bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-600 shadow-2xs hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                                    title="Imprimir Pase Térmico"
+                                >
+                                    <flux:icon.printer class="size-3 text-zinc-600 dark:text-zinc-400" />
+                                    <span>Pase</span>
+                                </a>
+                                {{-- Checkmark verde --}}
+                                <span class="size-4.5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[9px] font-black shadow-2xs" title="Clic en la tarjeta para anular">
+                                    ✓
+                                </span>
+                            </div>
                         @else
-                            <span class="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-blue-600 font-black text-sm px-1">
+                            <span class="shrink-0 size-4.5 rounded-full bg-zinc-100 group-hover:bg-blue-600 text-zinc-400 group-hover:text-white flex items-center justify-center text-[10px] font-black transition-colors">
                                 +
                             </span>
                         @endif
-                    </button>
+                    </div>
                 @empty
-                    <div class="col-span-full text-center py-10 text-xs text-zinc-500">
+                    <div class="col-span-full text-center py-8 text-xs text-zinc-400">
                         No hay estudiantes activos matriculados en este curso.
                     </div>
                 @endforelse
@@ -708,33 +747,33 @@ new #[Title('Registro de Atrasos')] class extends Component {
     </div>
 
     {{-- SECCIÓN INFERIOR: INGRESOS DE HOY (Debajo del cuadro de cursos) --}}
-    <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm space-y-4">
-        <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+    <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3.5 sm:p-4 shadow-xs space-y-3">
+        <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-2.5">
             <div>
-                <h2 class="text-base font-black text-zinc-900 dark:text-zinc-100 tracking-tight">
+                <h2 class="text-sm font-black text-zinc-900 dark:text-zinc-100 tracking-tight">
                     Ingresos Registrados Hoy ({{ $this->atrasosHoy->count() }})
                 </h2>
-                <p class="text-xs text-zinc-500">Ordenados cronológicamente desde la llegada más reciente</p>
+                <p class="text-[11px] text-zinc-500">Ordenados cronológicamente desde la llegada más reciente</p>
             </div>
-            <span class="text-xs font-mono font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1 rounded-lg">
+            <span class="text-xs font-mono font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-md">
                 {{ \Carbon\Carbon::parse($fecha)->format('d/m/Y') }}
             </span>
         </div>
 
-        {{-- Grilla de Ingresos de Hoy --}}
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[500px] overflow-y-auto pr-1">
+        {{-- Grilla de Ingresos de Hoy Compacta --}}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-[400px] overflow-y-auto pr-1">
             @forelse($this->atrasosHoy as $atraso)
                 @php
                     $estudiante = $atraso->estudiante;
-                    $totalMes = $estudiante ? $estudiante->atrasosMesActualCount() : 1;
+                    $totalMes = $estudiante ? ($estudiante->atrasos_mes_actual_count ?? $estudiante->atrasosMesActualCount()) : 1;
                 @endphp
-                <div class="p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-800/40 hover:bg-white dark:hover:bg-zinc-800 transition-colors space-y-2">
+                <div class="p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-800/40 hover:bg-white dark:hover:bg-zinc-800 transition-colors space-y-2">
                     <div class="flex items-start justify-between gap-2">
                         <div class="min-w-0 flex-1">
                             <div class="font-black text-xs text-zinc-900 dark:text-zinc-100 leading-snug truncate">
                                 {{ $estudiante?->nombreCompleto() ?? 'Estudiante' }}
                             </div>
-                            <div class="flex items-center gap-1.5 mt-0.5 text-[11px] text-zinc-500">
+                            <div class="flex items-center gap-1.5 mt-0.5 text-[10px] text-zinc-500">
                                 <span class="font-bold text-zinc-700 dark:text-zinc-300">
                                     {{ $atraso->curso?->nombreAbreviado() ?? $estudiante?->curso?->nombreAbreviado() ?? 'S/C' }}
                                 </span>
@@ -751,15 +790,15 @@ new #[Title('Registro de Atrasos')] class extends Component {
                         {{-- Semáforo de Reincidencia del Mes --}}
                         <div class="shrink-0">
                             @if($totalMes >= 3)
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300 border border-rose-300">
+                                <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-black bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300 border border-rose-300">
                                     ⚠️ {{ $totalMes }}° atraso (Citar)
                                 </span>
                             @elseif($totalMes === 2)
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-300">
+                                <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-black bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-300">
                                     🟡 {{ $totalMes }}° atraso
                                 </span>
                             @else
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-300">
+                                <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-300">
                                     🟢 1er atraso
                                 </span>
                             @endif
@@ -768,13 +807,13 @@ new #[Title('Registro de Atrasos')] class extends Component {
 
                     {{-- Barra de Acciones Rápidas del Registro --}}
                     <div class="flex items-center justify-between pt-1 border-t border-zinc-200/60 dark:border-zinc-700/60">
-                        <div class="flex items-center gap-1.5">
+                        <div class="flex items-center gap-1">
                             {{-- Botón Toggle Justificación rápida --}}
                             <button 
                                 type="button" 
                                 wire:click="toggleJustificado({{ $atraso->id }})"
                                 @class([
-                                    'px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all',
+                                    'px-2 py-0.5 rounded text-[9px] font-bold transition-all',
                                     'bg-emerald-600 text-white hover:bg-emerald-700' => $atraso->estado === 'justificado',
                                     'bg-zinc-200 text-zinc-700 hover:bg-zinc-300 dark:bg-zinc-700 dark:text-zinc-300' => $atraso->estado !== 'justificado',
                                 ])
@@ -787,9 +826,9 @@ new #[Title('Registro de Atrasos')] class extends Component {
                                 type="button" 
                                 wire:click="abrirModalEdicion({{ $atraso->id }})"
                                 class="p-1 rounded text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
-                                title="Agregar motivo u observación"
+                                title="Editar observación"
                             >
-                                <flux:icon.pencil-square class="size-4" />
+                                <flux:icon.pencil-square class="size-3.5" />
                             </button>
                         </div>
 
@@ -798,27 +837,27 @@ new #[Title('Registro de Atrasos')] class extends Component {
                             <a 
                                 href="{{ route('atrasos.ticket', $atraso->id) }}" 
                                 target="_blank" 
-                                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-zinc-100 hover:bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-200 transition-colors"
+                                class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-bold bg-zinc-100 hover:bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-200 transition-colors"
                                 title="Imprimir Pase Térmico"
                             >
-                                <flux:icon.printer class="size-3.5" />
+                                <flux:icon.printer class="size-3" />
                                 <span>Pase</span>
                             </a>
 
-                            {{-- Botón Anular / Eliminar (Modal estético) --}}
+                            {{-- Botón Anular / Eliminar --}}
                             <button 
                                 type="button" 
                                 wire:click="confirmarEliminacion({{ $atraso->id }})" 
                                 class="p-1 rounded text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
-                                title="Anular o eliminar registro"
+                                title="Anular atraso"
                             >
-                                <flux:icon.trash class="size-4" />
+                                <flux:icon.trash class="size-3.5" />
                             </button>
                         </div>
                     </div>
                 </div>
             @empty
-                <div class="col-span-full text-center py-12 text-xs text-zinc-400">
+                <div class="col-span-full text-center py-8 text-xs text-zinc-400">
                     No se han registrado atrasos en la fecha seleccionada.
                 </div>
             @endforelse
@@ -826,16 +865,16 @@ new #[Title('Registro de Atrasos')] class extends Component {
     </div>
 
     {{-- Modal de Edición de Justificación / Motivo --}}
-    <flux:modal wire:model="modalEdicion" class="md:w-96 space-y-5">
+    <flux:modal wire:model="modalEdicion" class="md:w-96 space-y-4">
         <div>
             <flux:heading size="lg">Detalle del Atraso</flux:heading>
-            <flux:subheading>Actualizar justificación u observación de Inspectoría.</flux:subheading>
+            <flux:subheading class="text-xs">Actualizar justificación u observación.</flux:subheading>
         </div>
 
-        <div class="space-y-4">
+        <div class="space-y-3">
             <flux:field>
-                <flux:label>Estado de Justificación</flux:label>
-                <flux:select wire:model="editarEstado">
+                <flux:label class="text-xs">Estado de Justificación</flux:label>
+                <flux:select size="sm" wire:model="editarEstado">
                     <flux:select.option value="injustificado">Injustificado</flux:select.option>
                     <flux:select.option value="justificado">Justificado</flux:select.option>
                     <flux:select.option value="pendiente">Pendiente de Justificativo</flux:select.option>
@@ -843,32 +882,32 @@ new #[Title('Registro de Atrasos')] class extends Component {
             </flux:field>
 
             <flux:field>
-                <flux:label>Motivo</flux:label>
-                <flux:input wire:model="editarMotivo" placeholder="Ej: Pase médico, Locomoción, Apoderado presente..." />
+                <flux:label class="text-xs">Motivo</flux:label>
+                <flux:input size="sm" wire:model="editarMotivo" placeholder="Ej: Pase médico, Locomoción..." />
             </flux:field>
 
             <flux:field>
-                <flux:label>Observaciones Adicionales</flux:label>
-                <flux:textarea wire:model="editarObservaciones" placeholder="Detalles relevantes para Inspectoría General..." />
+                <flux:label class="text-xs">Observaciones</flux:label>
+                <flux:textarea size="sm" wire:model="editarObservaciones" placeholder="Detalles de Inspectoría..." />
             </flux:field>
         </div>
 
-        <div class="flex justify-end gap-2 pt-2">
-            <flux:button wire:click="$set('modalEdicion', false)">Cancelar</flux:button>
-            <flux:button variant="primary" wire:click="guardarEdicion">Guardar Cambios</flux:button>
+        <div class="flex justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+            <flux:button size="sm" wire:click="$set('modalEdicion', false)">Cancelar</flux:button>
+            <flux:button size="sm" variant="primary" wire:click="guardarEdicion">Guardar Cambios</flux:button>
         </div>
     </flux:modal>
 
     {{-- Modal Estético para Anular / Eliminar Registro --}}
     <flux:modal wire:model="modalEliminar" class="md:w-96">
-        <div class="space-y-5">
-            <div class="flex items-start gap-4">
-                <div class="size-11 rounded-2xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
-                    <flux:icon.trash class="size-6" />
+        <div class="space-y-4">
+            <div class="flex items-start gap-3">
+                <div class="size-10 rounded-xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+                    <flux:icon.trash class="size-5" />
                 </div>
                 <div>
                     <flux:heading size="lg" class="text-zinc-900 dark:text-zinc-100 font-black">
-                        Anular Registro de Atraso
+                        Anular Atraso
                     </flux:heading>
                     <flux:subheading class="text-xs text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
                         ¿Estás seguro de que deseas anular el atraso de <span class="font-bold text-zinc-800 dark:text-zinc-200">{{ $estudianteAEliminarNombre }}</span>? El registro será eliminado permanentemente.
@@ -876,72 +915,12 @@ new #[Title('Registro de Atrasos')] class extends Component {
                 </div>
             </div>
 
-            <div class="flex justify-end gap-2.5 pt-2 border-t border-zinc-100 dark:border-zinc-800">
-                <flux:button variant="ghost" wire:click="$set('modalEliminar', false)">
+            <div class="flex justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                <flux:button size="sm" variant="ghost" wire:click="$set('modalEliminar', false)">
                     Cancelar
                 </flux:button>
-                <flux:button variant="danger" wire:click="eliminarAtraso">
+                <flux:button size="sm" variant="danger" wire:click="eliminarAtraso">
                     Sí, Anular Atraso
-                </flux:button>
-            </div>
-        </div>
-    </flux:modal>
-
-    {{-- Modal Estético de Confirmación Antes de Registrar Atraso --}}
-    <flux:modal wire:model="modalConfirmarIngreso" class="md:w-[420px]">
-        <div class="space-y-5">
-            <div class="flex items-start gap-3.5">
-                <div class="size-12 rounded-2xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 shadow-inner">
-                    <flux:icon.clock class="size-6" />
-                </div>
-                <div>
-                    <flux:heading size="lg" class="text-zinc-900 dark:text-zinc-100 font-black tracking-tight">
-                        Confirmar Ingreso de Atraso
-                    </flux:heading>
-                    <flux:subheading class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                        Verifica los datos del alumno antes de registrar su llegada.
-                    </flux:subheading>
-                </div>
-            </div>
-
-            {{-- Ficha resumida del estudiante y hora --}}
-            <div class="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/80 space-y-2.5">
-                <div>
-                    <span class="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">Estudiante</span>
-                    <span class="text-sm font-black text-zinc-900 dark:text-zinc-100 leading-snug">
-                        {{ $estudianteAIngresarNombre }}
-                    </span>
-                </div>
-
-                <div class="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-200/70 dark:border-zinc-700/60 text-xs">
-                    <div>
-                        <span class="block text-[10px] font-bold uppercase text-zinc-400">Curso</span>
-                        <span class="font-bold text-blue-600 dark:text-blue-400">{{ $estudianteAIngresarCurso }}</span>
-                    </div>
-                    @if($estudianteAIngresarRut)
-                        <div>
-                            <span class="block text-[10px] font-bold uppercase text-zinc-400">RUT</span>
-                            <span class="font-mono font-semibold text-zinc-700 dark:text-zinc-300">{{ $estudianteAIngresarRut }}</span>
-                        </div>
-                    @endif
-                </div>
-
-                <div class="pt-2 border-t border-zinc-200/70 dark:border-zinc-700/60 flex items-center justify-between">
-                    <span class="text-xs font-bold text-zinc-600 dark:text-zinc-400">Hora de llegada estimada:</span>
-                    <span class="inline-flex items-center gap-1.5 font-mono text-sm font-black text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1 rounded-lg border border-blue-200 dark:border-blue-900">
-                        <flux:icon.clock class="size-3.5" />
-                        {{ $horaLlegadaConfirmacion }} hrs
-                    </span>
-                </div>
-            </div>
-
-            {{-- Botones Aceptar o Cancelar --}}
-            <div class="flex justify-end gap-2.5 pt-2 border-t border-zinc-100 dark:border-zinc-800">
-                <flux:button variant="ghost" wire:click="$set('modalConfirmarIngreso', false)">
-                    Cancelar
-                </flux:button>
-                <flux:button variant="primary" wire:click="registrarAtraso">
-                    Aceptar y Registrar
                 </flux:button>
             </div>
         </div>

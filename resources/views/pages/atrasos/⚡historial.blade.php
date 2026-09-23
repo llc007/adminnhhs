@@ -5,6 +5,7 @@ use App\Models\Curso;
 use App\Models\Estudiante;
 use Carbon\Carbon;
 use Flux\Flux;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
@@ -29,6 +30,15 @@ new #[Title('Historial de Atrasos')] class extends Component {
     #[Url]
     public string $estado = ''; // '', 'injustificado', 'justificado', 'pendiente'
 
+    #[Url]
+    public string $filtroAtrasosMes = ''; // '', '1', '2', '3', '3+', '4+'
+
+    #[Url]
+    public string $sortBy = 'fecha'; // 'fecha', 'atrasos_mes'
+
+    #[Url]
+    public string $sortDirection = 'desc'; // 'asc', 'desc'
+
     // Modal de Historial Detallado del Estudiante
     public bool $modalDetalleEstudiante = false;
     public ?int $estudianteSeleccionadoId = null;
@@ -37,6 +47,7 @@ new #[Title('Historial de Atrasos')] class extends Component {
     // Modal para editar estado / motivo
     public bool $modalEdicion = false;
     public ?int $atrasoAEditarId = null;
+    public string $editarEstudianteNombre = '';
     public string $editarEstado = 'injustificado';
     public string $editarMotivo = '';
     public string $editarObservaciones = '';
@@ -99,9 +110,25 @@ new #[Title('Historial de Atrasos')] class extends Component {
 
     public function updating($field): void
     {
-        if (in_array($field, ['search', 'curso_id', 'fecha', 'filtroTemporal', 'estado'])) {
+        if (in_array($field, ['search', 'curso_id', 'fecha', 'filtroTemporal', 'estado', 'filtroAtrasosMes', 'sortBy', 'sortDirection'])) {
             $this->resetPage();
         }
+    }
+
+    public function sort(string $column): void
+    {
+        if ($this->sortBy === $column) {
+            $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            $this->sortBy = $column;
+            $this->sortDirection = $column === 'atrasos_mes' ? 'desc' : 'asc';
+        }
+        $this->resetPage();
+    }
+
+    public function ordenarPor(string $column): void
+    {
+        $this->sort($column);
     }
 
     public function setFiltroTemporal(string $filtro): void
@@ -118,9 +145,11 @@ new #[Title('Historial de Atrasos')] class extends Component {
 
     public function clearFilters(): void
     {
-        $this->reset(['search', 'curso_id', 'estado']);
+        $this->reset(['search', 'curso_id', 'estado', 'filtroAtrasosMes']);
         $this->filtroTemporal = 'dia';
         $this->fecha = now('America/Santiago')->toDateString();
+        $this->sortBy = 'fecha';
+        $this->sortDirection = 'desc';
         $this->resetPage();
     }
 
@@ -151,7 +180,26 @@ new #[Title('Historial de Atrasos')] class extends Component {
 
     private function getFilteredQuery()
     {
+        $isSqlite = DB::connection()->getDriverName() === 'sqlite';
+
+        $subqueryGenerator = function () use ($isSqlite) {
+            $sq = Atraso::selectRaw('count(*)')
+                ->from('atrasos as a2')
+                ->whereColumn('a2.estudiante_id', 'atrasos.estudiante_id')
+                ->whereColumn('a2.school_id', 'atrasos.school_id');
+
+            if ($isSqlite) {
+                $sq->whereRaw("strftime('%Y-%m', a2.fecha) = strftime('%Y-%m', atrasos.fecha)");
+            } else {
+                $sq->whereRaw('YEAR(a2.fecha) = YEAR(atrasos.fecha) AND MONTH(a2.fecha) = MONTH(atrasos.fecha)');
+            }
+
+            return $sq;
+        };
+
         $query = Atraso::with(['estudiante.curso', 'curso', 'registradoPor'])
+            ->select('atrasos.*')
+            ->selectSub($subqueryGenerator(), 'atrasos_mes_count')
             ->where('school_id', $this->school?->id);
 
         if (! empty($this->search)) {
@@ -189,6 +237,16 @@ new #[Title('Historial de Atrasos')] class extends Component {
             $query->where('estado', $this->estado);
         }
 
+        if (! empty($this->filtroAtrasosMes)) {
+            if ($this->filtroAtrasosMes === '3+') {
+                $query->where($subqueryGenerator(), '>=', 3);
+            } elseif ($this->filtroAtrasosMes === '4+') {
+                $query->where($subqueryGenerator(), '>=', 4);
+            } elseif (is_numeric($this->filtroAtrasosMes)) {
+                $query->where($subqueryGenerator(), '=', (int) $this->filtroAtrasosMes);
+            }
+        }
+
         // Filtro Temporal
         $anchor = ! empty($this->fecha) ? Carbon::parse($this->fecha, 'America/Santiago') : now('America/Santiago');
 
@@ -203,7 +261,13 @@ new #[Title('Historial de Atrasos')] class extends Component {
             $query->whereYear('fecha', $anchor->year)->whereMonth('fecha', $anchor->month);
         }
 
-        return $query->orderBy('fecha', 'desc')->orderBy('hora', 'desc');
+        if ($this->sortBy === 'atrasos_mes') {
+            return $query->orderBy('atrasos_mes_count', $this->sortDirection)
+                ->orderBy('fecha', 'desc')
+                ->orderBy('hora', 'desc');
+        }
+
+        return $query->orderBy('fecha', $this->sortDirection)->orderBy('hora', $this->sortDirection);
     }
 
     /**
@@ -224,39 +288,44 @@ new #[Title('Historial de Atrasos')] class extends Component {
     /**
      * Alternar justificación rápida desde la tabla.
      */
+    /**
+     * Alternar justificación rápida desde la tabla o abrir modal.
+     */
     public function toggleJustificado(int $atrasoId): void
     {
-        $atraso = Atraso::where('school_id', $this->school?->id)->find($atrasoId);
-        if (! $atraso) {
-            return;
-        }
-
-        if ($atraso->estado === 'justificado') {
-            $atraso->update([
-                'estado' => 'injustificado',
-                'motivo' => null,
-            ]);
-            Flux::toast(heading: 'Injustificado', text: 'El atraso ahora está sin justificación.', variant: 'warning');
-        } else {
-            $atraso->update([
-                'estado' => 'justificado',
-                'motivo' => 'Justificado desde historial',
-            ]);
-            Flux::toast(heading: 'Justificado', text: 'El atraso ha sido justificado.', variant: 'success');
-        }
+        $this->justificarAtraso($atrasoId);
     }
 
-    public function abrirModalEdicion(int $atrasoId): void
+    /**
+     * Abrir modal "Detalle del Atraso" con estado 'justificado' preseleccionado.
+     */
+    public function justificarAtraso(int $atrasoId): void
     {
-        $atraso = Atraso::where('school_id', $this->school?->id)->find($atrasoId);
+        $atraso = Atraso::with('estudiante')->where('school_id', $this->school?->id)->find($atrasoId);
         if (! $atraso) {
             return;
         }
 
         $this->atrasoAEditarId = $atraso->id;
-        $this->editarEstado = $atraso->estado;
+        $this->editarEstado = 'justificado';
         $this->editarMotivo = $atraso->motivo ?? '';
         $this->editarObservaciones = $atraso->observaciones ?? '';
+        $this->editarEstudianteNombre = $atraso->estudiante?->nombreCompleto() ?? 'Estudiante';
+        $this->modalEdicion = true;
+    }
+
+    public function abrirModalEdicion(int $atrasoId, ?string $estadoPorDefecto = null): void
+    {
+        $atraso = Atraso::with('estudiante')->where('school_id', $this->school?->id)->find($atrasoId);
+        if (! $atraso) {
+            return;
+        }
+
+        $this->atrasoAEditarId = $atraso->id;
+        $this->editarEstado = $estadoPorDefecto ?? $atraso->estado;
+        $this->editarMotivo = $atraso->motivo ?? '';
+        $this->editarObservaciones = $atraso->observaciones ?? '';
+        $this->editarEstudianteNombre = $atraso->estudiante?->nombreCompleto() ?? 'Estudiante';
         $this->modalEdicion = true;
     }
 
@@ -278,6 +347,7 @@ new #[Title('Historial de Atrasos')] class extends Component {
 
         $this->modalEdicion = false;
         $this->atrasoAEditarId = null;
+        $this->editarEstudianteNombre = '';
     }
 
     public function confirmarEliminacion(int $atrasoId): void
@@ -330,7 +400,7 @@ new #[Title('Historial de Atrasos')] class extends Component {
             fputcsv($file, $columns, ';');
 
             foreach ($atrasos as $a) {
-                $totalMes = $a->estudiante ? $a->estudiante->atrasosMesActualCount() : 1;
+                $totalMes = (int) ($a->atrasos_mes_count ?? ($a->estudiante ? $a->estudiante->atrasosMesActualCount() : 1));
                 fputcsv($file, [
                     $a->id,
                     $a->fecha ? Carbon::parse($a->fecha)->format('d/m/Y') : '',
@@ -441,13 +511,13 @@ new #[Title('Historial de Atrasos')] class extends Component {
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
             {{-- Buscar Estudiante por nombre o RUT --}}
-            <flux:field class="lg:col-span-4">
+            <flux:field class="lg:col-span-3">
                 <flux:label class="text-[11px]">Buscar Estudiante</flux:label>
                 <flux:input size="sm" class="!text-xs" wire:model.live.debounce.300ms="search" placeholder="Nombre, apellido o RUT..." />
             </flux:field>
 
             {{-- Filtrar por Curso --}}
-            <flux:field class="lg:col-span-3">
+            <flux:field class="lg:col-span-2">
                 <flux:label class="text-[11px]">Curso</flux:label>
                 <flux:select size="sm" class="!text-xs" wire:model.live="curso_id">
                     <flux:select.option value="">Todos los cursos</flux:select.option>
@@ -492,6 +562,19 @@ new #[Title('Historial de Atrasos')] class extends Component {
                         Todo
                     </button>
                 </div>
+            </flux:field>
+
+            {{-- Filtrar por Atrasos Mes --}}
+            <flux:field class="lg:col-span-2">
+                <flux:label class="text-[11px]">Atrasos Mes</flux:label>
+                <flux:select size="sm" class="!text-xs" wire:model.live="filtroAtrasosMes">
+                    <flux:select.option value="">Todos</flux:select.option>
+                    <flux:select.option value="1">1er atraso</flux:select.option>
+                    <flux:select.option value="2">2do atraso</flux:select.option>
+                    <flux:select.option value="3">3er atraso</flux:select.option>
+                    <flux:select.option value="3+">3 o más (Citación)</flux:select.option>
+                    <flux:select.option value="4+">4 o más atrasos</flux:select.option>
+                </flux:select>
             </flux:field>
 
             {{-- Filtrar por Estado --}}
@@ -548,10 +631,27 @@ new #[Title('Historial de Atrasos')] class extends Component {
             <flux:table>
                 <flux:table.columns>
                     <flux:table.column class="w-14 text-[11px]">ID</flux:table.column>
-                    <flux:table.column class="text-[11px]">Fecha y Hora</flux:table.column>
+                    <flux:table.column 
+                        class="text-[11px]" 
+                        sortable 
+                        :sorted="$sortBy === 'fecha'" 
+                        :direction="$sortDirection"
+                        wire:click="sort('fecha')"
+                    >
+                        Fecha y Hora
+                    </flux:table.column>
                     <flux:table.column class="text-[11px]">Estudiante</flux:table.column>
                     <flux:table.column class="text-[11px]">Curso</flux:table.column>
-                    <flux:table.column class="text-[11px] text-center">Atrasos Mes</flux:table.column>
+                    <flux:table.column 
+                        class="text-[11px]" 
+                        align="center"
+                        sortable 
+                        :sorted="$sortBy === 'atrasos_mes'" 
+                        :direction="$sortDirection"
+                        wire:click="sort('atrasos_mes')"
+                    >
+                        Atrasos Mes
+                    </flux:table.column>
                     <flux:table.column class="text-[11px]">Minutos</flux:table.column>
                     <flux:table.column class="text-[11px]">Estado / Motivo</flux:table.column>
                     <flux:table.column class="text-[11px]">Registrado Por</flux:table.column>
@@ -562,7 +662,7 @@ new #[Title('Historial de Atrasos')] class extends Component {
                     @forelse($atrasos as $atraso)
                         @php
                             $estudiante = $atraso->estudiante;
-                            $atrasosMes = $estudiante ? $estudiante->atrasosMesActualCount() : 1;
+                            $atrasosMes = (int) ($atraso->atrasos_mes_count ?? ($estudiante ? $estudiante->atrasosMesActualCount() : 1));
                         @endphp
                         <flux:table.row 
                             class="hover:bg-blue-50/60 dark:hover:bg-blue-950/20 cursor-pointer transition-colors group"
@@ -666,28 +766,18 @@ new #[Title('Historial de Atrasos')] class extends Component {
                             {{-- Acciones (con stopPropagation para no abrir el modal al clickear un botón) --}}
                             <flux:table.cell class="py-2.5 text-right" wire:click.stop>
                                 <div class="flex items-center justify-end gap-1">
-                                    {{-- Botón toggle justificado --}}
+                                    {{-- Botón justificar / ver justificación --}}
                                     <button 
                                         type="button" 
-                                        wire:click.stop="toggleJustificado({{ $atraso->id }})"
+                                        wire:click.stop="justificarAtraso({{ $atraso->id }})"
                                         @class([
                                             'px-2 py-0.5 rounded text-[10px] font-bold transition-all',
                                             'bg-emerald-600 text-white hover:bg-emerald-700' => $atraso->estado === 'justificado',
                                             'bg-zinc-200 text-zinc-700 hover:bg-zinc-300 dark:bg-zinc-700 dark:text-zinc-300' => $atraso->estado !== 'justificado',
                                         ])
-                                        title="Cambiar justificación"
+                                        title="{{ $atraso->estado === 'justificado' ? 'Editar justificación' : 'Justificar atraso' }}"
                                     >
-                                        {{ $atraso->estado === 'justificado' ? '✓' : 'Justificar' }}
-                                    </button>
-
-                                    {{-- Botón editar motivo --}}
-                                    <button 
-                                        type="button" 
-                                        wire:click.stop="abrirModalEdicion({{ $atraso->id }})"
-                                        class="p-1 rounded text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
-                                        title="Editar detalle u observación"
-                                    >
-                                        <flux:icon.pencil-square class="size-3.5" />
+                                        {{ $atraso->estado === 'justificado' ? '✓ Justificado' : 'Justificar' }}
                                     </button>
 
                                     {{-- Pase Térmico --}}
@@ -753,17 +843,13 @@ new #[Title('Historial de Atrasos')] class extends Component {
                             </div>
                         </div>
                     </div>
-
-                    <flux:badge color="zinc" size="sm" class="font-mono">
-                        {{ $estudianteSeleccionado->atrasos->count() }} atrasos en total
-                    </flux:badge>
                 </div>
 
                 {{-- Resumen de Reincidencia del Estudiante --}}
                 @php
                     $atrasosEstudianteMes = $estudianteSeleccionado->atrasosMesActualCount();
                 @endphp
-                <div class="grid grid-cols-3 gap-2 text-center">
+                <div class="grid grid-cols-2 gap-3 text-center">
                     <div class="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700">
                         <span class="block text-[10px] font-bold uppercase text-zinc-400">Total Histórico</span>
                         <span class="text-base font-black text-zinc-800 dark:text-zinc-200">{{ $estudianteSeleccionado->atrasos->count() }}</span>
@@ -771,12 +857,6 @@ new #[Title('Historial de Atrasos')] class extends Component {
                     <div class="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50">
                         <span class="block text-[10px] font-bold uppercase text-amber-600 dark:text-amber-400">Mes en Curso</span>
                         <span class="text-base font-black text-amber-700 dark:text-amber-300">{{ $atrasosEstudianteMes }}</span>
-                    </div>
-                    <div class="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50">
-                        <span class="block text-[10px] font-bold uppercase text-rose-600 dark:text-rose-400">Estado RICE</span>
-                        <span class="text-xs font-black {{ $atrasosEstudianteMes >= 3 ? 'text-rose-700 dark:text-rose-300' : 'text-zinc-700 dark:text-zinc-300' }}">
-                            {{ $atrasosEstudianteMes >= 3 ? '⚠️ CITACIÓN' : 'Normal' }}
-                        </span>
                     </div>
                 </div>
 
@@ -845,27 +925,29 @@ new #[Title('Historial de Atrasos')] class extends Component {
     <flux:modal wire:model="modalEdicion" class="md:w-96 space-y-5">
         <div>
             <flux:heading size="lg">Detalle del Atraso</flux:heading>
-            <flux:subheading>Actualizar estado o motivo del atraso.</flux:subheading>
+            <flux:subheading>
+                {{ $editarEstudianteNombre ?: 'Actualizar estado o motivo del atraso.' }}
+            </flux:subheading>
         </div>
 
         <div class="space-y-4">
             <flux:field>
                 <flux:label>Estado</flux:label>
                 <flux:select wire:model="editarEstado">
-                    <flux:select.option value="injustificado">Injustificado</flux:select.option>
                     <flux:select.option value="justificado">Justificado</flux:select.option>
+                    <flux:select.option value="injustificado">Injustificado</flux:select.option>
                     <flux:select.option value="pendiente">Pendiente</flux:select.option>
                 </flux:select>
             </flux:field>
 
             <flux:field>
-                <flux:label>Motivo</flux:label>
-                <flux:input wire:model="editarMotivo" placeholder="Ej: Pase médico, Locomoción, Apoderado presente..." />
+                <flux:label>Motivo de Justificación</flux:label>
+                <flux:input wire:model="editarMotivo" placeholder="Ej: Apoderado presente, Pase médico, Locomoción..." />
             </flux:field>
 
             <flux:field>
-                <flux:label>Observaciones</flux:label>
-                <flux:textarea wire:model="editarObservaciones" placeholder="Detalles de Inspectoría..." />
+                <flux:label>Observaciones (Opcional)</flux:label>
+                <flux:textarea wire:model="editarObservaciones" placeholder="Detalles adicionales de Inspectoría..." rows="2" />
             </flux:field>
         </div>
 

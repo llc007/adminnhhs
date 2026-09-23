@@ -68,17 +68,14 @@ test('authorized users can access the atrasos index page', function () {
         ->assertOk();
 });
 
-test('can request confirmation and then register an atraso for a student via livewire', function () {
+test('clicking student registers atraso directly and clicking again opens annul confirmation modal', function () {
     [$user, $schoolId, $cursoId, $estudiante] = setupAtrasosEnvironment('inspector');
 
     $this->actingAs($user);
 
-    Livewire::test('pages::atrasos.index')
-        ->call('solicitarConfirmacionIngreso', $estudiante->id)
-        ->assertSet('modalConfirmarIngreso', true)
-        ->assertSet('estudianteAIngresarNombre', $estudiante->nombreCompleto())
-        ->call('registrarAtraso')
-        ->assertSet('modalConfirmarIngreso', false);
+    $component = Livewire::test('pages::atrasos.index')
+        ->call('clickEstudiante', $estudiante->id)
+        ->assertSet('modalEliminar', false);
 
     expect(Atraso::where('school_id', $schoolId)->where('estudiante_id', $estudiante->id)->count())->toBe(1);
 
@@ -86,6 +83,11 @@ test('can request confirmation and then register an atraso for a student via liv
     expect($atraso->estado)->toBe('injustificado')
         ->and($atraso->curso_id)->toBe($cursoId)
         ->and($atraso->registrado_por_user_id)->toBe($user->id);
+
+    // Clicking again opens annul modal
+    $component->call('clickEstudiante', $estudiante->id)
+        ->assertSet('modalEliminar', true)
+        ->assertSet('atrasoAEliminarId', $atraso->id);
 });
 
 test('can register an atraso for a student via livewire', function () {
@@ -119,6 +121,27 @@ test('prevents registering duplicate atraso on the same day', function () {
 
     // Count should still be 1
     expect(Atraso::where('estudiante_id', $estudiante->id)->count())->toBe(1);
+});
+
+test('pressing enter in search registers first result and annulment removes it', function () {
+    [$user, $schoolId, $cursoId, $estudiante] = setupAtrasosEnvironment('inspector');
+
+    $this->actingAs($user);
+
+    $component = Livewire::test('pages::atrasos.index')
+        ->set('search', 'JUAN')
+        ->call('registrarPrimerResultado');
+
+    expect(Atraso::where('school_id', $schoolId)->where('estudiante_id', $estudiante->id)->count())->toBe(1);
+
+    $atraso = Atraso::where('estudiante_id', $estudiante->id)->first();
+
+    // Clicking the registered student opens annul confirmation modal
+    $component->call('clickEstudiante', $estudiante->id)
+        ->assertSet('modalEliminar', true)
+        ->call('eliminarAtraso');
+
+    expect(Atraso::find($atraso->id))->toBeNull();
 });
 
 test('can toggle justificado status and delete an atraso', function () {
@@ -289,17 +312,14 @@ test('can toggle justificado and edit atraso in historial', function () {
     ]);
 
     Livewire::test('pages::atrasos.historial')
-        ->call('toggleJustificado', $atraso->id);
-
-    expect($atraso->fresh()->estado)->toBe('justificado');
-
-    Livewire::test('pages::atrasos.historial')
-        ->call('abrirModalEdicion', $atraso->id)
+        ->call('justificarAtraso', $atraso->id)
         ->assertSet('modalEdicion', true)
+        ->assertSet('editarEstado', 'justificado')
         ->set('editarMotivo', 'Certificado médico')
         ->call('guardarEdicion');
 
-    expect($atraso->fresh()->motivo)->toBe('Certificado médico');
+    expect($atraso->fresh()->estado)->toBe('justificado')
+        ->and($atraso->fresh()->motivo)->toBe('Certificado médico');
 });
 
 test('can delete atraso in historial', function () {
@@ -375,4 +395,156 @@ test('historial updates in real-time when a new atraso is registered and support
     $component->call('toggleAutoRefresh')
         ->assertSet('autoRefresh', false)
         ->assertSee('En vivo pausado');
+});
+
+test('historial can filter by monthly late arrivals count', function () {
+    [$user, $schoolId, $cursoId, $estudiante1] = setupAtrasosEnvironment('inspector');
+    $this->actingAs($user);
+
+    // Create a 2nd student
+    $estudiante2 = Estudiante::create([
+        'school_id' => $schoolId,
+        'curso_id' => $cursoId,
+        'nombres_csv' => 'MARIA LOPEZ SILVA',
+        'rut_numero' => '22555666',
+        'rut_dv' => '8',
+        'estado' => 'activo',
+    ]);
+
+    $today = now('America/Santiago')->toDateString();
+
+    // Student 1 has 1 atraso this month
+    Atraso::create([
+        'school_id' => $schoolId,
+        'estudiante_id' => $estudiante1->id,
+        'curso_id' => $cursoId,
+        'registrado_por_user_id' => $user->id,
+        'fecha' => $today,
+        'hora' => '08:10:00',
+        'minutos_atraso' => 10,
+        'estado' => 'injustificado',
+    ]);
+
+    // Student 2 has 2 atrasos this month
+    Atraso::create([
+        'school_id' => $schoolId,
+        'estudiante_id' => $estudiante2->id,
+        'curso_id' => $cursoId,
+        'registrado_por_user_id' => $user->id,
+        'fecha' => $today,
+        'hora' => '08:15:00',
+        'minutos_atraso' => 15,
+        'estado' => 'injustificado',
+    ]);
+    Atraso::create([
+        'school_id' => $schoolId,
+        'estudiante_id' => $estudiante2->id,
+        'curso_id' => $cursoId,
+        'registrado_por_user_id' => $user->id,
+        'fecha' => $today,
+        'hora' => '08:20:00',
+        'minutos_atraso' => 20,
+        'estado' => 'injustificado',
+    ]);
+
+    // Filter 1er atraso: should only show Student 1
+    Livewire::test('pages::atrasos.historial')
+        ->set('filtroTemporal', 'mes')
+        ->set('filtroAtrasosMes', '1')
+        ->assertSee('JUAN PEREZ GONZALEZ')
+        ->assertDontSee('MARIA LOPEZ SILVA');
+
+    // Filter 2do atraso: should only show Student 2
+    Livewire::test('pages::atrasos.historial')
+        ->set('filtroTemporal', 'mes')
+        ->set('filtroAtrasosMes', '2')
+        ->assertSee('MARIA LOPEZ SILVA')
+        ->assertDontSee('JUAN PEREZ GONZALEZ');
+
+    // Filter 3+ atrasos: none should match yet
+    Livewire::test('pages::atrasos.historial')
+        ->set('filtroTemporal', 'mes')
+        ->set('filtroAtrasosMes', '3+')
+        ->assertDontSee('JUAN PEREZ GONZALEZ')
+        ->assertDontSee('MARIA LOPEZ SILVA');
+
+    // Add a 3rd atraso for Student 2
+    Atraso::create([
+        'school_id' => $schoolId,
+        'estudiante_id' => $estudiante2->id,
+        'curso_id' => $cursoId,
+        'registrado_por_user_id' => $user->id,
+        'fecha' => $today,
+        'hora' => '08:25:00',
+        'minutos_atraso' => 25,
+        'estado' => 'injustificado',
+    ]);
+
+    // Filter 3+ atrasos: now Student 2 matches
+    Livewire::test('pages::atrasos.historial')
+        ->set('filtroTemporal', 'mes')
+        ->set('filtroAtrasosMes', '3+')
+        ->assertSee('MARIA LOPEZ SILVA')
+        ->assertDontSee('JUAN PEREZ GONZALEZ');
+});
+
+test('historial can sort table by monthly late arrivals count', function () {
+    [$user, $schoolId, $cursoId, $estudiante1] = setupAtrasosEnvironment('inspector');
+    $this->actingAs($user);
+
+    $estudiante2 = Estudiante::create([
+        'school_id' => $schoolId,
+        'curso_id' => $cursoId,
+        'nombres_csv' => 'MARIA LOPEZ SILVA',
+        'rut_numero' => '22555666',
+        'rut_dv' => '8',
+        'estado' => 'activo',
+    ]);
+
+    $today = now('America/Santiago')->toDateString();
+
+    // Student 1 has 1 atraso
+    Atraso::create([
+        'school_id' => $schoolId,
+        'estudiante_id' => $estudiante1->id,
+        'curso_id' => $cursoId,
+        'registrado_por_user_id' => $user->id,
+        'fecha' => $today,
+        'hora' => '08:10:00',
+        'minutos_atraso' => 10,
+        'estado' => 'injustificado',
+    ]);
+
+    // Student 2 has 3 atrasos
+    for ($i = 0; $i < 3; $i++) {
+        Atraso::create([
+            'school_id' => $schoolId,
+            'estudiante_id' => $estudiante2->id,
+            'curso_id' => $cursoId,
+            'registrado_por_user_id' => $user->id,
+            'fecha' => $today,
+            'hora' => '08:15:00',
+            'minutos_atraso' => 15,
+            'estado' => 'injustificado',
+        ]);
+    }
+
+    // Sort by atrasos_mes DESC (default direction when clicking atrasos_mes)
+    $component = Livewire::test('pages::atrasos.historial')
+        ->set('filtroTemporal', 'mes')
+        ->call('sort', 'atrasos_mes')
+        ->assertSet('sortBy', 'atrasos_mes')
+        ->assertSet('sortDirection', 'desc');
+
+    $atrasos = $component->viewData('atrasos');
+    expect($atrasos->first()->estudiante_id)->toBe($estudiante2->id)
+        ->and($atrasos->first()->atrasos_mes_count)->toBe(3);
+
+    // Toggle to ASC
+    $component->call('sort', 'atrasos_mes')
+        ->assertSet('sortDirection', 'asc');
+
+    $atrasosAsc = $component->viewData('atrasos');
+    expect($atrasosAsc->first()->estudiante_id)->toBe($estudiante1->id)
+        ->and($atrasosAsc->first()->atrasos_mes_count)->toBe(1);
 });

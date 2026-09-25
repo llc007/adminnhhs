@@ -821,6 +821,29 @@ new #[Title('Historial de Atrasos')] class extends Component {
         </div>
     </flux:card>
 
+    {{-- Indicadores Ultra-Compactos del Periodo Seleccionado --}}
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div class="flex items-center justify-between px-3 py-1.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-2xs">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Total Atrasos</span>
+            <span class="text-sm font-black text-zinc-900 dark:text-zinc-100">{{ $totalFiltrados }}</span>
+        </div>
+
+        <div class="flex items-center justify-between px-3 py-1.5 rounded-lg bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200/60 dark:border-blue-900/40 shadow-2xs">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Alumnos</span>
+            <span class="text-sm font-black text-blue-700 dark:text-blue-300">{{ $alumnosUnicos }}</span>
+        </div>
+
+        <div class="flex items-center justify-between px-3 py-1.5 rounded-lg bg-rose-50/60 dark:bg-rose-950/30 border border-rose-200/60 dark:border-rose-900/40 shadow-2xs">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">Injustificados</span>
+            <span class="text-sm font-black text-rose-700 dark:text-rose-300">{{ $injustificadosFiltrados }}</span>
+        </div>
+
+        <div class="flex items-center justify-between px-3 py-1.5 rounded-lg bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-900/40 shadow-2xs">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Justificados</span>
+            <span class="text-sm font-black text-emerald-700 dark:text-emerald-300">{{ $justificadosFiltrados }}</span>
+        </div>
+    </div>
+
     {{-- Tabla Principal de Atrasos --}}
     <flux:card class="overflow-hidden shadow-sm p-0 border border-zinc-200 dark:border-zinc-800">
         <div class="px-5 py-2 overflow-x-auto">
@@ -1036,41 +1059,6 @@ new #[Title('Historial de Atrasos')] class extends Component {
             {{ $atrasos->links(data: ['scrollTo' => false]) }}
         </div>
     </flux:card>
-
-    {{-- Cards de Estadísticas del Periodo Seleccionado (Ubicados debajo de la tabla) --}}
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <flux:card class="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
-            <span class="block text-[10px] uppercase font-bold text-zinc-400 tracking-wider">Total Atrasos</span>
-            <div class="flex items-baseline gap-2 mt-1">
-                <span class="text-2xl font-black text-zinc-900 dark:text-zinc-100">{{ $totalFiltrados }}</span>
-                <span class="text-xs text-zinc-500">en este filtro</span>
-            </div>
-        </flux:card>
-
-        <flux:card class="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
-            <span class="block text-[10px] uppercase font-bold text-blue-500 tracking-wider">Alumnos Afectados</span>
-            <div class="flex items-baseline gap-2 mt-1">
-                <span class="text-2xl font-black text-blue-700 dark:text-blue-400">{{ $alumnosUnicos }}</span>
-                <span class="text-xs text-zinc-500">estudiantes distintos</span>
-            </div>
-        </flux:card>
-
-        <flux:card class="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
-            <span class="block text-[10px] uppercase font-bold text-rose-500 tracking-wider">Injustificados</span>
-            <div class="flex items-baseline gap-2 mt-1">
-                <span class="text-2xl font-black text-rose-600 dark:text-rose-400">{{ $injustificadosFiltrados }}</span>
-                <span class="text-xs text-zinc-500">sin justificar</span>
-            </div>
-        </flux:card>
-
-        <flux:card class="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
-            <span class="block text-[10px] uppercase font-bold text-emerald-500 tracking-wider">Justificados</span>
-            <div class="flex items-baseline gap-2 mt-1">
-                <span class="text-2xl font-black text-emerald-600 dark:text-emerald-400">{{ $justificadosFiltrados }}</span>
-                <span class="text-xs text-zinc-500">con justificativo</span>
-            </div>
-        </flux:card>
-    </div>
 
     {{-- MODAL DE HISTORIAL COMPLETO DEL ESTUDIANTE AL HACER CLICK EN LA FILA --}}
     <flux:modal wire:model="modalDetalleEstudiante" class="md:w-[680px]">

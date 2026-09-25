@@ -42,7 +42,7 @@ class CheckRole
             // redirect them to their respective functional home route instead of throwing a 403.
             if ($request->routeIs('dashboard') || $request->routeIs('entrevistas.dashboard')) {
                 if ($request->user()->hasRole(['gerencia', 'rectoria'])) {
-                    return redirect()->route('gerencia.dashboard');
+                    return redirect()->route('direccion.dashboard');
                 }
                 if ($request->user()->hasRole(['inspector', 'recepcion'])) {
                     return redirect()->route('entrevistas.recepcion');

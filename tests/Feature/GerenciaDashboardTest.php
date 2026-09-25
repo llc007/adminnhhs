@@ -98,7 +98,7 @@ test('user with gerencia role can access gerencia dashboard', function () {
     [$gerente, $docente, $schoolId] = setupGerenciaEnvironment();
 
     $this->actingAs($gerente)
-        ->get(route('gerencia.dashboard'))
+        ->get(route('direccion.dashboard'))
         ->assertOk()
         ->assertSee('Reporte Entrevistas')
         ->assertSee('Control de Gestión')
@@ -118,10 +118,10 @@ test('user with rectoria role can access dashboard and is redirected from /dashb
 
     $this->actingAs($rector)
         ->get('/dashboard')
-        ->assertRedirect(route('gerencia.dashboard'));
+        ->assertRedirect(route('direccion.dashboard'));
 
     $this->actingAs($rector)
-        ->get(route('gerencia.dashboard'))
+        ->get(route('direccion.dashboard'))
         ->assertOk()
         ->assertSee('Reporte Entrevistas')
         ->assertSee('Control de Gestión');
@@ -131,16 +131,24 @@ test('user without gerencia or directivo role receives 403 on gerencia dashboard
     [$gerente, $docente, $schoolId] = setupGerenciaEnvironment();
 
     $this->actingAs($docente)
-        ->get(route('gerencia.dashboard'))
+        ->get(route('direccion.dashboard'))
         ->assertForbidden();
 });
 
-test('user with gerencia role visiting /dashboard is redirected to /gerencia/dashboard', function () {
+test('user with gerencia role visiting /dashboard is redirected to /direccion/dashboard', function () {
     [$gerente, $docente, $schoolId] = setupGerenciaEnvironment();
 
     $this->actingAs($gerente)
         ->get('/dashboard')
-        ->assertRedirect(route('gerencia.dashboard'));
+        ->assertRedirect(route('direccion.dashboard'));
+});
+
+test('visiting /gerencia/dashboard redirects to /direccion/dashboard', function () {
+    [$gerente] = setupGerenciaEnvironment();
+
+    $this->actingAs($gerente)
+        ->get('/gerencia/dashboard')
+        ->assertRedirect(route('direccion.dashboard'));
 });
 
 test('gerencia dashboard livewire component calculates kpis and periods accurately', function () {
@@ -164,7 +172,7 @@ test('user with gerencia role can access printable executive summary report', fu
     [$gerente, $docente, $schoolId] = setupGerenciaEnvironment();
 
     $this->actingAs($gerente)
-        ->get(route('gerencia.imprimir.resumen', ['periodo' => 'ano_actual', 'ciclo' => 'todos']))
+        ->get(route('direccion.imprimir.resumen', ['periodo' => 'ano_actual', 'ciclo' => 'todos']))
         ->assertOk()
         ->assertSee('Resumen Ejecutivo de Gestión y Entrevistas')
         ->assertSee('ROBERTO SOSTENEDOR')

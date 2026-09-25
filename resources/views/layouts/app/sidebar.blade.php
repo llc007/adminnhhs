@@ -24,7 +24,7 @@
                 $user->can('ver-dashboard-entrevistas')
                     ? route('dashboard')
                     : ($user->hasRole(['gerencia', 'rectoria'])
-                        ? route('gerencia.dashboard')
+                        ? route('direccion.dashboard')
                         : ($user->can('ver-entrevistas-propias')
                             ? route('entrevistas.agenda')
                             : route('entrevistas.index'))))
@@ -39,8 +39,8 @@
             @if (auth()->user()->hasRole(['superadmin', 'administrador', 'directivo', 'gerencia', 'rectoria']) ||
                     auth()->user()->can('ver-dashboard-gerencia'))
                 <flux:sidebar.group class="grid mb-2" :heading="__('Direccion & Rectoria')">
-                    <flux:sidebar.item icon="presentation-chart-line" :href="route('gerencia.dashboard')"
-                        :current="request()->routeIs('gerencia.dashboard')" wire:navigate>
+                    <flux:sidebar.item icon="presentation-chart-line" :href="route('direccion.dashboard')"
+                        :current="request()->routeIs('direccion.dashboard') || request()->routeIs('gerencia.dashboard')" wire:navigate>
                         {{ __('Reporte Entrevistas') }}
                     </flux:sidebar.item>
                 </flux:sidebar.group>

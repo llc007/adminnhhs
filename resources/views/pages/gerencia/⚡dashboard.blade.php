@@ -374,7 +374,7 @@ new class extends Component {
             <flux:button 
                 variant="primary" 
                 icon="printer" 
-                href="{{ route('gerencia.imprimir.resumen', ['periodo' => $periodo, 'ciclo' => $ciclo]) }}" 
+                href="{{ route('direccion.imprimir.resumen', ['periodo' => $periodo, 'ciclo' => $ciclo]) }}" 
                 target="_blank"
                 class="bg-[#00376e] hover:bg-blue-800 text-white shadow-sm font-semibold">
                 {{ __('Imprimir Informe PDF') }}

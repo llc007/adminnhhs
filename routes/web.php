@@ -21,8 +21,14 @@ Route::middleware(['auth', 'verified', 'role:administrador,directivo,superadmin'
 
 // Dashboard Dirección & Rectoría — Gerencia, Rectoría, Directivos, Administradores y Superadmin
 Route::middleware(['auth', 'verified', 'role_or_permission:superadmin|administrador|directivo|gerencia|rectoria|ver-dashboard-gerencia'])->group(function () {
-    Route::livewire('/gerencia/dashboard', 'pages::gerencia.dashboard')->name('gerencia.dashboard');
-    Route::get('/gerencia/imprimir/resumen-ejecutivo', [ReportesPrintController::class, 'resumenEjecutivo'])->name('gerencia.imprimir.resumen');
+    Route::livewire('/direccion/dashboard', 'pages::gerencia.dashboard')->name('direccion.dashboard');
+    Route::get('/direccion/imprimir/resumen-ejecutivo', [ReportesPrintController::class, 'resumenEjecutivo'])->name('direccion.imprimir.resumen');
+
+    // Redirecciones de compatibilidad para rutas previas
+    Route::get('/gerencia/dashboard', fn () => redirect()->route('direccion.dashboard'))->name('gerencia.dashboard');
+    Route::get('/gerencia/imprimir/resumen-ejecutivo', fn () => redirect()->route('direccion.imprimir.resumen', request()->query()))->name('gerencia.imprimir.resumen');
+    Route::redirect('/direccion', '/direccion/dashboard');
+    Route::redirect('/gerencia', '/direccion/dashboard');
 });
 
 // Reportes Estadísticos — Administradores, Directivos, Gerencia, Rectoría y usuarios con permiso

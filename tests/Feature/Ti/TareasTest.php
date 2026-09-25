@@ -101,7 +101,7 @@ test('completing a recurring daily task creates the next occurrence for tomorrow
     expect($siguiente)->not->toBeNull();
     expect($siguiente->titulo)->toBe('Respaldo Diario BD');
     expect($siguiente->estado)->toBe('pendiente');
-    expect($siguiente->fecha_programada->format('Y-m-d'))->toBe(now()->addDay()->format('Y-m-d'));
+    expect($siguiente->fecha_programada->format('Y-m-d'))->toBe(now()->addWeekday()->format('Y-m-d'));
 });
 
 test('filtering tasks by frequency tab and calendar date works', function () {

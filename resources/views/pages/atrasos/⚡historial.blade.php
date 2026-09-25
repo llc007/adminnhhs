@@ -849,7 +849,6 @@ new #[Title('Historial de Atrasos')] class extends Component {
         <div class="px-5 py-2 overflow-x-auto">
             <flux:table>
                 <flux:table.columns>
-                    <flux:table.column class="w-14 text-[11px]">ID</flux:table.column>
                     <flux:table.column 
                         class="text-[11px]" 
                         sortable 
@@ -887,28 +886,14 @@ new #[Title('Historial de Atrasos')] class extends Component {
                             class="hover:bg-blue-50/60 dark:hover:bg-blue-950/20 cursor-pointer transition-colors group"
                             wire:click="verHistorialEstudiante({{ $atraso->estudiante_id }})"
                         >
-                            {{-- ID --}}
+                            {{-- Fecha y Hora (sin año ni badge) --}}
                             <flux:table.cell class="py-2.5">
-                                <span class="font-mono text-[11px] font-bold text-zinc-500 dark:text-zinc-400">#{{ $atraso->id }}</span>
-                            </flux:table.cell>
-
-                            {{-- Fecha y Hora (sin año) --}}
-                            <flux:table.cell class="py-2.5">
-                                <div class="flex items-center gap-1.5 text-xs font-semibold text-zinc-900 dark:text-zinc-100 flex-wrap">
+                                <div class="flex items-center gap-1.5 text-xs font-semibold text-zinc-900 dark:text-zinc-100">
                                     <flux:icon.calendar class="size-3.5 text-zinc-400 shrink-0" />
                                     <span>{{ Carbon::parse($atraso->fecha)->format('d/m') }}</span>
                                     <span class="font-mono font-bold text-blue-600 dark:text-blue-400 ml-1">
                                         {{ Carbon::parse($atraso->hora)->format('H:i') }} hrs
                                     </span>
-                                    @if($atraso->isTarde())
-                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800" title="Jornada Tarde (13:30)">
-                                            🌙 Tarde
-                                        </span>
-                                    @else
-                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800" title="Jornada Mañana (08:00)">
-                                            ☀️ Mañana
-                                        </span>
-                                    @endif
                                 </div>
                             </flux:table.cell>
 
@@ -1042,7 +1027,7 @@ new #[Title('Historial de Atrasos')] class extends Component {
                         </flux:table.row>
                     @empty
                         <flux:table.row>
-                            <flux:table.cell colspan="9">
+                            <flux:table.cell colspan="8">
                                 <div class="py-12 text-center text-zinc-500">
                                     <flux:icon.magnifying-glass class="size-8 mx-auto opacity-40 mb-2" />
                                     <p class="text-xs font-semibold">No se encontraron atrasos registrados con los filtros seleccionados.</p>

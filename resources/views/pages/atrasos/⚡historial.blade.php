@@ -34,6 +34,9 @@ new #[Title('Historial de Atrasos')] class extends Component {
     public string $jornada = ''; // '', 'manana', 'tarde'
 
     #[Url]
+    public string $ciclo = ''; // '', 'basica', 'media'
+
+    #[Url]
     public string $filtroAtrasosMes = ''; // '', '1', '2', '3', '3+', '4+'
 
     #[Url]
@@ -47,10 +50,13 @@ new #[Title('Historial de Atrasos')] class extends Component {
     public ?int $estudianteSeleccionadoId = null;
     public ?Estudiante $estudianteSeleccionado = null;
 
-    // Modal para editar estado / motivo
+    // Modal para editar fecha, hora, jornada, estado y motivo del atraso
     public bool $modalEdicion = false;
     public ?int $atrasoAEditarId = null;
     public string $editarEstudianteNombre = '';
+    public string $editarFecha = '';
+    public string $editarHora = '';
+    public string $editarJornada = 'manana';
     public string $editarEstado = 'injustificado';
     public string $editarMotivo = '';
     public string $editarObservaciones = '';
@@ -59,6 +65,18 @@ new #[Title('Historial de Atrasos')] class extends Component {
     public bool $modalEliminar = false;
     public ?int $atrasoAEliminarId = null;
     public string $estudianteAEliminarNombre = '';
+
+    // Modal para registrar y justificar nuevo atraso (ingreso posterior)
+    public bool $modalNuevoAtraso = false;
+    public string $nuevoSearchEstudiante = '';
+    public ?int $nuevoEstudianteId = null;
+    public ?Estudiante $nuevoEstudiante = null;
+    public string $nuevaFecha = '';
+    public string $nuevaHora = '';
+    public string $nuevaJornada = 'manana';
+    public string $nuevoEstado = 'justificado';
+    public string $nuevoMotivo = '';
+    public string $nuevasObservaciones = '';
 
     // Sincronización en tiempo real
     public bool $autoRefresh = true;
@@ -113,7 +131,7 @@ new #[Title('Historial de Atrasos')] class extends Component {
 
     public function updating($field): void
     {
-        if (in_array($field, ['search', 'curso_id', 'fecha', 'filtroTemporal', 'estado', 'jornada', 'filtroAtrasosMes', 'sortBy', 'sortDirection'])) {
+        if (in_array($field, ['search', 'curso_id', 'fecha', 'filtroTemporal', 'estado', 'jornada', 'ciclo', 'filtroAtrasosMes', 'sortBy', 'sortDirection'])) {
             $this->resetPage();
         }
     }
@@ -148,7 +166,7 @@ new #[Title('Historial de Atrasos')] class extends Component {
 
     public function clearFilters(): void
     {
-        $this->reset(['search', 'curso_id', 'estado', 'jornada', 'filtroAtrasosMes']);
+        $this->reset(['search', 'curso_id', 'estado', 'jornada', 'ciclo', 'filtroAtrasosMes']);
         $this->filtroTemporal = 'dia';
         $this->fecha = now('America/Santiago')->toDateString();
         $this->sortBy = 'fecha';
@@ -244,6 +262,16 @@ new #[Title('Historial de Atrasos')] class extends Component {
             $query->where('jornada', $this->jornada);
         }
 
+        if (! empty($this->ciclo)) {
+            $query->where(function ($q) {
+                $q->whereHas('curso', function ($cq) {
+                    $cq->where('modalidad', $this->ciclo);
+                })->orWhereHas('estudiante.curso', function ($cq) {
+                    $cq->where('modalidad', $this->ciclo);
+                });
+            });
+        }
+
         if (! empty($this->filtroAtrasosMes)) {
             if ($this->filtroAtrasosMes === '3+') {
                 $query->where($subqueryGenerator(), '>=', 3);
@@ -308,17 +336,7 @@ new #[Title('Historial de Atrasos')] class extends Component {
      */
     public function justificarAtraso(int $atrasoId): void
     {
-        $atraso = Atraso::with('estudiante')->where('school_id', $this->school?->id)->find($atrasoId);
-        if (! $atraso) {
-            return;
-        }
-
-        $this->atrasoAEditarId = $atraso->id;
-        $this->editarEstado = 'justificado';
-        $this->editarMotivo = $atraso->motivo ?? '';
-        $this->editarObservaciones = $atraso->observaciones ?? '';
-        $this->editarEstudianteNombre = $atraso->estudiante?->nombreCompleto() ?? 'Estudiante';
-        $this->modalEdicion = true;
+        $this->abrirModalEdicion($atrasoId, 'justificado');
     }
 
     public function abrirModalEdicion(int $atrasoId, ?string $estadoPorDefecto = null): void
@@ -329,6 +347,9 @@ new #[Title('Historial de Atrasos')] class extends Component {
         }
 
         $this->atrasoAEditarId = $atraso->id;
+        $this->editarFecha = $atraso->fecha ? Carbon::parse($atraso->fecha)->toDateString() : now('America/Santiago')->toDateString();
+        $this->editarHora = $atraso->hora ? Carbon::parse($atraso->hora)->format('H:i') : now('America/Santiago')->format('H:i');
+        $this->editarJornada = $atraso->jornada ?? ($this->editarHora >= '13:30' ? 'tarde' : 'manana');
         $this->editarEstado = $estadoPorDefecto ?? $atraso->estado;
         $this->editarMotivo = $atraso->motivo ?? '';
         $this->editarObservaciones = $atraso->observaciones ?? '';
@@ -344,12 +365,32 @@ new #[Title('Historial de Atrasos')] class extends Component {
 
         $atraso = Atraso::where('school_id', $this->school?->id)->find($this->atrasoAEditarId);
         if ($atraso) {
+            $fecha = ! empty($this->editarFecha) ? $this->editarFecha : $atraso->fecha;
+            $hora = ! empty($this->editarHora) ? $this->editarHora : $atraso->hora;
+            if (strlen($hora) === 5) {
+                $hora .= ':00';
+            }
+
+            $jornada = in_array($this->editarJornada, ['manana', 'tarde']) ? $this->editarJornada : ($atraso->jornada ?? 'manana');
+            $horaOficial = $jornada === 'tarde' ? '13:30:00' : '08:00:00';
+            $horaLimite = Carbon::parse($fecha . ' ' . $horaOficial, 'America/Santiago');
+            $momentoIngreso = Carbon::parse($fecha . ' ' . $hora, 'America/Santiago');
+
+            $minutosAtraso = 0;
+            if ($momentoIngreso->greaterThan($horaLimite)) {
+                $minutosAtraso = (int) $horaLimite->diffInMinutes($momentoIngreso);
+            }
+
             $atraso->update([
+                'fecha' => $fecha,
+                'hora' => $hora,
+                'jornada' => $jornada,
+                'minutos_atraso' => $minutosAtraso,
                 'estado' => $this->editarEstado,
                 'motivo' => $this->editarMotivo ?: null,
                 'observaciones' => $this->editarObservaciones ?: null,
             ]);
-            Flux::toast(heading: 'Actualizado', text: 'El estado del atraso ha sido modificado.', variant: 'success');
+            Flux::toast(heading: 'Atraso Actualizado', text: 'Se guardaron los cambios del atraso.', variant: 'success');
         }
 
         $this->modalEdicion = false;
@@ -385,6 +426,168 @@ new #[Title('Historial de Atrasos')] class extends Component {
         $this->modalEliminar = false;
         $this->atrasoAEliminarId = null;
         $this->estudianteAEliminarNombre = '';
+    }
+
+    public function abrirModalNuevoAtraso(): void
+    {
+        $now = now('America/Santiago');
+        $this->reset([
+            'nuevoSearchEstudiante',
+            'nuevoEstudianteId',
+            'nuevoEstudiante',
+            'nuevoMotivo',
+            'nuevasObservaciones',
+        ]);
+        $this->nuevaFecha = $now->toDateString();
+        $this->nuevaHora = $now->format('H:i');
+        $this->nuevaJornada = $now->format('H:i:s') >= '13:30:00' ? 'tarde' : 'manana';
+        $this->nuevoEstado = 'justificado';
+        $this->modalNuevoAtraso = true;
+    }
+
+    public function seleccionarNuevoEstudiante(int $id): void
+    {
+        $estudiante = Estudiante::with('curso')->where('school_id', $this->school?->id)->find($id);
+        if ($estudiante) {
+            $this->nuevoEstudianteId = $estudiante->id;
+            $this->nuevoEstudiante = $estudiante;
+            $this->nuevoSearchEstudiante = '';
+        }
+    }
+
+    public function deseleccionarNuevoEstudiante(): void
+    {
+        $this->nuevoEstudianteId = null;
+        $this->nuevoEstudiante = null;
+        $this->nuevoSearchEstudiante = '';
+    }
+
+    public function seleccionarPrimerResultadoNuevo(): void
+    {
+        $primer = $this->resultadosNuevoEstudiante->first();
+        if ($primer) {
+            $this->seleccionarNuevoEstudiante($primer->id);
+        }
+    }
+
+    #[Computed]
+    public function resultadosNuevoEstudiante()
+    {
+        $query = trim($this->nuevoSearchEstudiante);
+        if (mb_strlen($query) < 2 || ! $this->school) {
+            return collect();
+        }
+
+        $cleanRut = preg_replace('/[^0-9kK]/', '', $query);
+        $words = array_filter(explode(' ', $query));
+
+        return Estudiante::activos()
+            ->with(['curso'])
+            ->where('school_id', $this->school->id)
+            ->where(function ($q) use ($words, $cleanRut) {
+                foreach ($words as $word) {
+                    $w = trim($word);
+                    if ($w === '') {
+                        continue;
+                    }
+                    $q->where(function ($sq) use ($w) {
+                        $sq->where('nombres_csv', 'like', "%{$w}%");
+                    });
+                }
+                if (! empty($cleanRut)) {
+                    $q->orWhere('rut_numero', 'like', "%{$cleanRut}%");
+                }
+            })
+            ->take(8)
+            ->get();
+    }
+
+    public function guardarNuevoAtraso(bool $imprimir = false): void
+    {
+        $user = auth()->user();
+        if (! $user->hasRole('superadmin') && ! $user->can('ingresar-atrasos')) {
+            Flux::toast(heading: 'Error', text: 'No tienes permiso para registrar atrasos.', variant: 'danger');
+            return;
+        }
+
+        if (! $this->nuevoEstudianteId) {
+            Flux::toast(heading: 'Atención', text: 'Debes seleccionar un estudiante para continuar.', variant: 'warning');
+            return;
+        }
+
+        $school = $this->school;
+        if (! $school) {
+            Flux::toast(heading: 'Error', text: 'No tienes un colegio activo seleccionado.', variant: 'danger');
+            return;
+        }
+
+        $estudiante = Estudiante::where('school_id', $school->id)->find($this->nuevoEstudianteId);
+        if (! $estudiante) {
+            Flux::toast(heading: 'Error', text: 'Estudiante no encontrado.', variant: 'danger');
+            return;
+        }
+
+        $fechaRegistro = ! empty($this->nuevaFecha) ? $this->nuevaFecha : now('America/Santiago')->toDateString();
+
+        // Control de duplicados en la misma fecha
+        $yaRegistrado = Atraso::where('school_id', $school->id)
+            ->where('estudiante_id', $estudiante->id)
+            ->whereDate('fecha', $fechaRegistro)
+            ->first();
+
+        if ($yaRegistrado) {
+            Flux::toast(
+                heading: 'Estudiante ya registrado',
+                text: "{$estudiante->nombreCompleto()} ya cuenta con un atraso registrado en la fecha seleccionada.",
+                variant: 'warning'
+            );
+            return;
+        }
+
+        $horaIngresada = ! empty($this->nuevaHora) ? $this->nuevaHora : now('America/Santiago')->format('H:i');
+        if (strlen($horaIngresada) === 5) {
+            $horaIngresada .= ':00';
+        }
+
+        $jornada = in_array($this->nuevaJornada, ['manana', 'tarde']) ? $this->nuevaJornada : 'manana';
+        $horaOficial = $jornada === 'tarde' ? '13:30:00' : '08:00:00';
+        $horaLimite = Carbon::parse($fechaRegistro . ' ' . $horaOficial, 'America/Santiago');
+        $momentoIngreso = Carbon::parse($fechaRegistro . ' ' . $horaIngresada, 'America/Santiago');
+
+        $minutosAtraso = 0;
+        if ($momentoIngreso->greaterThan($horaLimite)) {
+            $minutosAtraso = (int) $horaLimite->diffInMinutes($momentoIngreso);
+        }
+
+        $nuevoAtraso = Atraso::create([
+            'school_id' => $school->id,
+            'academic_year_id' => $this->academicYear?->id,
+            'estudiante_id' => $estudiante->id,
+            'curso_id' => $estudiante->curso_id,
+            'registrado_por_user_id' => auth()->id(),
+            'fecha' => $fechaRegistro,
+            'hora' => $horaIngresada,
+            'jornada' => $jornada,
+            'minutos_atraso' => $minutosAtraso,
+            'estado' => $this->nuevoEstado ?: 'justificado',
+            'motivo' => $this->nuevoMotivo ?: null,
+            'observaciones' => $this->nuevasObservaciones ?: null,
+        ]);
+
+        $this->modalNuevoAtraso = false;
+        $this->resetPage();
+
+        $totalMes = $estudiante->atrasosMesActualCount();
+
+        Flux::toast(
+            heading: 'Atraso Registrado',
+            text: "{$estudiante->nombreCompleto()} registrado como {$this->nuevoEstado} (#{$totalMes} en el mes).",
+            variant: 'success'
+        );
+
+        if ($imprimir) {
+            $this->js("window.open('" . route('atrasos.ticket', $nuevoAtraso->id) . "', '_blank')");
+        }
     }
 
     public function exportarCsv()
@@ -455,7 +658,7 @@ new #[Title('Historial de Atrasos')] class extends Component {
 }; ?>
 
 @php
-    $debeActualizar = $this->autoRefresh && $this->esFechaHoy && ! $modalDetalleEstudiante && ! $modalEdicion && ! $modalEliminar;
+    $debeActualizar = $this->autoRefresh && $this->esFechaHoy && ! $modalDetalleEstudiante && ! $modalEdicion && ! $modalEliminar && ! $modalNuevoAtraso;
 @endphp
 
 <div 
@@ -499,6 +702,17 @@ new #[Title('Historial de Atrasos')] class extends Component {
             <flux:button variant="primary" icon="document-arrow-down" wire:click="exportarCsv" class="bg-gradient-to-br from-[#00376e] to-blue-800">
                 Exportar CSV
             </flux:button>
+
+            @if(auth()->user()->hasRole('superadmin') || auth()->user()->can('ingresar-atrasos'))
+                <flux:button 
+                    variant="primary" 
+                    icon="plus" 
+                    wire:click="abrirModalNuevoAtraso" 
+                    class="bg-gradient-to-br from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-bold shadow-sm"
+                >
+                    Registrar y Justificar
+                </flux:button>
+            @endif
         </div>
     </x-header>
 
@@ -571,13 +785,13 @@ new #[Title('Historial de Atrasos')] class extends Component {
                 </div>
             </flux:field>
 
-            {{-- Filtrar por Jornada --}}
+            {{-- Filtrar por Ciclo (Básica o Media) --}}
             <flux:field class="lg:col-span-4">
-                <flux:label class="text-[11px]">Jornada</flux:label>
-                <flux:select size="sm" class="!text-xs" wire:model.live="jornada">
-                    <flux:select.option value="">Todas las jornadas</flux:select.option>
-                    <flux:select.option value="manana">☀️ Mañana (08:00)</flux:select.option>
-                    <flux:select.option value="tarde">🌙 Tarde (13:30)</flux:select.option>
+                <flux:label class="text-[11px]">Ciclo</flux:label>
+                <flux:select size="sm" class="!text-xs" wire:model.live="ciclo">
+                    <flux:select.option value="">Todos los ciclos</flux:select.option>
+                    <flux:select.option value="basica">Básica (1º a 8º Básico)</flux:select.option>
+                    <flux:select.option value="media">Media (1º a 4º Medio)</flux:select.option>
                 </flux:select>
             </flux:field>
 
@@ -606,41 +820,6 @@ new #[Title('Historial de Atrasos')] class extends Component {
             </flux:field>
         </div>
     </flux:card>
-
-    {{-- Cards de Estadísticas del Periodo Seleccionado --}}
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <flux:card class="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
-            <span class="block text-[10px] uppercase font-bold text-zinc-400 tracking-wider">Total Atrasos</span>
-            <div class="flex items-baseline gap-2 mt-1">
-                <span class="text-2xl font-black text-zinc-900 dark:text-zinc-100">{{ $totalFiltrados }}</span>
-                <span class="text-xs text-zinc-500">en este filtro</span>
-            </div>
-        </flux:card>
-
-        <flux:card class="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
-            <span class="block text-[10px] uppercase font-bold text-blue-500 tracking-wider">Alumnos Afectados</span>
-            <div class="flex items-baseline gap-2 mt-1">
-                <span class="text-2xl font-black text-blue-700 dark:text-blue-400">{{ $alumnosUnicos }}</span>
-                <span class="text-xs text-zinc-500">estudiantes distintos</span>
-            </div>
-        </flux:card>
-
-        <flux:card class="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
-            <span class="block text-[10px] uppercase font-bold text-rose-500 tracking-wider">Injustificados</span>
-            <div class="flex items-baseline gap-2 mt-1">
-                <span class="text-2xl font-black text-rose-600 dark:text-rose-400">{{ $injustificadosFiltrados }}</span>
-                <span class="text-xs text-zinc-500">sin justificar</span>
-            </div>
-        </flux:card>
-
-        <flux:card class="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
-            <span class="block text-[10px] uppercase font-bold text-emerald-500 tracking-wider">Justificados</span>
-            <div class="flex items-baseline gap-2 mt-1">
-                <span class="text-2xl font-black text-emerald-600 dark:text-emerald-400">{{ $justificadosFiltrados }}</span>
-                <span class="text-xs text-zinc-500">con justificativo</span>
-            </div>
-        </flux:card>
-    </div>
 
     {{-- Tabla Principal de Atrasos --}}
     <flux:card class="overflow-hidden shadow-sm p-0 border border-zinc-200 dark:border-zinc-800">
@@ -690,11 +869,11 @@ new #[Title('Historial de Atrasos')] class extends Component {
                                 <span class="font-mono text-[11px] font-bold text-zinc-500 dark:text-zinc-400">#{{ $atraso->id }}</span>
                             </flux:table.cell>
 
-                            {{-- Fecha y Hora --}}
+                            {{-- Fecha y Hora (sin año) --}}
                             <flux:table.cell class="py-2.5">
                                 <div class="flex items-center gap-1.5 text-xs font-semibold text-zinc-900 dark:text-zinc-100 flex-wrap">
                                     <flux:icon.calendar class="size-3.5 text-zinc-400 shrink-0" />
-                                    <span>{{ Carbon::parse($atraso->fecha)->format('d/m/Y') }}</span>
+                                    <span>{{ Carbon::parse($atraso->fecha)->format('d/m') }}</span>
                                     <span class="font-mono font-bold text-blue-600 dark:text-blue-400 ml-1">
                                         {{ Carbon::parse($atraso->hora)->format('H:i') }} hrs
                                     </span>
@@ -806,6 +985,16 @@ new #[Title('Historial de Atrasos')] class extends Component {
                                         {{ $atraso->estado === 'justificado' ? '✓ Justificado' : 'Justificar' }}
                                     </button>
 
+                                    {{-- Botón Editar Atraso (Fecha, Hora, Detalle) --}}
+                                    <button 
+                                        type="button" 
+                                        wire:click.stop="abrirModalEdicion({{ $atraso->id }})"
+                                        class="p-1 rounded text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                                        title="Editar fecha, hora y detalle del atraso"
+                                    >
+                                        <flux:icon.pencil-square class="size-3.5" />
+                                    </button>
+
                                     {{-- Pase Térmico --}}
                                     <a 
                                         href="{{ route('atrasos.ticket', $atraso->id) }}" 
@@ -847,6 +1036,41 @@ new #[Title('Historial de Atrasos')] class extends Component {
             {{ $atrasos->links(data: ['scrollTo' => false]) }}
         </div>
     </flux:card>
+
+    {{-- Cards de Estadísticas del Periodo Seleccionado (Ubicados debajo de la tabla) --}}
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <flux:card class="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
+            <span class="block text-[10px] uppercase font-bold text-zinc-400 tracking-wider">Total Atrasos</span>
+            <div class="flex items-baseline gap-2 mt-1">
+                <span class="text-2xl font-black text-zinc-900 dark:text-zinc-100">{{ $totalFiltrados }}</span>
+                <span class="text-xs text-zinc-500">en este filtro</span>
+            </div>
+        </flux:card>
+
+        <flux:card class="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
+            <span class="block text-[10px] uppercase font-bold text-blue-500 tracking-wider">Alumnos Afectados</span>
+            <div class="flex items-baseline gap-2 mt-1">
+                <span class="text-2xl font-black text-blue-700 dark:text-blue-400">{{ $alumnosUnicos }}</span>
+                <span class="text-xs text-zinc-500">estudiantes distintos</span>
+            </div>
+        </flux:card>
+
+        <flux:card class="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
+            <span class="block text-[10px] uppercase font-bold text-rose-500 tracking-wider">Injustificados</span>
+            <div class="flex items-baseline gap-2 mt-1">
+                <span class="text-2xl font-black text-rose-600 dark:text-rose-400">{{ $injustificadosFiltrados }}</span>
+                <span class="text-xs text-zinc-500">sin justificar</span>
+            </div>
+        </flux:card>
+
+        <flux:card class="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
+            <span class="block text-[10px] uppercase font-bold text-emerald-500 tracking-wider">Justificados</span>
+            <div class="flex items-baseline gap-2 mt-1">
+                <span class="text-2xl font-black text-emerald-600 dark:text-emerald-400">{{ $justificadosFiltrados }}</span>
+                <span class="text-xs text-zinc-500">con justificativo</span>
+            </div>
+        </flux:card>
+    </div>
 
     {{-- MODAL DE HISTORIAL COMPLETO DEL ESTUDIANTE AL HACER CLICK EN LA FILA --}}
     <flux:modal wire:model="modalDetalleEstudiante" class="md:w-[680px]">
@@ -947,32 +1171,61 @@ new #[Title('Historial de Atrasos')] class extends Component {
         @endif
     </flux:modal>
 
-    {{-- Modal Edición de Justificación / Motivo --}}
-    <flux:modal wire:model="modalEdicion" class="md:w-96 space-y-5">
+    {{-- Modal Edición de Atraso (Fecha, Hora, Jornada, Estado, Motivo) --}}
+    <flux:modal wire:model="modalEdicion" class="md:w-[480px] space-y-5">
         <div>
-            <flux:heading size="lg">Detalle del Atraso</flux:heading>
+            <flux:heading size="lg">Editar Atraso</flux:heading>
             <flux:subheading>
-                {{ $editarEstudianteNombre ?: 'Actualizar estado o motivo del atraso.' }}
+                {{ $editarEstudianteNombre ?: 'Actualizar fecha, hora o justificativo del atraso.' }}
             </flux:subheading>
         </div>
 
         <div class="space-y-4">
-            <flux:field>
-                <flux:label>Estado</flux:label>
-                <flux:select wire:model="editarEstado">
-                    <flux:select.option value="justificado">Justificado</flux:select.option>
-                    <flux:select.option value="injustificado">Injustificado</flux:select.option>
-                    <flux:select.option value="pendiente">Pendiente</flux:select.option>
-                </flux:select>
-            </flux:field>
+            {{-- Fecha, Hora y Jornada --}}
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <flux:field>
+                    <flux:label class="text-[11px]">Fecha</flux:label>
+                    <flux:input type="date" size="sm" wire:model="editarFecha" />
+                </flux:field>
+
+                <flux:field>
+                    <flux:label class="text-[11px]">Hora Ingreso</flux:label>
+                    <flux:input type="time" size="sm" wire:model="editarHora" />
+                </flux:field>
+
+                <flux:field>
+                    <flux:label class="text-[11px]">Jornada</flux:label>
+                    <flux:select size="sm" wire:model="editarJornada">
+                        <flux:select.option value="manana">☀️ Mañana</flux:select.option>
+                        <flux:select.option value="tarde">🌙 Tarde</flux:select.option>
+                    </flux:select>
+                </flux:field>
+            </div>
+
+            {{-- Estado y Motivo --}}
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <flux:field class="sm:col-span-1">
+                    <flux:label class="text-[11px]">Estado</flux:label>
+                    <flux:select size="sm" wire:model="editarEstado">
+                        <flux:select.option value="justificado">Justificado</flux:select.option>
+                        <flux:select.option value="injustificado">Injustificado</flux:select.option>
+                        <flux:select.option value="pendiente">Pendiente</flux:select.option>
+                    </flux:select>
+                </flux:field>
+
+                <flux:field class="sm:col-span-2">
+                    <flux:label class="text-[11px]">Motivo de Justificación</flux:label>
+                    <flux:input 
+                        size="sm" 
+                        wire:model="editarMotivo" 
+                        list="motivos-atraso-rapido"
+                        placeholder="Ej: Apoderado presente, Pase médico, Locomoción..." 
+                    />
+                </flux:field>
+            </div>
 
             <flux:field>
-                <flux:label>Motivo de Justificación</flux:label>
-                <flux:input wire:model="editarMotivo" placeholder="Ej: Apoderado presente, Pase médico, Locomoción..." />
-            </flux:field>
-
-            <flux:field>
-                <flux:label>Observaciones (Opcional)</flux:label>
+                <flux:label class="text-[11px]">Observaciones (Opcional)</flux:label>
                 <flux:textarea wire:model="editarObservaciones" placeholder="Detalles adicionales de Inspectoría..." rows="2" />
             </flux:field>
         </div>
@@ -1006,6 +1259,173 @@ new #[Title('Historial de Atrasos')] class extends Component {
                 </flux:button>
                 <flux:button variant="danger" wire:click="eliminarAtraso">
                     Sí, Anular Atraso
+                </flux:button>
+            </div>
+        </div>
+    </flux:modal>
+
+    {{-- Modal para Registrar y Justificar Atraso Directamente (Ingreso Posterior) --}}
+    <flux:modal wire:model="modalNuevoAtraso" class="md:w-[540px] space-y-5">
+        <div class="flex items-center gap-3">
+            <div class="size-10 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                <flux:icon.plus-circle class="size-6" />
+            </div>
+            <div>
+                <flux:heading size="lg">Registrar y Justificar Atraso</flux:heading>
+                <flux:subheading>Para estudiantes que ingresan después del registro masivo</flux:subheading>
+            </div>
+        </div>
+
+        <div class="space-y-4">
+            {{-- Selección de Estudiante --}}
+            @if($this->nuevoEstudiante)
+                <div class="p-3 rounded-xl bg-blue-50/80 dark:bg-blue-950/30 border border-blue-200/80 dark:border-blue-900/50 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="size-9 rounded-lg bg-[#00376e] text-white flex items-center justify-center font-bold text-xs uppercase shrink-0">
+                            {{ mb_substr($this->nuevoEstudiante->nombres_csv ?? 'E', 0, 2) }}
+                        </div>
+                        <div class="leading-tight">
+                            <span class="block text-xs font-black text-zinc-900 dark:text-zinc-100">
+                                {{ $this->nuevoEstudiante->nombreCompleto() }}
+                            </span>
+                            <div class="flex items-center gap-2 text-[11px] text-zinc-500 font-mono mt-0.5">
+                                <span>{{ $this->nuevoEstudiante->rutCompleto() }}</span>
+                                <span>•</span>
+                                <span class="font-sans font-semibold text-blue-700 dark:text-blue-300">
+                                    {{ $this->nuevoEstudiante->curso?->nombreCompleto() ?? 'Sin curso' }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <button 
+                        type="button" 
+                        wire:click="deseleccionarNuevoEstudiante" 
+                        class="p-1 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-200/60 dark:hover:bg-zinc-800 transition-colors"
+                        title="Cambiar estudiante"
+                    >
+                        <flux:icon.x-mark class="size-4" />
+                    </button>
+                </div>
+            @else
+                <div class="relative">
+                    <flux:field>
+                        <flux:label class="text-[11px]">Estudiante <span class="text-rose-500">*</span></flux:label>
+                        <flux:input 
+                            size="sm"
+                            wire:model.live.debounce.250ms="nuevoSearchEstudiante" 
+                            wire:keydown.enter.prevent="seleccionarPrimerResultadoNuevo"
+                            icon="magnifying-glass"
+                            placeholder="Buscar por nombre, apellido o RUT..." 
+                            autocomplete="off"
+                        />
+                    </flux:field>
+
+                    @if(!empty($this->nuevoSearchEstudiante) && mb_strlen(trim($this->nuevoSearchEstudiante)) >= 2)
+                        <div class="absolute left-0 right-0 top-full mt-1 z-50 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-lg max-h-56 overflow-y-auto divide-y divide-zinc-100 dark:divide-zinc-800">
+                            @forelse($this->resultadosNuevoEstudiante as $res)
+                                <button 
+                                    type="button" 
+                                    wire:click="seleccionarNuevoEstudiante({{ $res->id }})"
+                                    class="w-full px-3 py-2 text-left hover:bg-blue-50 dark:hover:bg-blue-950/40 flex items-center justify-between transition-colors text-xs"
+                                >
+                                    <div>
+                                        <span class="font-bold text-zinc-800 dark:text-zinc-200 block">{{ $res->nombreCompleto() }}</span>
+                                        <span class="text-[10px] text-zinc-400 font-mono">{{ $res->rutCompleto() }}</span>
+                                    </div>
+                                    <span class="text-[11px] font-semibold text-blue-600 dark:text-blue-400">
+                                        {{ $res->curso?->nombreAbreviado() ?? 'S/C' }}
+                                    </span>
+                                </button>
+                            @empty
+                                <div class="p-3 text-center text-xs text-zinc-400">
+                                    No se encontraron estudiantes con "{{ $this->nuevoSearchEstudiante }}"
+                                </div>
+                            @endforelse
+                        </div>
+                    @endif
+                </div>
+            @endif
+
+            {{-- Fila con Fecha, Hora y Jornada --}}
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <flux:field>
+                    <flux:label class="text-[11px]">Fecha</flux:label>
+                    <flux:input type="date" size="sm" wire:model="nuevaFecha" />
+                </flux:field>
+
+                <flux:field>
+                    <flux:label class="text-[11px]">Hora Ingreso</flux:label>
+                    <flux:input type="time" size="sm" wire:model="nuevaHora" />
+                </flux:field>
+
+                <flux:field>
+                    <flux:label class="text-[11px]">Jornada</flux:label>
+                    <flux:select size="sm" wire:model="nuevaJornada">
+                        <flux:select.option value="manana">☀️ Mañana (08:00)</flux:select.option>
+                        <flux:select.option value="tarde">🌙 Tarde (13:30)</flux:select.option>
+                    </flux:select>
+                </flux:field>
+            </div>
+
+            {{-- Fila con Estado y Motivo --}}
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <flux:field class="sm:col-span-1">
+                    <flux:label class="text-[11px]">Estado</flux:label>
+                    <flux:select size="sm" wire:model.live="nuevoEstado">
+                        <flux:select.option value="justificado">Justificado</flux:select.option>
+                        <flux:select.option value="injustificado">Injustificado</flux:select.option>
+                        <flux:select.option value="pendiente">Pendiente</flux:select.option>
+                    </flux:select>
+                </flux:field>
+
+                <flux:field class="sm:col-span-2">
+                    <flux:label class="text-[11px]">
+                        Motivo @if($nuevoEstado === 'justificado') <span class="text-emerald-600 font-bold">*</span> @endif
+                    </flux:label>
+                    <flux:input 
+                        size="sm" 
+                        wire:model="nuevoMotivo" 
+                        list="motivos-atraso-rapido"
+                        placeholder="Ej: Apoderado presente, Pase médico, Locomoción..." 
+                    />
+                    <datalist id="motivos-atraso-rapido">
+                        <option value="Apoderado presente en portería">
+                        <option value="Atención médica / Dental">
+                        <option value="Pase de Inspectoría General">
+                        <option value="Problemas de locomoción / Transporte">
+                        <option value="Trámites personales / familiares">
+                        <option value="Certificado médico adjunto">
+                        <option value="Autorizado por Dirección">
+                    </datalist>
+                </flux:field>
+            </div>
+
+            {{-- Observaciones --}}
+            <flux:field>
+                <flux:label class="text-[11px]">Observaciones (Opcional)</flux:label>
+                <flux:textarea wire:model="nuevasObservaciones" placeholder="Detalles u observaciones de Inspectoría..." rows="2" />
+            </flux:field>
+        </div>
+
+        <div class="flex items-center justify-between gap-2 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+            <flux:button variant="ghost" wire:click="$set('modalNuevoAtraso', false)">
+                Cancelar
+            </flux:button>
+            <div class="flex items-center gap-2">
+                <flux:button 
+                    variant="primary" 
+                    wire:click="guardarNuevoAtraso(false)"
+                    class="bg-[#00376e] hover:bg-blue-800 text-white"
+                >
+                    Guardar
+                </flux:button>
+                <flux:button 
+                    variant="primary" 
+                    icon="printer" 
+                    wire:click="guardarNuevoAtraso(true)" 
+                    class="bg-gradient-to-br from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-bold"
+                >
+                    Guardar e Imprimir
                 </flux:button>
             </div>
         </div>

@@ -641,3 +641,171 @@ test('can filter historial by jornada', function () {
     $recordsAll = $componentAll->viewData('atrasos');
     expect($recordsAll->total())->toBe(2);
 });
+
+test('can open modal and register new justified atraso directly from historial', function () {
+    [$user, $schoolId, $cursoId, $estudiante] = setupAtrasosEnvironment('inspector');
+
+    $this->actingAs($user);
+
+    $component = Livewire::test('pages::atrasos.historial')
+        ->call('abrirModalNuevoAtraso')
+        ->assertSet('modalNuevoAtraso', true)
+        ->assertSet('nuevoEstado', 'justificado')
+        ->set('nuevoSearchEstudiante', 'PEREZ');
+
+    expect($component->get('resultadosNuevoEstudiante')->count())->toBe(1);
+
+    $component->call('seleccionarNuevoEstudiante', $estudiante->id)
+        ->assertSet('nuevoEstudianteId', $estudiante->id)
+        ->set('nuevaHora', '08:45')
+        ->set('nuevaJornada', 'manana')
+        ->set('nuevoMotivo', 'Apoderado presente en portería')
+        ->call('guardarNuevoAtraso', false)
+        ->assertSet('modalNuevoAtraso', false);
+
+    $atraso = Atraso::where('school_id', $schoolId)->where('estudiante_id', $estudiante->id)->first();
+    expect($atraso)->not->toBeNull()
+        ->and($atraso->estado)->toBe('justificado')
+        ->and($atraso->motivo)->toBe('Apoderado presente en portería')
+        ->and($atraso->minutos_atraso)->toBe(45)
+        ->and($atraso->jornada)->toBe('manana')
+        ->and($atraso->registrado_por_user_id)->toBe($user->id);
+});
+
+test('cannot register duplicate atraso for same student on same date from historial', function () {
+    [$user, $schoolId, $cursoId, $estudiante] = setupAtrasosEnvironment('inspector');
+
+    $today = now('America/Santiago')->toDateString();
+
+    Atraso::create([
+        'school_id' => $schoolId,
+        'estudiante_id' => $estudiante->id,
+        'curso_id' => $cursoId,
+        'registrado_por_user_id' => $user->id,
+        'fecha' => $today,
+        'hora' => '08:10:00',
+        'minutos_atraso' => 10,
+        'jornada' => 'manana',
+        'estado' => 'injustificado',
+    ]);
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::atrasos.historial')
+        ->call('abrirModalNuevoAtraso')
+        ->call('seleccionarNuevoEstudiante', $estudiante->id)
+        ->set('nuevaFecha', $today)
+        ->set('nuevaHora', '09:00')
+        ->call('guardarNuevoAtraso', false);
+
+    expect(Atraso::where('estudiante_id', $estudiante->id)->whereDate('fecha', $today)->count())->toBe(1);
+});
+
+test('can edit atraso fecha and hora in historial and recalculates minutes', function () {
+    [$user, $schoolId, $cursoId, $estudiante] = setupAtrasosEnvironment('inspector');
+    $this->actingAs($user);
+
+    $atraso = Atraso::create([
+        'school_id' => $schoolId,
+        'estudiante_id' => $estudiante->id,
+        'curso_id' => $cursoId,
+        'registrado_por_user_id' => $user->id,
+        'fecha' => '2026-09-23',
+        'hora' => '08:10:00',
+        'minutos_atraso' => 10,
+        'jornada' => 'manana',
+        'estado' => 'injustificado',
+    ]);
+
+    Livewire::test('pages::atrasos.historial')
+        ->call('abrirModalEdicion', $atraso->id)
+        ->assertSet('modalEdicion', true)
+        ->assertSet('editarFecha', '2026-09-23')
+        ->assertSet('editarHora', '08:10')
+        ->set('editarFecha', '2026-09-24')
+        ->set('editarHora', '08:45')
+        ->set('editarMotivo', 'Problema de locomoción')
+        ->call('guardarEdicion')
+        ->assertSet('modalEdicion', false);
+
+    $updated = $atraso->fresh();
+    expect($updated->fecha->toDateString())->toBe('2026-09-24')
+        ->and($updated->hora)->toBe('08:45:00')
+        ->and($updated->minutos_atraso)->toBe(45)
+        ->and($updated->motivo)->toBe('Problema de locomoción');
+});
+
+test('can filter historial by ciclo (basica or media)', function () {
+    [$user, $schoolId, $cursoMediaId, $estudianteMedia] = setupAtrasosEnvironment('inspector');
+
+    // Create a basica course and student
+    $cursoBasicaId = DB::table('cursos')->insertGetId([
+        'school_id' => $schoolId,
+        'academic_year_id' => DB::table('academic_years')->where('school_id', $schoolId)->value('id'),
+        'nivel' => 5,
+        'modalidad' => 'basica',
+        'letra' => 'A',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $estudianteBasica = Estudiante::create([
+        'school_id' => $schoolId,
+        'curso_id' => $cursoBasicaId,
+        'nombres_csv' => 'PEDRO PICAPIEDRA',
+        'rut_numero' => '23111222',
+        'rut_dv' => '3',
+        'estado' => 'activo',
+    ]);
+
+    $today = now('America/Santiago')->toDateString();
+
+    $atrasoMedia = Atraso::create([
+        'school_id' => $schoolId,
+        'estudiante_id' => $estudianteMedia->id,
+        'curso_id' => $cursoMediaId,
+        'registrado_por_user_id' => $user->id,
+        'fecha' => $today,
+        'hora' => '08:15:00',
+        'minutos_atraso' => 15,
+        'jornada' => 'manana',
+        'estado' => 'injustificado',
+    ]);
+
+    $atrasoBasica = Atraso::create([
+        'school_id' => $schoolId,
+        'estudiante_id' => $estudianteBasica->id,
+        'curso_id' => $cursoBasicaId,
+        'registrado_por_user_id' => $user->id,
+        'fecha' => $today,
+        'hora' => '08:20:00',
+        'minutos_atraso' => 20,
+        'jornada' => 'manana',
+        'estado' => 'injustificado',
+    ]);
+
+    $this->actingAs($user);
+
+    // Filter by 'basica'
+    $componentBasica = Livewire::test('pages::atrasos.historial')
+        ->set('ciclo', 'basica');
+
+    $recordsBasica = $componentBasica->viewData('atrasos');
+    expect($recordsBasica->total())->toBe(1)
+        ->and($recordsBasica->first()->id)->toBe($atrasoBasica->id);
+
+    // Filter by 'media'
+    $componentMedia = Livewire::test('pages::atrasos.historial')
+        ->set('ciclo', 'media');
+
+    $recordsMedia = $componentMedia->viewData('atrasos');
+    expect($recordsMedia->total())->toBe(1)
+        ->and($recordsMedia->first()->id)->toBe($atrasoMedia->id);
+
+    // Clear ciclo filter
+    $componentTodos = Livewire::test('pages::atrasos.historial')
+        ->set('ciclo', '');
+
+    $recordsTodos = $componentTodos->viewData('atrasos');
+    expect($recordsTodos->total())->toBe(2);
+});

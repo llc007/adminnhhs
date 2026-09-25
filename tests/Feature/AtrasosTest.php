@@ -809,3 +809,33 @@ test('can filter historial by ciclo (basica or media)', function () {
     $recordsTodos = $componentTodos->viewData('atrasos');
     expect($recordsTodos->total())->toBe(2);
 });
+
+test('historial student detail modal displays who registered the atraso in cronograma', function () {
+    [$user, $schoolId, $cursoId, $estudiante] = setupAtrasosEnvironment('inspector');
+
+    $user->update([
+        'nombres' => 'MARIA',
+        'apellido_pat' => 'RODRIGUEZ',
+    ]);
+
+    $atraso = Atraso::create([
+        'school_id' => $schoolId,
+        'academic_year_id' => 1,
+        'estudiante_id' => $estudiante->id,
+        'curso_id' => $cursoId,
+        'registrado_por_user_id' => $user->id,
+        'fecha' => now('America/Santiago')->toDateString(),
+        'hora' => '08:15:00',
+        'minutos_atraso' => 15,
+        'jornada' => 'manana',
+        'estado' => 'injustificado',
+    ]);
+
+    $this->actingAs($user);
+
+    $component = Livewire::test('pages::atrasos.historial')
+        ->call('verHistorialEstudiante', $estudiante->id)
+        ->assertSet('modalDetalleEstudiante', true)
+        ->assertSee('MARIA RODRIGUEZ')
+        ->assertSee('Por:');
+});

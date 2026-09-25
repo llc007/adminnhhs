@@ -872,7 +872,6 @@ new #[Title('Historial de Atrasos')] class extends Component {
                     </flux:table.column>
                     <flux:table.column class="text-[11px]">Minutos</flux:table.column>
                     <flux:table.column class="text-[11px]">Estado / Motivo</flux:table.column>
-                    <flux:table.column class="text-[11px]">Registrado Por</flux:table.column>
                     <flux:table.column class="text-right text-[11px]">Acciones</flux:table.column>
                 </flux:table.columns>
 
@@ -969,13 +968,6 @@ new #[Title('Historial de Atrasos')] class extends Component {
                                 </div>
                             </flux:table.cell>
 
-                            {{-- Registrado Por --}}
-                            <flux:table.cell class="py-2.5">
-                                <span class="text-[11px] text-zinc-600 dark:text-zinc-400 font-medium truncate block max-w-[110px]" title="{{ $atraso->registradoPor?->nombreCompleto() ?? 'Sistema' }}">
-                                    {{ $atraso->registradoPor ? ($atraso->registradoPor->nombres . ' ' . $atraso->registradoPor->apellido_pat) : 'Sistema' }}
-                                </span>
-                            </flux:table.cell>
-
                             {{-- Acciones (con stopPropagation para no abrir el modal al clickear un botón) --}}
                             <flux:table.cell class="py-2.5 text-right" wire:click.stop>
                                 <div class="flex items-center justify-end gap-1">
@@ -1027,7 +1019,7 @@ new #[Title('Historial de Atrasos')] class extends Component {
                         </flux:table.row>
                     @empty
                         <flux:table.row>
-                            <flux:table.cell colspan="8">
+                            <flux:table.cell colspan="7">
                                 <div class="py-12 text-center text-zinc-500">
                                     <flux:icon.magnifying-glass class="size-8 mx-auto opacity-40 mb-2" />
                                     <p class="text-xs font-semibold">No se encontraron atrasos registrados con los filtros seleccionados.</p>
@@ -1092,7 +1084,7 @@ new #[Title('Historial de Atrasos')] class extends Component {
                     <div class="max-h-72 overflow-y-auto rounded-xl border border-zinc-200 dark:border-zinc-800 divide-y divide-zinc-100 dark:divide-zinc-800">
                         @forelse($estudianteSeleccionado->atrasos as $item)
                             <div class="p-3 flex items-center justify-between gap-3 text-xs hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
-                                <div class="flex items-center gap-2.5">
+                                <div class="flex items-center gap-2.5 flex-wrap">
                                     <span class="font-bold text-zinc-800 dark:text-zinc-200">
                                         {{ Carbon::parse($item->fecha)->format('d/m/Y') }}
                                     </span>
@@ -1104,6 +1096,9 @@ new #[Title('Historial de Atrasos')] class extends Component {
                                             (+{{ $item->minutos_atraso }}m)
                                         </span>
                                     @endif
+                                    <span class="text-[11px] text-zinc-500 dark:text-zinc-400">
+                                        • Por: <span class="font-semibold text-zinc-700 dark:text-zinc-300">{{ $item->registradoPor ? ($item->registradoPor->nombres . ' ' . $item->registradoPor->apellido_pat) : 'Sistema' }}</span>
+                                    </span>
                                 </div>
 
                                 <div class="flex items-center gap-2">

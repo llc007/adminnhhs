@@ -61,25 +61,12 @@ class FilterNotificationEmails
                     : null;
 
                 $subject = $mailMessage ? ($mailMessage->subject ?? 'Notificación del sistema') : 'Notificación';
-                $body = '';
-
-                if ($mailMessage) {
-                    if (method_exists($mailMessage, 'render')) {
-                        try {
-                            $body = (string) $mailMessage->render();
-                        } catch (\Throwable $e) {
-                            $body = implode("\n", $mailMessage->introLines ?? []);
-                        }
-                    } else {
-                        $body = implode("\n", $mailMessage->introLines ?? []);
-                    }
-                }
 
                 MailLog::create([
                     'mail_id' => null,
                     'to' => $to,
                     'subject' => $subject,
-                    'body' => $body,
+                    'body' => null,
                     'status' => 'not_sent',
                     'error_message' => 'Envío bloqueado: El módulo de envío de correos está desactivado.',
                     'sent_at' => now(),

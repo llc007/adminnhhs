@@ -91,10 +91,9 @@ new #[Title('Auditoría de Correos')] class extends Component
             });
 
             MailLog::create([
-                'school_id' => auth()->user()->current_school_id,
                 'to' => $this->emailPrueba,
                 'subject' => '🟢 Prueba de Servidor de Correo - Plataforma NHHS',
-                'body' => $bodyHtml,
+                'body' => null,
                 'status' => 'sent',
                 'sent_at' => now(),
             ]);
@@ -108,10 +107,9 @@ new #[Title('Auditoría de Correos')] class extends Component
             );
         } catch (\Throwable $e) {
             MailLog::create([
-                'school_id' => auth()->user()->current_school_id,
                 'to' => $this->emailPrueba,
                 'subject' => '🟢 Prueba de Servidor de Correo - Plataforma NHHS (FALLIDO)',
-                'body' => 'Falló el envío del correo de prueba. Error: ' . $e->getMessage(),
+                'body' => null,
                 'status' => 'failed',
                 'error_message' => $e->getMessage(),
             ]);
@@ -130,7 +128,8 @@ new #[Title('Auditoría de Correos')] class extends Component
         if (!$log) return;
 
         try {
-            \Illuminate\Support\Facades\Mail::html($log->body, function ($message) use ($log) {
+            $content = $log->body ?: "<p>Reenvío de notificación del sistema: <strong>" . e($log->subject) . "</strong></p>";
+            \Illuminate\Support\Facades\Mail::html($content, function ($message) use ($log) {
                 $message->to($log->to)
                     ->subject($log->subject);
             });
@@ -432,16 +431,23 @@ new #[Title('Auditoría de Correos')] class extends Component
                     </div>
                 @endif
 
-                {{-- Cuerpo del Correo en Iframe --}}
+                {{-- Cuerpo del Correo en Iframe o Nota Informativa --}}
                 <div>
                     <span class="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2">{{ __('Contenido del Mensaje') }}</span>
-                    <div class="border rounded-xl overflow-hidden shadow-inner bg-white dark:bg-zinc-900">
-                        <iframe 
-                            srcdoc="{{ $selected->body }}" 
-                            class="w-full h-[400px] border-none"
-                            sandbox="allow-same-origin"
-                        ></iframe>
-                    </div>
+                    @if($selected->body)
+                        <div class="border rounded-xl overflow-hidden shadow-inner bg-white dark:bg-zinc-900">
+                            <iframe 
+                                srcdoc="{{ $selected->body }}" 
+                                class="w-full h-[400px] border-none"
+                                sandbox="allow-same-origin"
+                            ></iframe>
+                        </div>
+                    @else
+                        <div class="p-6 text-center text-zinc-500 dark:text-zinc-400 text-xs italic bg-zinc-50 dark:bg-zinc-800/20 rounded-xl border border-dashed border-zinc-200 dark:border-zinc-700">
+                            <flux:icon.document-text class="size-6 mx-auto mb-2 text-zinc-400 opacity-60" />
+                            {{ __('El cuerpo HTML no se almacena para optimizar el rendimiento y espacio en la base de datos.') }}
+                        </div>
+                    @endif
                 </div>
 
                 <div class="flex justify-between items-center pt-4 border-t dark:border-zinc-700">

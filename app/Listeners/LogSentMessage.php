@@ -25,7 +25,6 @@ class LogSentMessage
             ->implode(', ');
 
         $subject = $event->message->getSubject() ?? '(Sin Asunto)';
-        $body = $event->message->getHtmlBody() ?: $event->message->getTextBody() ?: '';
 
         $mailId = null;
         if (isset($event->sent) && method_exists($event->sent, 'getSymfonySentMessage')) {
@@ -36,7 +35,7 @@ class LogSentMessage
             'mail_id' => $mailId,
             'to' => $to,
             'subject' => $subject,
-            'body' => $body,
+            'body' => null,
             'status' => 'sent',
             'sent_at' => now(),
         ]);

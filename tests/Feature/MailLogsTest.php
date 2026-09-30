@@ -49,8 +49,39 @@ test('sending an email creates a mail log entry via the listener', function () {
 
     expect(MailLog::count())->toBe(1);
     $log = MailLog::first();
-    expect($log->body)->toContain('Este es el contenido de prueba');
+    expect($log->body)->toBeNull();
     expect($log->mail_id)->not->toBeNull();
+});
+
+test('mail logs older than 2 months are pruned', function () {
+    MailLog::truncate();
+
+    // Log with 3 months ago
+    DB::table('mail_logs')->insert([
+        'to' => 'old@example.com',
+        'subject' => 'Old Mail',
+        'status' => 'sent',
+        'sent_at' => now()->subMonths(3),
+        'created_at' => now()->subMonths(3),
+        'updated_at' => now()->subMonths(3),
+    ]);
+
+    // Log with 10 days ago
+    DB::table('mail_logs')->insert([
+        'to' => 'recent@example.com',
+        'subject' => 'Recent Mail',
+        'status' => 'sent',
+        'sent_at' => now()->subDays(10),
+        'created_at' => now()->subDays(10),
+        'updated_at' => now()->subDays(10),
+    ]);
+
+    expect(MailLog::count())->toBe(2);
+
+    $this->artisan('model:prune', ['--model' => [MailLog::class]]);
+
+    expect(MailLog::count())->toBe(1);
+    expect(MailLog::first()->to)->toBe('recent@example.com');
 });
 
 test('livewire search and status filters work correctly', function () {

@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('mail_id')->nullable()->index();
             $table->string('to');
             $table->string('subject');
-            $table->longText('body');
+            $table->longText('body')->nullable();
             $table->string('status')->default('sent'); // sent, failed, delivered, bounced
             $table->text('error_message')->nullable();
             $table->timestamp('sent_at');

@@ -456,7 +456,7 @@ new class extends Component {
                             <td class="px-6 py-5">
                                 @if($cita->estudiante)
                                     <p class="font-bold text-base {{ in_array($cita->estado, ['cancelada', 'ausente']) ? 'text-zinc-400 dark:text-zinc-500 line-through decoration-zinc-300 dark:decoration-zinc-700' : (in_array($cita->estado, ['realizada']) || ($cita->estado === 'abierta' || str_contains($cita->mensaje_recepcion ?? '', '[SALIDA]')) ? 'text-zinc-500 dark:text-zinc-400' : 'text-zinc-800 dark:text-zinc-200') }}">
-                                        {{ $cita->estudiante->apoderado_nombres ? $cita->estudiante->apoderado_nombres . ' ' . $cita->estudiante->apoderado_apellido_pat : 'Sin nombre registrado' }}
+                                        {{ $cita->estudiante->apoderado_nombres ? $cita->estudiante->apoderadoNombreCompleto() : 'Sin nombre registrado' }}
                                     </p>
                                     <p class="text-xs text-zinc-500 dark:text-zinc-400 font-mono mt-0.5">
                                         {{ $cita->estudiante->rut_numero ? $cita->estudiante->rutCompleto() : '-' }}
@@ -773,7 +773,7 @@ new class extends Component {
                             <td class="px-6 py-4">
                                 @if($box->ocupado && $box->entrevista && $box->entrevista->estudiante)
                                     <p class="text-sm text-zinc-700 dark:text-zinc-300">
-                                        {{ $box->entrevista->estudiante->apoderado_nombres ? $box->entrevista->estudiante->apoderado_nombres . ' ' . $box->entrevista->estudiante->apoderado_apellido_pat : 'Apoderado' }}
+                                        {{ $box->entrevista->estudiante->apoderado_nombres ? $box->entrevista->estudiante->apoderadoNombreCompleto() : 'Apoderado' }}
                                     </p>
                                     <p class="text-[10px] text-zinc-500 font-mono mt-0.5">
                                         Ingreso: {{ \Carbon\Carbon::parse($box->entrevista->hora_llegada)->format('H:i') }}

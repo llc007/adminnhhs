@@ -137,6 +137,26 @@ class Estudiante extends Model
     }
 
     /**
+     * Get the apoderado's full name without duplicating last names if already included in nombres.
+     */
+    public function apoderadoNombreCompleto(): string
+    {
+        $nombres = trim($this->apoderado_nombres ?? '');
+        $pat = trim($this->apoderado_apellido_pat ?? '');
+        $mat = trim($this->apoderado_apellido_mat ?? '');
+
+        if ($nombres === '') {
+            return trim("{$pat} {$mat}");
+        }
+
+        if ($pat !== '' && str_contains(mb_strtoupper($nombres, 'UTF-8'), mb_strtoupper($pat, 'UTF-8'))) {
+            return $nombres;
+        }
+
+        return trim("{$nombres} {$pat} {$mat}");
+    }
+
+    /**
      * Scope a query to only include active students.
      */
     public function scopeActivos($query)

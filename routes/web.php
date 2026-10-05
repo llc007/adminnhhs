@@ -4,6 +4,7 @@ use App\Http\Controllers\AtrasoPrintController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\MailWebhookController;
 use App\Http\Controllers\ReportesPrintController;
+use App\Http\Controllers\RestablecerClavePrintController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/login')->name('home');
@@ -90,6 +91,12 @@ Route::middleware(['auth', 'verified', 'role_or_permission:superadmin|ver-atraso
 Route::middleware(['auth', 'verified', 'role_or_permission:superadmin|gestionar-funcionarios'])->group(function () {
     Route::livewire('/funcionarios', 'pages::usuarios.funcionarios.index')->name('funcionarios.index');
     Route::livewire('/funcionarios/ficha/{id}', 'pages::usuarios.funcionarios.ficha')->name('funcionarios.ficha');
+});
+
+// Restablecer Contraseña / Entrega de Credenciales — requiere ver-estudiantes, gestionar-funcionarios o superadmin
+Route::middleware(['auth', 'verified', 'role_or_permission:superadmin|administrador|ver-estudiantes|gestionar-funcionarios'])->group(function () {
+    Route::livewire('/usuarios/restablecer-clave', 'pages::usuarios.restablecer_clave')->name('usuarios.restablecer_clave');
+    Route::get('/usuarios/restablecer-clave/imprimir', [RestablecerClavePrintController::class, 'imprimir'])->name('restablecer_clave.imprimir');
 });
 
 // Configuración y Cargas Administrativas — Solo Superadmin

@@ -758,6 +758,26 @@ test('can filter historial by ciclo (basica or media)', function () {
         'estado' => 'activo',
     ]);
 
+    // Create a 7mo basico course and student (should belong to 'media' cycle 7º a 4º Medio)
+    $cursoSeptimoId = DB::table('cursos')->insertGetId([
+        'school_id' => $schoolId,
+        'academic_year_id' => DB::table('academic_years')->where('school_id', $schoolId)->value('id'),
+        'nivel' => 7,
+        'modalidad' => 'basica',
+        'letra' => 'B',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $estudianteSeptimo = Estudiante::create([
+        'school_id' => $schoolId,
+        'curso_id' => $cursoSeptimoId,
+        'nombres_csv' => 'LUCAS GONZALEZ',
+        'rut_numero' => '24111333',
+        'rut_dv' => '5',
+        'estado' => 'activo',
+    ]);
+
     $today = now('America/Santiago')->toDateString();
 
     $atrasoMedia = Atraso::create([
@@ -784,9 +804,21 @@ test('can filter historial by ciclo (basica or media)', function () {
         'estado' => 'injustificado',
     ]);
 
+    $atrasoSeptimo = Atraso::create([
+        'school_id' => $schoolId,
+        'estudiante_id' => $estudianteSeptimo->id,
+        'curso_id' => $cursoSeptimoId,
+        'registrado_por_user_id' => $user->id,
+        'fecha' => $today,
+        'hora' => '08:25:00',
+        'minutos_atraso' => 25,
+        'jornada' => 'manana',
+        'estado' => 'injustificado',
+    ]);
+
     $this->actingAs($user);
 
-    // Filter by 'basica'
+    // Filter by 'basica' (1º a 6º) -> only $atrasoBasica (5º basico)
     $componentBasica = Livewire::test('pages::atrasos.historial')
         ->set('ciclo', 'basica');
 
@@ -794,20 +826,20 @@ test('can filter historial by ciclo (basica or media)', function () {
     expect($recordsBasica->total())->toBe(1)
         ->and($recordsBasica->first()->id)->toBe($atrasoBasica->id);
 
-    // Filter by 'media'
+    // Filter by 'media' (7º a 4º Medio) -> both $atrasoMedia (3º medio) and $atrasoSeptimo (7º basico)
     $componentMedia = Livewire::test('pages::atrasos.historial')
         ->set('ciclo', 'media');
 
     $recordsMedia = $componentMedia->viewData('atrasos');
-    expect($recordsMedia->total())->toBe(1)
-        ->and($recordsMedia->first()->id)->toBe($atrasoMedia->id);
+    expect($recordsMedia->total())->toBe(2)
+        ->and($recordsMedia->pluck('id')->all())->toContain($atrasoMedia->id, $atrasoSeptimo->id);
 
     // Clear ciclo filter
     $componentTodos = Livewire::test('pages::atrasos.historial')
         ->set('ciclo', '');
 
     $recordsTodos = $componentTodos->viewData('atrasos');
-    expect($recordsTodos->total())->toBe(2);
+    expect($recordsTodos->total())->toBe(3);
 });
 
 test('historial student detail modal displays who registered the atraso in cronograma', function () {

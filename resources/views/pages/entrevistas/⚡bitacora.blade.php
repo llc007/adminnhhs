@@ -776,7 +776,7 @@ new class extends Component {
                         <div>
                             <label class="block text-[10px] uppercase font-bold text-zinc-400 mb-1 tracking-wider">Apoderado Titular</label>
                             <p class="text-sm font-semibold text-zinc-900 dark:text-zinc-200">
-                                {{ $entrevista->estudiante->apoderado_nombres ? $entrevista->estudiante->apoderado_nombres . ' ' . $entrevista->estudiante->apoderado_apellido_pat : 'Sin nombre registrado' }}
+                                {{ $entrevista->estudiante->apoderado_nombres ? $entrevista->estudiante->apoderadoNombreCompleto() : 'Sin nombre registrado' }}
                             </p>
                             <p class="text-[10px] text-zinc-500 mt-1 uppercase">{{ $entrevista->estudiante->apoderado_parentesco ?? 'Vínculo' }}</p>
                         </div>

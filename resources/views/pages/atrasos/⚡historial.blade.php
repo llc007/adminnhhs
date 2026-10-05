@@ -263,12 +263,22 @@ new #[Title('Historial de Atrasos')] class extends Component {
         }
 
         if (! empty($this->ciclo)) {
-            $query->where(function ($q) {
-                $q->whereHas('curso', function ($cq) {
-                    $cq->where('modalidad', $this->ciclo);
-                })->orWhereHas('estudiante.curso', function ($cq) {
-                    $cq->where('modalidad', $this->ciclo);
-                });
+            $applyCicloScope = function ($cq) {
+                if ($this->ciclo === 'basica') {
+                    $cq->where('modalidad', 'basica')->where('nivel', '<=', 6);
+                } elseif ($this->ciclo === 'media') {
+                    $cq->where(function ($mcq) {
+                        $mcq->where('modalidad', 'media')
+                            ->orWhere(function ($bcq) {
+                                $bcq->where('modalidad', 'basica')->where('nivel', '>=', 7);
+                            });
+                    });
+                }
+            };
+
+            $query->where(function ($q) use ($applyCicloScope) {
+                $q->whereHas('curso', $applyCicloScope)
+                    ->orWhereHas('estudiante.curso', $applyCicloScope);
             });
         }
 
@@ -790,8 +800,8 @@ new #[Title('Historial de Atrasos')] class extends Component {
                 <flux:label class="text-[11px]">Ciclo</flux:label>
                 <flux:select size="sm" class="!text-xs" wire:model.live="ciclo">
                     <flux:select.option value="">Todos los ciclos</flux:select.option>
-                    <flux:select.option value="basica">Básica (1º a 8º Básico)</flux:select.option>
-                    <flux:select.option value="media">Media (1º a 4º Medio)</flux:select.option>
+                    <flux:select.option value="basica">Básica (1º a 6º)</flux:select.option>
+                    <flux:select.option value="media">Media (7º a 4º Medio)</flux:select.option>
                 </flux:select>
             </flux:field>
 

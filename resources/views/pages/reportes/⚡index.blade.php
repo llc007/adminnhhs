@@ -1436,7 +1436,7 @@ new #[Title('Módulo de Reportes')] class extends Component {
                                 </p>
                                 
                                 <p class="text-xs text-zinc-600 dark:text-zinc-400">
-                                    <strong>Apoderado:</strong> {{ $cita->estudiante?->apoderado_nombres ? $cita->estudiante->apoderado_nombres . ' ' . $cita->estudiante->apoderado_apellido_pat : 'Sin nombre' }}
+                                    <strong>Apoderado:</strong> {{ $cita->estudiante?->apoderado_nombres ? $cita->estudiante->apoderadoNombreCompleto() : 'Sin nombre' }}
                                     • <strong>Motivo:</strong> {{ $cita->motivo }}
                                 </p>
                             </div>
@@ -1514,7 +1514,7 @@ new #[Title('Módulo de Reportes')] class extends Component {
                                 </p>
                                 
                                 <p class="text-xs text-zinc-600 dark:text-zinc-400">
-                                    <strong>Apoderado:</strong> {{ $cita->estudiante?->apoderado_nombres ? $cita->estudiante->apoderado_nombres . ' ' . $cita->estudiante->apoderado_apellido_pat : 'Sin nombre' }}
+                                    <strong>Apoderado:</strong> {{ $cita->estudiante?->apoderado_nombres ? $cita->estudiante->apoderadoNombreCompleto() : 'Sin nombre' }}
                                     • <strong>Citado por:</strong> {{ $cita->user ? $cita->user->nombreCompleto() : 'Docente no asignado' }}
                                 </p>
                             </div>

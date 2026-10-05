@@ -540,7 +540,7 @@ new class extends Component {
                         @if ($this->estudiante)
                             @php
                                 $nombreApoderado = $this->estudiante->apoderado_nombres
-                                    ? trim($this->estudiante->apoderado_nombres . ' ' . $this->estudiante->apoderado_apellido_pat)
+                                    ? $this->estudiante->apoderadoNombreCompleto()
                                     : null;
                                 $emailApoderado = $this->estudiante->apoderado_email;
                             @endphp

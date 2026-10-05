@@ -123,6 +123,14 @@
                             {{ __('Funcionarios') }}
                         </flux:sidebar.item>
                     @endif
+
+                    @if (auth()->user()->hasRole('superadmin') || auth()->user()->canAny(['ver-estudiantes', 'gestionar-funcionarios']))
+                        <flux:sidebar.item icon="key" :href="route('usuarios.restablecer_clave')"
+                            :current="request()->routeIs('usuarios.restablecer_clave')"
+                            wire:navigate>
+                            {{ __('Restablecer Contraseña') }}
+                        </flux:sidebar.item>
+                    @endif
                 </flux:sidebar.group>
             @endif
 

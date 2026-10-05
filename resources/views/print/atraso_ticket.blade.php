@@ -5,19 +5,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pase de Ingreso - {{ $atraso->estudiante?->nombreCompleto() ?? 'Estudiante' }}</title>
     <style>
+        * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
         @page {
             margin: 0;
-            size: 80mm auto;
+            size: 72mm auto;
+        }
+        html, body {
+            margin: 0;
+            padding: 0;
+            background: #fff;
+            color: #000;
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, monospace;
             width: 72mm;
-            margin: 0 auto;
-            padding: 8px 4px;
-            color: #000;
-            background: #fff;
+            padding: 4px 6px;
             font-size: 12px;
-            line-height: 1.3;
+            line-height: 1.25;
+            page-break-inside: avoid;
+            break-inside: avoid;
         }
         .header {
             text-align: center;
@@ -74,6 +84,7 @@
         .footer {
             border-top: 1px dashed #000;
             padding-top: 8px;
+            padding-bottom: 24px;
             margin-top: 12px;
             text-align: center;
             font-size: 10px;

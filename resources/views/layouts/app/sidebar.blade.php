@@ -25,9 +25,11 @@
                     ? route('dashboard')
                     : ($user->hasRole(['gerencia', 'rectoria'])
                         ? route('direccion.dashboard')
-                        : ($user->can('ver-entrevistas-propias')
-                            ? route('entrevistas.agenda')
-                            : route('entrevistas.index'))))
+                        : ($user->hasRole('estudiante')
+                            ? route('portal-apoderado')
+                            : ($user->can('ver-entrevistas-propias')
+                                ? route('entrevistas.agenda')
+                                : route('entrevistas.index')))))
                 : route('login')" wire:navigate />
             <flux:sidebar.collapse
                 class="in-data-flux-sidebar-on-desktop:not-in-data-flux-sidebar-collapsed-desktop:-mr-2" />
@@ -36,6 +38,14 @@
         <livewire:admin.seleccionar-colegio />
 
         <flux:sidebar.nav>
+            @if (auth()->user()->hasRole('estudiante'))
+                <flux:sidebar.group class="grid mb-2" :heading="__('Portal Familia')">
+                    <flux:sidebar.item icon="academic-cap" :href="route('portal-apoderado')"
+                        :current="request()->routeIs('portal-apoderado')" wire:navigate>
+                        {{ __('Portal Apoderado') }}
+                    </flux:sidebar.item>
+                </flux:sidebar.group>
+            @endif
             @if (auth()->user()->hasRole(['superadmin', 'administrador', 'directivo', 'gerencia', 'rectoria']) ||
                     auth()->user()->can('ver-dashboard-gerencia'))
                 <flux:sidebar.group class="grid mb-2" :heading="__('Direccion & Rectoria')">

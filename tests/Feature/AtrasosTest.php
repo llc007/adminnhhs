@@ -2,9 +2,13 @@
 
 use App\Models\Atraso;
 use App\Models\Estudiante;
+use App\Models\MailLog;
+use App\Models\School;
 use App\Models\User;
+use App\Notifications\AtrasoRegistradoNotification;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -870,4 +874,202 @@ test('historial student detail modal displays who registered the atraso in crono
         ->assertSet('modalDetalleEstudiante', true)
         ->assertSee('MARIA RODRIGUEZ')
         ->assertSee('Por:');
+});
+
+test('notifies apoderado by email when atraso is registered from index', function () {
+    [$user, $schoolId, $cursoId, $estudiante] = setupAtrasosEnvironment('inspector');
+
+    $estudiante->update([
+        'apoderado_email' => 'apoderado.test@gmail.com',
+        'apoderado_nombres' => 'CARLOS',
+        'apoderado_apellido_pat' => 'PEREZ',
+    ]);
+
+    Notification::fake();
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::atrasos.index')
+        ->call('registrarAtraso', $estudiante->id);
+
+    Notification::assertSentOnDemand(
+        AtrasoRegistradoNotification::class,
+        function ($notification, $channels, $notifiable) use ($estudiante) {
+            return $notifiable->routes['mail'] === 'apoderado.test@gmail.com'
+                && $notification->atraso->estudiante_id === $estudiante->id;
+        }
+    );
+});
+
+test('notifies apoderado by email when atraso is registered from historial modal', function () {
+    [$user, $schoolId, $cursoId, $estudiante] = setupAtrasosEnvironment('inspector');
+
+    $estudiante->update([
+        'apoderado_email' => 'mama.test@gmail.com',
+        'apoderado_nombres' => 'ANA',
+        'apoderado_apellido_pat' => 'GONZALEZ',
+    ]);
+
+    Notification::fake();
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::atrasos.historial')
+        ->set('nuevoEstudianteId', $estudiante->id)
+        ->set('nuevaFecha', now('America/Santiago')->toDateString())
+        ->set('nuevaHora', '08:15')
+        ->set('nuevaJornada', 'manana')
+        ->set('nuevoEstado', 'justificado')
+        ->set('nuevoMotivo', 'Médico')
+        ->call('guardarNuevoAtraso', false);
+
+    Notification::assertSentOnDemand(
+        AtrasoRegistradoNotification::class,
+        function ($notification, $channels, $notifiable) use ($estudiante) {
+            return $notifiable->routes['mail'] === 'mama.test@gmail.com'
+                && $notification->atraso->estudiante_id === $estudiante->id
+                && $notification->atraso->estado === 'justificado';
+        }
+    );
+});
+
+test('does not send notification if estudiante has no apoderado email', function () {
+    [$user, $schoolId, $cursoId, $estudiante] = setupAtrasosEnvironment('inspector');
+
+    $estudiante->update(['apoderado_email' => null]);
+
+    Notification::fake();
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::atrasos.index')
+        ->call('registrarAtraso', $estudiante->id);
+
+    Notification::assertNothingSent();
+});
+
+test('atraso notification is recorded in mail_logs table', function () {
+    [$user, $schoolId, $cursoId, $estudiante] = setupAtrasosEnvironment('inspector');
+
+    $estudiante->update([
+        'apoderado_email' => 'auditoria.test@gmail.com',
+        'apoderado_nombres' => 'ROBERTO',
+        'apoderado_apellido_pat' => 'SOTO',
+    ]);
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::atrasos.index')
+        ->call('registrarAtraso', $estudiante->id);
+
+    $log = MailLog::where('to', 'like', '%auditoria.test@gmail.com%')->first();
+    expect($log)->not->toBeNull()
+        ->and($log->subject)->toContain('[Atraso] Notificación de Ingreso:')
+        ->and($log->status)->toBe('sent')
+        ->and($log->body)->not->toBeNull();
+});
+
+test('atraso notification mail content hides estado when injustificado and shows it when justificado with correct signature', function () {
+    [$user, $schoolId, $cursoId, $estudiante] = setupAtrasosEnvironment('inspector');
+
+    $atrasoInjustificado = Atraso::create([
+        'school_id' => $schoolId,
+        'estudiante_id' => $estudiante->id,
+        'curso_id' => $cursoId,
+        'registrado_por_user_id' => $user->id,
+        'fecha' => now('America/Santiago')->toDateString(),
+        'hora' => '08:15:00',
+        'minutos_atraso' => 15,
+        'jornada' => 'manana',
+        'estado' => 'injustificado',
+    ]);
+
+    $notifInjustificado = new AtrasoRegistradoNotification($atrasoInjustificado, 1);
+    $mailInjustificado = $notifInjustificado->toMail(new stdClass);
+    $renderedInjustificado = $mailInjustificado->render();
+
+    expect((string) $renderedInjustificado)->not->toContain('Estado:')
+        ->and($mailInjustificado->salutation)->toBe('Atentamente, Inspectoría - New Heaven High School');
+
+    $atrasoJustificado = Atraso::create([
+        'school_id' => $schoolId,
+        'estudiante_id' => $estudiante->id,
+        'curso_id' => $cursoId,
+        'registrado_por_user_id' => $user->id,
+        'fecha' => now('America/Santiago')->toDateString(),
+        'hora' => '08:20:00',
+        'minutos_atraso' => 20,
+        'jornada' => 'manana',
+        'estado' => 'justificado',
+        'motivo' => 'Hora médica',
+    ]);
+
+    $notifJustificado = new AtrasoRegistradoNotification($atrasoJustificado, 2);
+    $mailJustificado = $notifJustificado->toMail(new stdClass);
+    $renderedJustificado = $mailJustificado->render();
+
+    expect((string) $renderedJustificado)->toContain('Estado:')
+        ->and((string) $renderedJustificado)->toContain('Justificado (Hora médica)')
+        ->and($mailJustificado->salutation)->toBe('Atentamente, Inspectoría - New Heaven High School');
+});
+
+test('atraso notification is not sent when atrasos_notificar_apoderados is disabled', function () {
+    [$user, $schoolId, $cursoId, $estudiante] = setupAtrasosEnvironment('inspector');
+
+    $school = School::find($schoolId);
+    $modulos = $school->modulos_publicados;
+    $modulos['atrasos_notificar_apoderados'] = false;
+    $school->modulos_publicados = $modulos;
+    $school->save();
+
+    $estudiante->update([
+        'apoderado_email' => 'apoderado.silenciado@gmail.com',
+    ]);
+
+    Notification::fake();
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::atrasos.index')
+        ->call('registrarAtraso', $estudiante->id);
+
+    Notification::assertNothingSent();
+});
+
+test('superadmin can toggle notificarApoderadosHabilitado in historial and update school config', function () {
+    [$user, $schoolId, $cursoId, $estudiante] = setupAtrasosEnvironment('superadmin');
+
+    $this->actingAs($user);
+
+    $school = School::find($schoolId);
+    expect($school->atrasosEmailsEnabled())->toBeTrue();
+
+    Livewire::test('pages::atrasos.historial')
+        ->assertSet('notificarApoderadosHabilitado', true)
+        ->set('notificarApoderadosHabilitado', false);
+
+    $school->refresh();
+    expect($school->atrasosEmailsEnabled())->toBeFalse();
+
+    Livewire::test('pages::atrasos.historial')
+        ->set('notificarApoderadosHabilitado', true);
+
+    $school->refresh();
+    expect($school->atrasosEmailsEnabled())->toBeTrue();
+});
+
+test('non-superadmin cannot toggle notificarApoderadosHabilitado to alter school config', function () {
+    [$user, $schoolId, $cursoId, $estudiante] = setupAtrasosEnvironment('inspector');
+
+    $this->actingAs($user);
+
+    $school = School::find($schoolId);
+    expect($school->atrasosEmailsEnabled())->toBeTrue();
+
+    Livewire::test('pages::atrasos.historial')
+        ->set('notificarApoderadosHabilitado', false);
+
+    $school->refresh();
+    // School config remains true because non-superadmin was ignored
+    expect($school->modulos_publicados['atrasos_notificar_apoderados'])->toBeTrue();
 });

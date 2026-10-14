@@ -81,6 +81,40 @@ new #[Title('Historial de Atrasos')] class extends Component {
     // Sincronización en tiempo real
     public bool $autoRefresh = true;
 
+    // Notificación a apoderados
+    public bool $notificarApoderadosHabilitado = true;
+
+    public function updatedNotificarApoderadosHabilitado(bool $value): void
+    {
+        if (! auth()->user()->hasRole('superadmin')) {
+            return;
+        }
+
+        $school = $this->school;
+        if (! $school) {
+            return;
+        }
+
+        $modulos = $school->modulos_publicados;
+        $modulos['atrasos_notificar_apoderados'] = $value;
+        $school->modulos_publicados = $modulos;
+        $school->save();
+
+        if ($value) {
+            Flux::toast(
+                heading: 'Correos Activados',
+                text: 'Se enviarán correos automáticos a los apoderados al registrar atrasos.',
+                variant: 'success'
+            );
+        } else {
+            Flux::toast(
+                heading: 'Correos Desactivados',
+                text: 'Se pausó el envío de correos automáticos a los apoderados.',
+                variant: 'warning'
+            );
+        }
+    }
+
     public function toggleAutoRefresh(): void
     {
         $this->autoRefresh = ! $this->autoRefresh;
@@ -127,6 +161,8 @@ new #[Title('Historial de Atrasos')] class extends Component {
         if (empty($this->fecha)) {
             $this->fecha = now('America/Santiago')->toDateString();
         }
+
+        $this->notificarApoderadosHabilitado = $this->school?->atrasosEmailsEnabled() ?? true;
     }
 
     public function updating($field): void
@@ -585,9 +621,13 @@ new #[Title('Historial de Atrasos')] class extends Component {
         ]);
 
         $this->modalNuevoAtraso = false;
-        $this->resetPage();
-
         $totalMes = $estudiante->atrasosMesActualCount();
+
+        // Notificar al apoderado por correo electrónico en segundo plano (si está habilitado)
+        if ($school->atrasosEmailsEnabled() && ! empty($estudiante->apoderado_email)) {
+            \Illuminate\Support\Facades\Notification::route('mail', $estudiante->apoderado_email)
+                ->notify(new \App\Notifications\AtrasoRegistradoNotification($nuevoAtraso, $totalMes));
+        }
 
         Flux::toast(
             heading: 'Atraso Registrado',
@@ -683,8 +723,15 @@ new #[Title('Historial de Atrasos')] class extends Component {
         icono="clock"
     >
         <div class="flex items-center gap-2">
-            {{-- Indicador y Switch de Tiempo Real --}}
-            @if($this->esFechaHoy)
+            {{-- Switch para Superadmin (Correos Apoderados) o Indicador En Vivo --}}
+            @if(auth()->user()->hasRole('superadmin'))
+                <div class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 shadow-2xs">
+                    <flux:switch size="sm" wire:model.live="notificarApoderadosHabilitado" />
+                    <span class="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 select-none">
+                        {{ $notificarApoderadosHabilitado ? 'Correos Apoderados: ON' : 'Correos Apoderados: OFF' }}
+                    </span>
+                </div>
+            @elseif($this->esFechaHoy)
                 <button 
                     type="button" 
                     wire:click="toggleAutoRefresh"
@@ -1393,18 +1440,16 @@ new #[Title('Historial de Atrasos')] class extends Component {
                 <flux:button 
                     variant="primary" 
                     wire:click="guardarNuevoAtraso(false)"
-                    class="bg-[#00376e] hover:bg-blue-800 text-white"
+                    class="bg-gradient-to-br from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-bold"
                 >
                     Guardar
                 </flux:button>
                 <flux:button 
-                    variant="primary" 
+                    variant="subtle" 
                     icon="printer" 
                     wire:click="guardarNuevoAtraso(true)" 
-                    class="bg-gradient-to-br from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-bold"
-                >
-                    Guardar e Imprimir
-                </flux:button>
+                    title="Guardar e Imprimir"
+                />
             </div>
         </div>
     </flux:modal>

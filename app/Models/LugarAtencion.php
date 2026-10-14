@@ -12,7 +12,7 @@ class LugarAtencion extends Model
     protected $fillable = [
         'school_id',
         'nombre',
-        'activo'
+        'activo',
     ];
 
     public function school(): BelongsTo

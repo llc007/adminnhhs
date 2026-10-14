@@ -2,9 +2,9 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use App\Models\School;
 use App\Models\LugarAtencion;
+use App\Models\School;
+use Illuminate\Database\Seeder;
 
 class LugarAtencionSeeder extends Seeder
 {
@@ -14,7 +14,7 @@ class LugarAtencionSeeder extends Seeder
     public function run(): void
     {
         $schools = School::all();
-        
+
         $lugares = [
             'BOX 1',
             'BOX 2',
@@ -32,7 +32,7 @@ class LugarAtencionSeeder extends Seeder
             foreach ($lugares as $lugar) {
                 LugarAtencion::firstOrCreate([
                     'school_id' => $school->id,
-                    'nombre' => $lugar
+                    'nombre' => $lugar,
                 ]);
             }
         }

@@ -88,6 +88,10 @@ class GoogleAuthController extends Controller
 
             Auth::login($user);
 
+            if ($isStudent || $user->hasRole('estudiante')) {
+                return redirect()->route('portal-apoderado');
+            }
+
             return redirect()->intended('/dashboard');
         } catch (\Exception $e) {
             return redirect()->route('login')->with('error', 'Error real de Hostinger: '.$e->getMessage());

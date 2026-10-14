@@ -2,9 +2,9 @@
 
 namespace App\Models;
 
+use App\Models\Traits\BelongsToSchool;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
-use App\Models\Traits\BelongsToSchool;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable(['school_id', 'name', 'start_date', 'end_date', 'is_active'])]

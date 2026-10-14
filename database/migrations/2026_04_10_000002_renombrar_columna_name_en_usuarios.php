@@ -2,8 +2,8 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -23,7 +23,7 @@ return new class extends Migration
         // Los apellidos deberán completarse manualmente desde la ficha del funcionario.
         DB::table('users')->get()->each(function ($user) {
             DB::table('users')->where('id', $user->id)->update([
-                'nombres'      => $user->name,
+                'nombres' => $user->name,
                 'apellido_pat' => null,
                 'apellido_mat' => null,
             ]);

@@ -6,6 +6,12 @@ use App\Http\Controllers\MailWebhookController;
 use App\Http\Controllers\ReportesPrintController;
 use App\Http\Controllers\RestablecerClavePrintController;
 use Illuminate\Support\Facades\Route;
+use Livewire\Mechanisms\HandleRequests\EndpointResolver;
+
+// Intercepción de peticiones GET al endpoint de actualización de Livewire (para evitar 405 MethodNotAllowed por redirecciones)
+Route::get(EndpointResolver::updatePath(), function () {
+    return redirect()->to(request()->header('Referer') ?: route('dashboard'));
+})->name('livewire.update.fallback');
 
 Route::redirect('/', '/login')->name('home');
 
@@ -69,6 +75,11 @@ Route::livewire('/entrevistas/firma/{token}', 'pages::entrevistas.firma_publica'
 
 // Ruta pública para Confirmar o Rechazar Asistencia a Entrevista por correo
 Route::livewire('/entrevistas/confirmacion/{token}', 'pages::entrevistas.confirmacion_publica')->name('entrevistas.confirmacion_publica');
+
+// Portal de Apoderados y Estudiantes — Estudiante, Administrador y Superadmin
+Route::middleware(['auth', 'verified', 'role_or_permission:superadmin|administrador|estudiante'])->group(function () {
+    Route::livewire('/portal-apoderado', 'pages::apoderados.portal')->name('portal-apoderado');
+});
 
 // Vistas de Estudiantes — requiere permiso ver-estudiantes o superadmin
 Route::middleware(['auth', 'verified', 'role_or_permission:superadmin|ver-estudiantes'])->group(function () {

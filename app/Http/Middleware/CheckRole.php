@@ -60,7 +60,7 @@ class CheckRole
                     return redirect()->route('ti.prestamos.index');
                 }
                 if ($request->user()->hasRole('estudiante')) {
-                    return redirect()->route('entrevistas.index');
+                    return redirect()->route('portal-apoderado');
                 }
             }
 

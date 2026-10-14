@@ -16,7 +16,7 @@ class SchoolScope implements Scope
     {
         // Si hay un usuario logueado y tiene un colegio ACTIVO, filtramos.
         if (Auth::hasUser() && Auth::user()->current_school_id) {
-            $builder->where($model->getTable() . '.school_id', Auth::user()->current_school_id);
+            $builder->where($model->getTable().'.school_id', Auth::user()->current_school_id);
         }
     }
 }

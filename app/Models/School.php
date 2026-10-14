@@ -27,6 +27,7 @@ class School extends Model
             'adquisiciones' => true,
             'prestamos' => true,
             'envio_correos' => true,
+            'atrasos_notificar_apoderados' => true,
             'modo_mantenimiento' => false,
             'mensaje_mantenimiento' => 'El sistema se encuentra en mantenimiento programado. Volveremos en breve.',
         ];
@@ -46,6 +47,14 @@ class School extends Model
     public function emailsEnabled(): bool
     {
         return (bool) ($this->modulos_publicados['envio_correos'] ?? true);
+    }
+
+    /**
+     * Check if atrasos email notifications to apoderados are enabled for this school.
+     */
+    public function atrasosEmailsEnabled(): bool
+    {
+        return $this->emailsEnabled() && (bool) ($this->modulos_publicados['atrasos_notificar_apoderados'] ?? true);
     }
 
     /**

@@ -1,29 +1,37 @@
 <?php
+
+use App\Models\Estudiante;
+use Illuminate\Contracts\Console\Kernel;
+use Livewire\Component;
+
 require 'vendor/autoload.php';
 $app = require_once __DIR__.'/bootstrap/app.php';
-$kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
+$kernel = $app->make(Kernel::class);
 $kernel->bootstrap();
 
-$estudiante = \App\Models\Estudiante::first();
-echo "Before DB rut_dv: " . var_export($estudiante->rut_dv, true) . "\n";
+$estudiante = Estudiante::first();
+echo 'Before DB rut_dv: '.var_export($estudiante->rut_dv, true)."\n";
 
-$component = new class extends \Livewire\Component {
+$component = new class extends Component
+{
     public $rutDv = 0;
-    
-    public function rules() {
+
+    public function rules()
+    {
         return [
-            'rutDv' => ['nullable', 'max:1', 'regex:/^[0-9Kk]$/']
+            'rutDv' => ['nullable', 'max:1', 'regex:/^[0-9Kk]$/'],
         ];
     }
-    
-    public function save() {
+
+    public function save()
+    {
         $this->validate();
-        echo "Validation passed! rutDv = " . var_export($this->rutDv, true) . "\n";
+        echo 'Validation passed! rutDv = '.var_export($this->rutDv, true)."\n";
     }
 };
 
 try {
     $component->save();
-} catch (\Exception $e) {
-    echo "Exception: " . $e->getMessage() . "\n";
+} catch (Exception $e) {
+    echo 'Exception: '.$e->getMessage()."\n";
 }

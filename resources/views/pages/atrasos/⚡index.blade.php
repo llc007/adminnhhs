@@ -308,7 +308,7 @@ new #[Title('Registro de Atrasos')] class extends Component {
             $minutosAtraso = (int) $horaLimite->diffInMinutes($momentoIngreso);
         }
 
-        Atraso::create([
+        $atraso = Atraso::create([
             'school_id' => $school->id,
             'academic_year_id' => $this->academicYear?->id,
             'estudiante_id' => $estudiante->id,
@@ -326,6 +326,12 @@ new #[Title('Registro de Atrasos')] class extends Component {
         $this->search = '';
 
         $totalMes = $estudiante->atrasosMesActualCount();
+
+        // Notificar al apoderado por correo electrónico en segundo plano (si está habilitado)
+        if ($school->atrasosEmailsEnabled() && ! empty($estudiante->apoderado_email)) {
+            \Illuminate\Support\Facades\Notification::route('mail', $estudiante->apoderado_email)
+                ->notify(new \App\Notifications\AtrasoRegistradoNotification($atraso, $totalMes));
+        }
 
         if ($totalMes >= 3) {
             Flux::toast(

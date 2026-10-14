@@ -3,8 +3,6 @@
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 class SalidaApoderado extends Notification
@@ -41,7 +39,7 @@ class SalidaApoderado extends Notification
         return [
             'entrevista_id' => $this->entrevista->id,
             'titulo' => 'Apoderado se ha Retirado',
-            'mensaje' => 'Recepción ha confirmado la salida del apoderado de ' . $this->entrevista->estudiante->nombreCompleto() . '.',
+            'mensaje' => 'Recepción ha confirmado la salida del apoderado de '.$this->entrevista->estudiante->nombreCompleto().'.',
             'url' => route('entrevistas.bitacora', $this->entrevista->id),
             'icon' => 'arrow-right-start-on-rectangle',
             'color' => 'amber',

@@ -31,11 +31,13 @@ class LogSentMessage
             $mailId = trim($event->sent->getSymfonySentMessage()->getMessageId(), '<>');
         }
 
+        $body = $event->message->getHtmlBody() ?? $event->message->getTextBody();
+
         MailLog::create([
             'mail_id' => $mailId,
             'to' => $to,
             'subject' => $subject,
-            'body' => null,
+            'body' => $body,
             'status' => 'sent',
             'sent_at' => now(),
         ]);

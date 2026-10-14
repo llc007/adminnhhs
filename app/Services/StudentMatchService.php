@@ -32,7 +32,7 @@ class StudentMatchService
         if (preg_match('/\/Estudiantes\/(\d+)°?([A-Za-z])/', $orgUnitPath, $matches)) {
             $nivel = (int) $matches[1];
             $letra = strtoupper($matches[2]);
-            
+
             $curso = Curso::where('nivel', $nivel)
                 ->where('modalidad', 'basica')
                 ->where('letra', $letra)

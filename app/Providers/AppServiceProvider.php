@@ -40,8 +40,16 @@ class AppServiceProvider extends ServiceProvider
      */
     protected function configureDefaults(): void
     {
-        if (app()->isProduction()) {
-            URL::forceScheme('https');
+        if (
+            app()->isProduction()
+            || str_starts_with((string) config('app.url'), 'https://')
+            || str_contains(request()->getHost(), 'nhhs.cl')
+            || request()->isSecure()
+            || request()->header('X-Forwarded-Proto') === 'https'
+        ) {
+            if (! app()->environment('testing')) {
+                URL::forceScheme('https');
+            }
         }
 
         Date::use(CarbonImmutable::class);

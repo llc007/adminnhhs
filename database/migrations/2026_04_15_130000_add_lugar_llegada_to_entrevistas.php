@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::table('entrevistas', function (Blueprint $table) {
             // Se registra opcionalmente la hora a la que realmente llegó la persona
             $table->time('hora_llegada')->nullable()->after('hora');
-            
+
             // Lugar, Box o Sala (Ej: "Box 1", "Sala de Profesores")
             $table->string('lugar')->nullable()->after('estado');
         });

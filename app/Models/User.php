@@ -129,6 +129,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the teacher evaluations received by this user.
+     */
+    public function evaluacionesDocente(): HasMany
+    {
+        return $this->hasMany(EvaluacionDocente::class, 'profesor_id');
+    }
+
+    /**
      * Get the entrevistas assigned to this user.
      */
     public function entrevistas(): HasMany

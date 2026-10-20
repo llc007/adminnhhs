@@ -27,7 +27,7 @@ class CheckRole
 
         // If the user has ONLY the default 'externo' role (newly registered and unauthorized),
         // redirect them to the access request page rather than showing a static 403 error.
-        if ($request->user()->hasRole(['externo']) && ! $request->user()->hasRole(['docente', 'inspector', 'administrador', 'directivo', 'superadmin', 'asistente', 'psicosocial', 'recepcion', 'estudiante', 'ti', 'solicitante_adquisiciones', 'gerencia', 'rectoria'])) {
+        if ($request->user()->hasRole(['externo']) && ! $request->user()->hasRole(['docente', 'inspector', 'administrador', 'directivo', 'superadmin', 'asistente', 'psicosocial', 'recepcion', 'estudiante', 'ti', 'solicitante_adquisiciones', 'gerencia', 'rectoria', 'comision_ed'])) {
             return redirect()->route('sin-permiso');
         }
 
@@ -49,6 +49,9 @@ class CheckRole
                 }
                 if ($request->user()->hasRole(['docente'])) {
                     return redirect()->route('entrevistas.agenda');
+                }
+                if ($request->user()->hasRole('comision_ed')) {
+                    return redirect()->route('encuestas.resultados');
                 }
                 if ($request->user()->hasRole('asistente')) {
                     return redirect()->route('ti.prestamos.mis_prestamos');

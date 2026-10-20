@@ -73,6 +73,7 @@ new class extends Component {
                         'recepcion' => ['label' => 'Recepción/Portería', 'color' => 'emerald'],
                         'solicitante_adquisiciones' => ['label' => 'Solicitante Adq.', 'color' => 'amber'],
                         'ti' => ['label' => 'Personal de TI', 'color' => 'sky'],
+                        'comision_ed' => ['label' => 'Comisión ED', 'color' => 'fuchsia'],
                     ];
                 @endphp
 

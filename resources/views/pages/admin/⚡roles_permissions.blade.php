@@ -71,7 +71,7 @@ new #[Title('Roles y Permisos')] class extends Component
             app(PermissionRegistrar::class)->setPermissionsTeamId($schoolId);
 
             // Pre-create standard roles if they do not exist
-            $standardRoles = ['superadmin', 'administrador', 'directivo', 'docente', 'inspector', 'asistente', 'psicosocial', 'recepcion', 'solicitante_adquisiciones', 'ti', 'gerencia', 'rectoria'];
+            $standardRoles = ['superadmin', 'administrador', 'directivo', 'docente', 'inspector', 'asistente', 'psicosocial', 'recepcion', 'solicitante_adquisiciones', 'ti', 'gerencia', 'rectoria', 'comision_ed'];
             foreach ($standardRoles as $roleName) {
                 Role::findOrCreate($roleName, 'web');
             }

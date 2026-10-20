@@ -30,6 +30,9 @@ class School extends Model
             'atrasos_notificar_apoderados' => true,
             'modo_mantenimiento' => false,
             'mensaje_mantenimiento' => 'El sistema se encuentra en mantenimiento programado. Volveremos en breve.',
+            'encuesta_habilitada' => true,
+            'encuesta_pin_estudiante' => '1234',
+            'encuesta_pin_apoderado' => '5678',
         ];
 
         if (is_null($value)) {
@@ -55,6 +58,44 @@ class School extends Model
     public function atrasosEmailsEnabled(): bool
     {
         return $this->emailsEnabled() && (bool) ($this->modulos_publicados['atrasos_notificar_apoderados'] ?? true);
+    }
+
+    /**
+     * Check if teacher evaluation surveys are currently enabled for this school.
+     */
+    public function encuestasHabilitadas(): bool
+    {
+        return filter_var($this->modulos_publicados['encuesta_habilitada'] ?? true, FILTER_VALIDATE_BOOLEAN);
+    }
+
+    /**
+     * Get the access PIN for the student survey.
+     */
+    public function pinEncuestaEstudiante(): string
+    {
+        return (string) ($this->modulos_publicados['encuesta_pin_estudiante'] ?? '1234');
+    }
+
+    /**
+     * Get the access PIN for the parent (apoderado) survey.
+     */
+    public function pinEncuestaApoderado(): string
+    {
+        return (string) ($this->modulos_publicados['encuesta_pin_apoderado'] ?? '5678');
+    }
+
+    /**
+     * Update teacher evaluation survey configuration for this school.
+     */
+    public function actualizarConfigEncuesta(bool $habilitada, string $pinEstudiante, string $pinApoderado): void
+    {
+        $modulos = $this->modulos_publicados;
+        $modulos['encuesta_habilitada'] = $habilitada;
+        $modulos['encuesta_pin_estudiante'] = trim($pinEstudiante);
+        $modulos['encuesta_pin_apoderado'] = trim($pinApoderado);
+
+        $this->modulos_publicados = $modulos;
+        $this->save();
     }
 
     /**

@@ -170,6 +170,23 @@
                 </flux:sidebar.group>
             @endif
 
+            @if (auth()->user()->hasRole(['comision_ed', 'superadmin']))
+                <flux:sidebar.group :heading="__('Evaluación Docente')" class="grid mt-4">
+                    <flux:sidebar.item icon="chart-bar-square" :href="route('encuestas.resultados')"
+                        :current="request()->routeIs('encuestas.resultados')" wire:navigate>
+                        {{ __('Resultados y Admin.') }}
+                    </flux:sidebar.item>
+                    <flux:sidebar.item icon="qr-code" :href="route('encuestas.imprimir_qr')"
+                        :current="request()->routeIs('encuestas.imprimir_qr')">
+                        {{ __('Imprimir QR y PINs') }}
+                    </flux:sidebar.item>
+                    <flux:sidebar.item icon="computer-desktop" :href="route('encuestas.kiosco')"
+                        :current="request()->routeIs('encuestas.kiosco')">
+                        {{ __('Abrir Encuesta (Tablet)') }}
+                    </flux:sidebar.item>
+                </flux:sidebar.group>
+            @endif
+
             @if (auth()->user()->hasRole(['administrador', 'superadmin']))
                 <flux:sidebar.group :heading="__('Administración')" class="grid mt-4">
                     <flux:sidebar.item icon="arrow-path-rounded-square"

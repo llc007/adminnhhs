@@ -60,8 +60,8 @@ new #[Title('Módulos Publicados')] class extends Component {
 
         $isMaintenanceMode = filter_var($this->modulos['modo_mantenimiento'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
-        // Keep boolean types explicitly when saving
-        $school->modulos_publicados = [
+        // Keep boolean types explicitly when saving while preserving other settings (e.g., survey config)
+        $school->modulos_publicados = array_merge($school->modulos_publicados, [
             'entrevistas' => filter_var($this->modulos['entrevistas'] ?? true, FILTER_VALIDATE_BOOLEAN),
             'estudiantes' => filter_var($this->modulos['estudiantes'] ?? true, FILTER_VALIDATE_BOOLEAN),
             'adquisiciones' => filter_var($this->modulos['adquisiciones'] ?? true, FILTER_VALIDATE_BOOLEAN),
@@ -69,7 +69,7 @@ new #[Title('Módulos Publicados')] class extends Component {
             'envio_correos' => filter_var($this->modulos['envio_correos'] ?? true, FILTER_VALIDATE_BOOLEAN),
             'modo_mantenimiento' => $isMaintenanceMode,
             'mensaje_mantenimiento' => trim($this->modulos['mensaje_mantenimiento'] ?? 'El sistema se encuentra en mantenimiento programado. Volveremos en breve.'),
-        ];
+        ]);
         $school->save();
 
         Flux::toast(

@@ -252,6 +252,7 @@ new class extends Component {
                                 <flux:select.option value="administrador">{{ __('Administrador') }}</flux:select.option>
                                 <flux:select.option value="solicitante_adquisiciones">{{ __('Solicitante Adq.') }}</flux:select.option>
                                 <flux:select.option value="ti">{{ __('Personal de TI') }}</flux:select.option>
+                                <flux:select.option value="comision_ed">{{ __('Comisión ED') }}</flux:select.option>
                             </flux:select>
                         </flux:field>
 
@@ -346,6 +347,7 @@ new class extends Component {
                                             'externo' => ['label' => 'Pendiente', 'color' => 'orange'],
                                             'solicitante_adquisiciones' => ['label' => 'Solicitante Adq.', 'color' => 'amber'],
                                             'ti' => ['label' => 'Personal de TI', 'color' => 'sky'],
+                                            'comision_ed' => ['label' => 'Comisión ED', 'color' => 'fuchsia'],
                                         ];
                                     @endphp
                                     @forelse ($funcionario->active_roles as $role)
@@ -453,6 +455,7 @@ new class extends Component {
                         <flux:checkbox wire:model="roles" value="administrador" :label="__('Administrador')" />
                         <flux:checkbox wire:model="roles" value="solicitante_adquisiciones" :label="__('Solicitante Adq.')" />
                         <flux:checkbox wire:model="roles" value="ti" :label="__('Personal de TI')" />
+                        <flux:checkbox wire:model="roles" value="comision_ed" :label="__('Comisión ED')" />
                         @if(auth()->user()->hasRole('superadmin'))
                             <flux:checkbox wire:model="roles" value="superadmin" :label="__('Superadmin')" />
                         @endif

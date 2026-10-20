@@ -155,6 +155,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('/ti/mis-prestamos', 'pages::ti.prestamos.mis_prestamos')->name('ti.prestamos.mis_prestamos');
 });
 
+// Evaluación Docente — Acceso público por QR + PIN para tablets (sin login)
+Route::livewire('/encuestas/kiosco/{schoolId?}', 'pages::encuestas.kiosco')->name('encuestas.kiosco');
+
+// Evaluación Docente — Panel de Resultados, Administración e Impresión QR (Comisión ED y Superadmin)
+Route::middleware(['auth', 'verified', 'role:comision_ed,superadmin'])->group(function () {
+    Route::livewire('/encuestas/resultados', 'pages::encuestas.resultados')->name('encuestas.resultados');
+    Route::livewire('/encuestas/imprimir-qr', 'pages::encuestas.imprimir_qr')->name('encuestas.imprimir_qr');
+});
+
 Route::view('/plantilla', 'pages.plantilla1')->name('plantilla');
 
 require __DIR__.'/settings.php';

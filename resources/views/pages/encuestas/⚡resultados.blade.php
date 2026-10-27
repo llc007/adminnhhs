@@ -209,9 +209,9 @@ new #[Title('Resultados y Administración — Encuesta Docente')] class extends 
 
         $profesores = User::query()
             ->whereHas('schools', fn ($q) => $q->where('school_id', $schoolId))
-            ->whereDoesntHave('roles', function ($q) use ($schoolId) {
+            ->whereHas('roles', function ($q) use ($schoolId) {
                 $q->where('roles.team_id', $schoolId)
-                    ->where('roles.name', 'estudiante');
+                    ->where('roles.name', 'docente');
             })
             ->with([
                 'jefeDeCursos' => fn ($q) => $q->where('school_id', $schoolId),
@@ -289,6 +289,10 @@ new #[Title('Resultados y Administración — Encuesta Docente')] class extends 
         $schoolId = auth()->user()->current_school_id;
         $profesor = User::query()
             ->whereHas('schools', fn ($q) => $q->where('school_id', $schoolId))
+            ->whereHas('roles', function ($q) use ($schoolId) {
+                $q->where('roles.team_id', $schoolId)
+                    ->where('roles.name', 'docente');
+            })
             ->find($this->profesorDetalleId);
 
         if (! $profesor) {

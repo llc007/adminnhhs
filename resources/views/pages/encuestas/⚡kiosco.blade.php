@@ -151,6 +151,10 @@ new #[Layout('layouts.blank')] #[Title('Encuesta de Evaluación Docente')] class
 
         $profesor = User::query()
             ->whereHas('schools', fn ($q) => $q->where('school_id', $this->schoolId))
+            ->whereHas('roles', function ($q) {
+                $q->where('roles.team_id', $this->schoolId)
+                    ->where('roles.name', 'docente');
+            })
             ->find($id);
 
         if (! $profesor) {
@@ -281,9 +285,9 @@ new #[Layout('layouts.blank')] #[Title('Encuesta de Evaluación Docente')] class
     {
         return User::query()
             ->whereHas('schools', fn ($q) => $q->where('school_id', $this->schoolId))
-            ->whereDoesntHave('roles', function ($q) {
+            ->whereHas('roles', function ($q) {
                 $q->where('roles.team_id', $this->schoolId)
-                    ->where('roles.name', 'estudiante');
+                    ->where('roles.name', 'docente');
             })
             ->with(['jefeDeCursos' => fn ($q) => $q->where('school_id', $this->schoolId)])
             ->withCount([
@@ -313,6 +317,10 @@ new #[Layout('layouts.blank')] #[Title('Encuesta de Evaluación Docente')] class
 
         return User::query()
             ->whereHas('schools', fn ($q) => $q->where('school_id', $this->schoolId))
+            ->whereHas('roles', function ($q) {
+                $q->where('roles.team_id', $this->schoolId)
+                    ->where('roles.name', 'docente');
+            })
             ->with(['jefeDeCursos' => fn ($q) => $q->where('school_id', $this->schoolId)])
             ->find($this->profesorId);
     }

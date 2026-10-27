@@ -253,3 +253,27 @@ test('comision_ed or superadmin can reset and delete all surveys', function () {
 
     expect(EvaluacionDocente::where('school_id', $school->id)->count())->toBe(0);
 });
+
+test('only users with docente role appear in kiosk selector and results table', function () {
+    [$school, $encargada, $profesor] = createSchoolAndStaff();
+
+    $inspector = User::factory()->create([
+        'nombres' => 'PEDRO INSPECTOR',
+        'apellido_pat' => 'GOMEZ',
+        'current_school_id' => $school->id,
+    ]);
+    $inspector->syncRolesForSchool($school->id, ['inspector']);
+
+    // En la tablet (kiosco) solo aparece el docente, no el inspector
+    Livewire::test('pages::encuestas.kiosco', ['schoolId' => $school->id])
+        ->set('pinIngresado', '1234')
+        ->call('validarPin')
+        ->assertSee('CARLOS ALBERTO SOTO')
+        ->assertDontSee('PEDRO INSPECTOR GOMEZ');
+
+    // En la tabla de resultados solo aparece el docente, no el inspector
+    $this->actingAs($encargada);
+    Livewire::test('pages::encuestas.resultados')
+        ->assertSee('CARLOS ALBERTO SOTO')
+        ->assertDontSee('PEDRO INSPECTOR GOMEZ');
+});

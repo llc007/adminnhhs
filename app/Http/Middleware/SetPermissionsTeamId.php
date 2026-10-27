@@ -32,6 +32,11 @@ class SetPermissionsTeamId
             if ($schoolId) {
                 app(PermissionRegistrar::class)->setPermissionsTeamId($schoolId);
             }
+        } else {
+            $schoolId = $request->route('schoolId') ?? $request->query('schoolId') ?? School::first()?->id;
+            if ($schoolId) {
+                app(PermissionRegistrar::class)->setPermissionsTeamId((int) $schoolId);
+            }
         }
 
         return $next($request);

@@ -4,11 +4,13 @@ use App\Models\Curso;
 use App\Models\EvaluacionDocente;
 use App\Models\School;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Spatie\Permission\PermissionRegistrar;
 
 new #[Layout('layouts.blank')] #[Title('Encuesta de Evaluación Docente')] class extends Component
 {
@@ -36,6 +38,13 @@ new #[Layout('layouts.blank')] #[Title('Encuesta de Evaluación Docente')] class
 
     public ?string $mensajeError = null;
 
+    public function boot(): void
+    {
+        if ($this->schoolId) {
+            app(PermissionRegistrar::class)->setPermissionsTeamId($this->schoolId);
+        }
+    }
+
     public function mount(?int $schoolId = null): void
     {
         $school = $schoolId
@@ -49,6 +58,7 @@ new #[Layout('layouts.blank')] #[Title('Encuesta de Evaluación Docente')] class
         }
 
         $this->schoolId = $school->id;
+        app(PermissionRegistrar::class)->setPermissionsTeamId($this->schoolId);
 
         if (in_array($this->tipo, ['estudiante', 'apoderado'], true)) {
             $this->tipoRespondente = $this->tipo;
@@ -141,6 +151,28 @@ new #[Layout('layouts.blank')] #[Title('Encuesta de Evaluación Docente')] class
         $this->paso = 'pin';
     }
 
+    protected function baseDocentesQuery()
+    {
+        if ($this->schoolId) {
+            app(PermissionRegistrar::class)->setPermissionsTeamId($this->schoolId);
+        }
+
+        return User::query()
+            ->whereHas('schools', fn ($q) => $q->where('school_id', $this->schoolId))
+            ->where(function ($query) {
+                $query->whereHas('roles', fn ($q) => $q->where('roles.name', 'docente'))
+                    ->orWhereExists(function ($sub) {
+                        $sub->select(DB::raw(1))
+                            ->from('model_has_roles')
+                            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+                            ->whereColumn('model_has_roles.model_id', 'users.id')
+                            ->where('model_has_roles.model_type', User::class)
+                            ->where('model_has_roles.team_id', $this->schoolId)
+                            ->where('roles.name', 'docente');
+                    });
+            });
+    }
+
     public function seleccionarProfesor(int $id): void
     {
         if (! $this->pinValidado) {
@@ -149,13 +181,7 @@ new #[Layout('layouts.blank')] #[Title('Encuesta de Evaluación Docente')] class
             return;
         }
 
-        $profesor = User::query()
-            ->whereHas('schools', fn ($q) => $q->where('school_id', $this->schoolId))
-            ->whereHas('roles', function ($q) {
-                $q->where('roles.team_id', $this->schoolId)
-                    ->where('roles.name', 'docente');
-            })
-            ->find($id);
+        $profesor = $this->baseDocentesQuery()->find($id);
 
         if (! $profesor) {
             return;
@@ -283,12 +309,7 @@ new #[Layout('layouts.blank')] #[Title('Encuesta de Evaluación Docente')] class
     #[Computed]
     public function profesores()
     {
-        return User::query()
-            ->whereHas('schools', fn ($q) => $q->where('school_id', $this->schoolId))
-            ->whereHas('roles', function ($q) {
-                $q->where('roles.team_id', $this->schoolId)
-                    ->where('roles.name', 'docente');
-            })
+        return $this->baseDocentesQuery()
             ->with(['jefeDeCursos' => fn ($q) => $q->where('school_id', $this->schoolId)])
             ->withCount([
                 'evaluacionesDocente as respuestas_recibidas_count' => fn ($q) => $q
@@ -296,12 +317,16 @@ new #[Layout('layouts.blank')] #[Title('Encuesta de Evaluación Docente')] class
                     ->where('tipo_respondente', $this->tipoRespondente),
             ])
             ->when(strlen(trim($this->busquedaProfesor)) >= 1, function ($query) {
-                $term = '%'.trim($this->busquedaProfesor).'%';
-                $query->where(function ($q) use ($term) {
-                    $q->where('nombres', 'like', $term)
-                        ->orWhere('apellido_pat', 'like', $term)
-                        ->orWhere('apellido_mat', 'like', $term);
-                });
+                $words = array_filter(explode(' ', trim($this->busquedaProfesor)));
+                foreach ($words as $w) {
+                    $term = '%'.$w.'%';
+                    $query->where(function ($q) use ($term) {
+                        $q->where('nombres', 'like', $term)
+                            ->orWhere('apellido_pat', 'like', $term)
+                            ->orWhere('apellido_mat', 'like', $term)
+                            ->orWhere('email', 'like', $term);
+                    });
+                }
             })
             ->orderBy('nombres')
             ->orderBy('apellido_pat')
@@ -315,12 +340,7 @@ new #[Layout('layouts.blank')] #[Title('Encuesta de Evaluación Docente')] class
             return null;
         }
 
-        return User::query()
-            ->whereHas('schools', fn ($q) => $q->where('school_id', $this->schoolId))
-            ->whereHas('roles', function ($q) {
-                $q->where('roles.team_id', $this->schoolId)
-                    ->where('roles.name', 'docente');
-            })
+        return $this->baseDocentesQuery()
             ->with(['jefeDeCursos' => fn ($q) => $q->where('school_id', $this->schoolId)])
             ->find($this->profesorId);
     }
@@ -529,7 +549,11 @@ new #[Layout('layouts.blank')] #[Title('Encuesta de Evaluación Docente')] class
                         </button>
                     @empty
                         <div class="col-span-full py-10 text-center text-zinc-500 dark:text-zinc-400 text-sm">
-                            No se encontraron profesores con ese nombre.
+                            @if (trim($busquedaProfesor) !== '')
+                                No se encontraron profesores que coincidan con "{{ $busquedaProfesor }}".
+                            @else
+                                No hay profesores disponibles para evaluar en este momento.
+                            @endif
                         </div>
                     @endforelse
                 </div>

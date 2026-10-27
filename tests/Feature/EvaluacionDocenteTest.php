@@ -7,6 +7,7 @@ use App\Models\EvaluacionDocente;
 use App\Models\School;
 use App\Models\User;
 use Livewire\Livewire;
+use Spatie\Permission\PermissionRegistrar;
 
 function createSchoolAndStaff(): array
 {
@@ -276,4 +277,23 @@ test('only users with docente role appear in kiosk selector and results table', 
     Livewire::test('pages::encuestas.resultados')
         ->assertSee('CARLOS ALBERTO SOTO')
         ->assertDontSee('PEDRO INSPECTOR GOMEZ');
+});
+
+test('unauthenticated guest scanning QR can see and search professors even with clean spatie team context', function () {
+    [$school, $encargada, $profesor] = createSchoolAndStaff();
+
+    // Ensure user is guest and Spatie team context was reset
+    auth()->logout();
+    app(PermissionRegistrar::class)->setPermissionsTeamId(null);
+
+    Livewire::test('pages::encuestas.kiosco', ['schoolId' => $school->id])
+        ->set('pinIngresado', '1234')
+        ->call('validarPin')
+        ->assertSet('paso', 'seleccion')
+        ->assertSee('CARLOS ALBERTO SOTO')
+        ->set('busquedaProfesor', 'Soto')
+        ->assertSee('CARLOS ALBERTO SOTO')
+        ->set('busquedaProfesor', 'InexistenteXYZ')
+        ->assertSee('No se encontraron profesores que coincidan con')
+        ->assertSee('InexistenteXYZ');
 });

@@ -104,6 +104,11 @@ Route::middleware(['auth', 'verified', 'role_or_permission:superadmin|gestionar-
     Route::livewire('/funcionarios/ficha/{id}', 'pages::usuarios.funcionarios.ficha')->name('funcionarios.ficha');
 });
 
+// Gestión de Docentes y Jefaturas — requiere directivo, administrador, superadmin o permiso gestionar-funcionarios
+Route::middleware(['auth', 'verified', 'role_or_permission:superadmin|administrador|directivo|gestionar-funcionarios'])->group(function () {
+    Route::livewire('/docentes', 'pages::usuarios.docentes.index')->name('docentes.index');
+});
+
 // Restablecer Contraseña / Entrega de Credenciales — requiere ver-estudiantes, gestionar-funcionarios o superadmin
 Route::middleware(['auth', 'verified', 'role_or_permission:superadmin|administrador|ver-estudiantes|gestionar-funcionarios'])->group(function () {
     Route::livewire('/usuarios/restablecer-clave', 'pages::usuarios.restablecer_clave')->name('usuarios.restablecer_clave');

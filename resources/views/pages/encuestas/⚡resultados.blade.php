@@ -25,6 +25,10 @@ new #[Title('Resultados y Administración — Encuesta Docente')] class extends 
     // Panel de administración de encuestas
     public bool $modalAdminEncuesta = false;
 
+    public bool $modalConfirmarReset = false;
+
+    public string $tipoReset = 'todas'; // 'todas' | 'estudiante' | 'apoderado'
+
     public bool $encuestaHabilitada = true;
 
     public string $pinEstudiante = '1234';
@@ -98,6 +102,40 @@ new #[Title('Resultados y Administración — Encuesta Docente')] class extends 
 
         $this->encuestaHabilitada = ! $this->encuestaHabilitada;
         $this->guardarConfiguracionEncuesta();
+    }
+
+    public function reiniciarEncuestas(): void
+    {
+        $user = auth()->user();
+        if (! $user || ! $user->hasRole(['superadmin', 'comision_ed'])) {
+            abort(403);
+        }
+
+        $schoolId = $user->current_school_id ?? School::first()?->id;
+        if (! $schoolId) {
+            return;
+        }
+
+        $query = EvaluacionDocente::query()->where('school_id', $schoolId);
+
+        if (in_array($this->tipoReset, ['estudiante', 'apoderado'], true)) {
+            $query->where('tipo_respondente', $this->tipoReset);
+        }
+
+        $eliminadas = $query->delete();
+
+        $this->modalConfirmarReset = false;
+        $this->modalAdminEncuesta = false;
+        $this->modalDetalle = false;
+        $this->profesorDetalleId = null;
+
+        unset($this->kpis, $this->tablaResultados, $this->detalleProfesor);
+
+        Flux::toast(
+            heading: 'Encuestas reiniciadas',
+            text: "Se han eliminado {$eliminadas} respuestas correctamente.",
+            variant: 'success',
+        );
     }
 
     public function cambiarVista(string $tipo): void
@@ -352,6 +390,10 @@ new #[Title('Resultados y Administración — Encuesta Docente')] class extends 
             <flux:button size="sm" variant="filled" icon="key" wire:click="$set('modalAdminEncuesta', true)">
                 Modificar PINs
             </flux:button>
+            <flux:button size="sm" variant="ghost" icon="trash" class="!text-red-600 hover:!bg-red-50 dark:!text-red-400 dark:hover:!bg-red-950/40"
+                wire:click="$set('modalConfirmarReset', true)">
+                Reiniciar Encuestas
+            </flux:button>
             <flux:button size="sm" :variant="$encuestaHabilitada ? 'danger' : 'primary'"
                 icon="{{ $encuestaHabilitada ? 'lock-closed' : 'lock-open' }}"
                 wire:click="toggleEstadoRapido">
@@ -604,6 +646,43 @@ new #[Title('Resultados y Administración — Encuesta Docente')] class extends 
                 </flux:button>
             </div>
         </form>
+    </flux:modal>
+
+    {{-- Modal de Confirmación para Reiniciar / Eliminar Todas las Encuestas --}}
+    <flux:modal wire:model.self="modalConfirmarReset" class="max-w-md w-full">
+        <div class="space-y-6">
+            <div class="flex items-start gap-3.5">
+                <div class="size-11 rounded-xl bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 flex items-center justify-center shrink-0">
+                    <flux:icon.exclamation-triangle class="size-6" />
+                </div>
+                <div>
+                    <flux:heading size="lg">Reiniciar Encuestas</flux:heading>
+                    <flux:text class="mt-1 text-xs">
+                        Esta acción eliminará permanentemente las respuestas registradas para dejar el sistema en cero.
+                    </flux:text>
+                </div>
+            </div>
+
+            <div class="space-y-2">
+                <label class="block text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                    ¿Qué respuestas deseas eliminar?
+                </label>
+                <flux:select wire:model="tipoReset">
+                    <flux:select.option value="todas">Todas las encuestas (Estudiantes y Apoderados)</flux:select.option>
+                    <flux:select.option value="estudiante">Solo encuestas de Estudiantes</flux:select.option>
+                    <flux:select.option value="apoderado">Solo encuestas de Apoderados</flux:select.option>
+                </flux:select>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+                <flux:button variant="ghost" wire:click="$set('modalConfirmarReset', false)">
+                    Cancelar
+                </flux:button>
+                <flux:button variant="danger" icon="trash" wire:click="reiniciarEncuestas">
+                    Sí, eliminar encuestas
+                </flux:button>
+            </div>
+        </div>
     </flux:modal>
 
     {{-- Modal de Detalle Estilo Google Forms --}}

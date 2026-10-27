@@ -129,6 +129,19 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the active curso where this user is jefe for the current school and active academic year.
+     */
+    public function cursoJefatura(?int $schoolId = null): ?Curso
+    {
+        $schoolId = $schoolId ?? $this->current_school_id;
+
+        return $this->jefeDeCursos()
+            ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
+            ->whereHas('academicYear', fn ($q) => $q->where('is_active', true))
+            ->first();
+    }
+
+    /**
      * Get the teacher evaluations received by this user.
      */
     public function evaluacionesDocente(): HasMany

@@ -134,6 +134,14 @@
                         </flux:sidebar.item>
                     @endif
 
+                    @if (auth()->user()->hasRole(['superadmin', 'administrador', 'directivo']) || auth()->user()->can('gestionar-funcionarios'))
+                        <flux:sidebar.item icon="academic-cap" :href="route('docentes.index')"
+                            :current="request()->routeIs('docentes.*')"
+                            wire:navigate>
+                            {{ __('Docentes') }}
+                        </flux:sidebar.item>
+                    @endif
+
                     @if (auth()->user()->hasRole('superadmin') || auth()->user()->canAny(['ver-estudiantes', 'gestionar-funcionarios']))
                         <flux:sidebar.item icon="key" :href="route('usuarios.restablecer_clave')"
                             :current="request()->routeIs('usuarios.restablecer_clave')"

@@ -121,12 +121,10 @@ class TiTask extends Model
         $siguienteFechaStr = $siguienteFecha->format('Y-m-d');
 
         // Prevenir duplicados si la tarea para esa fecha ya fue creada (por ejemplo por auto-generación de hoy)
-        $existente = self::where('parent_id', $this->id)
-            ->orWhere(function ($q) use ($siguienteFechaStr) {
-                $q->where('titulo', $this->titulo)
-                    ->where('frecuencia', $this->frecuencia)
-                    ->whereDate('fecha_programada', $siguienteFechaStr);
-            })->first();
+        $existente = self::where('titulo', $this->titulo)
+            ->where('frecuencia', $this->frecuencia)
+            ->whereDate('fecha_programada', $siguienteFechaStr)
+            ->first();
 
         if ($existente) {
             return $existente;
@@ -177,12 +175,10 @@ class TiTask extends Model
                 $lastDateStr = $latestTask->fecha_programada ? $latestTask->fecha_programada->toDateString() : null;
 
                 if ($lastDateStr && $lastDateStr < $todayStr) {
-                    $existeHoy = self::where('parent_id', $latestTask->id)
-                        ->orWhere(function ($q) use ($latestTask, $todayStr) {
-                            $q->where('titulo', $latestTask->titulo)
-                                ->where('frecuencia', 'diaria')
-                                ->whereDate('fecha_programada', $todayStr);
-                        })->exists();
+                    $existeHoy = self::where('titulo', $latestTask->titulo)
+                        ->where('frecuencia', 'diaria')
+                        ->whereDate('fecha_programada', $todayStr)
+                        ->exists();
 
                     if (! $existeHoy) {
                         self::create([
@@ -217,12 +213,10 @@ class TiTask extends Model
             $lastDateStr = $latestTask->fecha_programada ? $latestTask->fecha_programada->toDateString() : null;
 
             if ($lastDateStr && $lastDateStr < $inicioSemanaStr) {
-                $existeEstaSemana = self::where('parent_id', $latestTask->id)
-                    ->orWhere(function ($q) use ($latestTask, $inicioSemanaStr, $finSemanaStr) {
-                        $q->where('titulo', $latestTask->titulo)
-                            ->where('frecuencia', 'semanal')
-                            ->whereBetween('fecha_programada', [$inicioSemanaStr, $finSemanaStr]);
-                    })->exists();
+                $existeEstaSemana = self::where('titulo', $latestTask->titulo)
+                    ->where('frecuencia', 'semanal')
+                    ->whereBetween('fecha_programada', [$inicioSemanaStr, $finSemanaStr])
+                    ->exists();
 
                 if (! $existeEstaSemana) {
                     self::create([
@@ -258,12 +252,10 @@ class TiTask extends Model
             $lastDateStr = $latestTask->fecha_programada ? $latestTask->fecha_programada->toDateString() : null;
 
             if ($lastDateStr && $lastDateStr < $inicioSemestreStr) {
-                $existeEsteSemestre = self::where('parent_id', $latestTask->id)
-                    ->orWhere(function ($q) use ($latestTask, $inicioSemestreStr, $finSemestreStr) {
-                        $q->where('titulo', $latestTask->titulo)
-                            ->where('frecuencia', 'semestral')
-                            ->whereBetween('fecha_programada', [$inicioSemestreStr, $finSemestreStr]);
-                    })->exists();
+                $existeEsteSemestre = self::where('titulo', $latestTask->titulo)
+                    ->where('frecuencia', 'semestral')
+                    ->whereBetween('fecha_programada', [$inicioSemestreStr, $finSemestreStr])
+                    ->exists();
 
                 if (! $existeEsteSemestre) {
                     self::create([
@@ -297,12 +289,10 @@ class TiTask extends Model
             $lastDateStr = $latestTask->fecha_programada ? $latestTask->fecha_programada->toDateString() : null;
 
             if ($lastDateStr && $lastDateStr < $inicioAnioStr) {
-                $existeEsteAnio = self::where('parent_id', $latestTask->id)
-                    ->orWhere(function ($q) use ($latestTask, $year) {
-                        $q->where('titulo', $latestTask->titulo)
-                            ->where('frecuencia', 'anual')
-                            ->whereYear('fecha_programada', $year);
-                    })->exists();
+                $existeEsteAnio = self::where('titulo', $latestTask->titulo)
+                    ->where('frecuencia', 'anual')
+                    ->whereYear('fecha_programada', $year)
+                    ->exists();
 
                 if (! $existeEsteAnio) {
                     self::create([

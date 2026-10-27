@@ -227,3 +227,29 @@ test('results page shows 20 quota for students and 2 quota for apoderados', func
         ->call('cambiarVista', 'apoderado')
         ->assertSee('1 / 2');
 });
+
+test('comision_ed or superadmin can reset and delete all surveys', function () {
+    [$school, $encargada, $profesor] = createSchoolAndStaff();
+
+    EvaluacionDocente::factory()->count(3)->create([
+        'school_id' => $school->id,
+        'profesor_id' => $profesor->id,
+        'tipo_respondente' => 'estudiante',
+    ]);
+
+    EvaluacionDocente::factory()->apoderado()->count(2)->create([
+        'school_id' => $school->id,
+        'profesor_id' => $profesor->id,
+    ]);
+
+    expect(EvaluacionDocente::where('school_id', $school->id)->count())->toBe(5);
+
+    $this->actingAs($encargada);
+
+    Livewire::test('pages::encuestas.resultados')
+        ->set('tipoReset', 'todas')
+        ->call('reiniciarEncuestas')
+        ->assertSet('modalConfirmarReset', false);
+
+    expect(EvaluacionDocente::where('school_id', $school->id)->count())->toBe(0);
+});

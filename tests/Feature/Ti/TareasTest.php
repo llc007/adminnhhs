@@ -442,3 +442,55 @@ test('uncompleted weekly task in previous week automatically generates instance 
     expect($currentWeekTask)->not->toBeNull();
     expect($currentWeekTask->estado)->toBe('pendiente');
 });
+
+test('completing a daily task that already has a parent leaves task in current day and creates tomorrow instance', function () {
+    $user = User::factory()->create();
+    $schoolId = DB::table('schools')->insertGetId([
+        'name' => 'Test School',
+        'domain' => 'test.com',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    $user->update(['current_school_id' => $schoolId]);
+    $user->syncRolesForSchool($schoolId, ['ti']);
+    $this->actingAs($user);
+
+    $today = now('America/Santiago');
+    $yesterday = $today->copy()->subWeekday();
+    $tomorrow = $today->copy()->addWeekday();
+
+    $taskAyer = TiTask::create([
+        'titulo' => 'Revisión Wifi Ed Media',
+        'frecuencia' => 'diaria',
+        'prioridad' => 'media',
+        'estado' => 'completada',
+        'fecha_programada' => $yesterday->toDateString(),
+        'creado_por' => $user->id,
+        'es_recurrente' => true,
+    ]);
+
+    $taskHoy = TiTask::create([
+        'titulo' => 'Revisión Wifi Ed Media',
+        'frecuencia' => 'diaria',
+        'prioridad' => 'media',
+        'estado' => 'pendiente',
+        'fecha_programada' => $today->toDateString(),
+        'creado_por' => $user->id,
+        'parent_id' => $taskAyer->id,
+        'es_recurrente' => true,
+    ]);
+
+    $siguiente = $taskHoy->completar('OK hoy');
+
+    // Today's task must remain completed in today's date
+    $taskHoy->refresh();
+    expect($taskHoy->estado)->toBe('completada');
+    expect($taskHoy->fecha_programada->toDateString())->toBe($today->toDateString());
+
+    // Next task must be created for tomorrow with parent_id = taskHoy->id
+    expect($siguiente)->not->toBeNull();
+    expect($siguiente->id)->not->toBe($taskHoy->id);
+    expect($siguiente->fecha_programada->toDateString())->toBe($tomorrow->toDateString());
+    expect($siguiente->parent_id)->toBe($taskHoy->id);
+    expect($siguiente->estado)->toBe('pendiente');
+});

@@ -97,6 +97,9 @@
                     <flux:sidebar.item icon="briefcase" :href="route('funcionarios.index')" :current="request()->routeIs('funcionarios.*')" wire:navigate>
                         {{ __('Funcionarios') }}
                     </flux:sidebar.item>
+                    <flux:sidebar.item icon="academic-cap" :href="route('docentes.index')" :current="request()->routeIs('docentes.*')" wire:navigate>
+                        {{ __('Docentes') }}
+                    </flux:sidebar.item>
                     @endif
                 </flux:sidebar.group>
             </flux:sidebar.nav>

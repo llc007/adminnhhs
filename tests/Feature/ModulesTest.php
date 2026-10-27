@@ -83,6 +83,10 @@ test('modules configuration can be updated by superadmin', function () {
         'envio_correos' => false,
         'modo_mantenimiento' => false,
         'mensaje_mantenimiento' => 'El sistema se encuentra en mantenimiento programado. Volveremos en breve.',
+        'atrasos_notificar_apoderados' => true,
+        'encuesta_habilitada' => true,
+        'encuesta_pin_estudiante' => '1234',
+        'encuesta_pin_apoderado' => '5678',
     ]);
 });
 

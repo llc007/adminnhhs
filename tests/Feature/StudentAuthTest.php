@@ -64,8 +64,8 @@ test('google login with student email assigns estudiante role and links profile'
     // Call Google Callback Route
     $response = $this->get(route('auth.google.callback'));
 
-    // Check redirection to intended or dashboard
-    $response->assertRedirect('/dashboard');
+    // Check redirection to portal-apoderado
+    $response->assertRedirect(route('portal-apoderado'));
 
     // Assert user created
     $user = User::where('email', 'juan.perez@newheavenhs.cl')->first();
@@ -111,7 +111,7 @@ test('google login with non-student email assigns default externo role', functio
     expect($user->hasRole('estudiante'))->toBeFalse();
 });
 
-test('dashboard page redirects student users to index route of entrevistas', function () {
+test('dashboard page redirects student users to portal-apoderado', function () {
     $user = User::factory()->create();
 
     $schoolId = DB::table('schools')->insertGetId([
@@ -126,7 +126,7 @@ test('dashboard page redirects student users to index route of entrevistas', fun
 
     $response = $this->actingAs($user)->get(route('dashboard'));
 
-    $response->assertRedirect(route('entrevistas.index'));
+    $response->assertRedirect(route('portal-apoderado'));
 });
 
 test('interviews index page scopes records to the authenticated student', function () {

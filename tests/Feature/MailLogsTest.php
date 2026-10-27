@@ -49,7 +49,7 @@ test('sending an email creates a mail log entry via the listener', function () {
 
     expect(MailLog::count())->toBe(1);
     $log = MailLog::first();
-    expect($log->body)->toBeNull();
+    expect($log->body)->toBe('Este es el contenido de prueba');
     expect($log->mail_id)->not->toBeNull();
 });
 

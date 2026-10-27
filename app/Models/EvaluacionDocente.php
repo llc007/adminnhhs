@@ -125,6 +125,50 @@ class EvaluacionDocente extends Model
         return $writer->writeString($url);
     }
 
+    /**
+     * Determina la clasificación y porcentaje según el puntaje obtenido y el puntaje máximo.
+     *
+     * - Destacado: 90% o superior
+     * - Competente: 80% a 89.9%
+     * - Básico: 70% a 79.9%
+     * - Por lograr: menos de 70%
+     *
+     * @return array{nombre: string, porcentaje: float, color: string, badge_class: string}|null
+     */
+    public static function clasificacionPorcentual(?float $puntajeObtenido, int $puntajeMaximo): ?array
+    {
+        if ($puntajeObtenido === null || $puntajeMaximo <= 0) {
+            return null;
+        }
+
+        $porcentaje = round(($puntajeObtenido / $puntajeMaximo) * 100, 1);
+
+        if ($porcentaje >= 90.0) {
+            $nombre = 'Destacado';
+            $color = 'emerald';
+            $badgeClass = 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800';
+        } elseif ($porcentaje >= 80.0) {
+            $nombre = 'Competente';
+            $color = 'blue';
+            $badgeClass = 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-800';
+        } elseif ($porcentaje >= 70.0) {
+            $nombre = 'Básico';
+            $color = 'amber';
+            $badgeClass = 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-200 dark:border-amber-800';
+        } else {
+            $nombre = 'Por lograr';
+            $color = 'red';
+            $badgeClass = 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300 border border-red-200 dark:border-red-800';
+        }
+
+        return [
+            'nombre' => $nombre,
+            'porcentaje' => $porcentaje,
+            'color' => $color,
+            'badge_class' => $badgeClass,
+        ];
+    }
+
     public function school(): BelongsTo
     {
         return $this->belongsTo(School::class);

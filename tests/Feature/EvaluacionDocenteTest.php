@@ -311,6 +311,47 @@ test('questions 3 and 10 allow No me toca con el profesor en ese bloque and pror
         ->and($eval->respuestas['10'])->toBe(EvaluacionDocente::VALOR_NO_APLICA);
 });
 
+test('double tapping enviarEncuesta only creates one evaluation and limpiarDuplicadas removes duplicates', function () {
+    [$school, $encargada, $profesor] = createSchoolAndStaff();
+
+    $component = Livewire::test('pages::encuestas.kiosco', ['schoolId' => $school->id])
+        ->set('pinIngresado', '1234')
+        ->call('validarPin')
+        ->call('seleccionarProfesor', $profesor->id)
+        ->call('comenzarEncuesta');
+
+    for ($i = 1; $i <= 10; $i++) {
+        $component->call('responderPregunta', $i, 3);
+    }
+
+    // Llamar enviarEncuesta dos veces seguidas (simulando doble toque en tablet)
+    $component->call('enviarEncuesta')
+        ->call('enviarEncuesta');
+
+    expect(EvaluacionDocente::where('profesor_id', $profesor->id)->count())->toBe(1);
+
+    // Si en base de datos ya existía una duplicada previa en el mismo segundo, limpiarDuplicadas la elimina
+    $primera = EvaluacionDocente::first();
+    EvaluacionDocente::create([
+        'school_id' => $school->id,
+        'profesor_id' => $profesor->id,
+        'tipo_respondente' => 'estudiante',
+        'con_jefatura' => false,
+        'respuestas' => $primera->respuestas,
+        'puntaje_obtenido' => $primera->puntaje_obtenido,
+        'puntaje_maximo' => $primera->puntaje_maximo,
+        'promedio' => $primera->promedio,
+    ]);
+
+    expect(EvaluacionDocente::where('profesor_id', $profesor->id)->count())->toBe(2);
+
+    $this->actingAs($encargada);
+    Livewire::test('pages::encuestas.resultados')
+        ->call('limpiarDuplicadas');
+
+    expect(EvaluacionDocente::where('profesor_id', $profesor->id)->count())->toBe(1);
+});
+
 test('unauthenticated guest scanning QR can see and search professors even with clean spatie team context', function () {
     [$school, $encargada, $profesor] = createSchoolAndStaff();
 

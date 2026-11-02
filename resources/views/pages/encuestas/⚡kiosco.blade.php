@@ -36,6 +36,8 @@ new #[Layout('layouts.blank')] #[Title('Encuesta de Evaluación Docente')] class
     /** @var array<string, int> */
     public array $respuestas = [];
 
+    public string $intentoId = '';
+
     public ?string $mensajeError = null;
 
     public function boot(): void
@@ -216,6 +218,7 @@ new #[Layout('layouts.blank')] #[Title('Encuesta de Evaluación Docente')] class
         }
 
         $this->respuestas = [];
+        $this->intentoId = (string) \Illuminate\Support\Str::uuid();
         $this->mensajeError = null;
         $this->paso = 'encuesta';
     }
@@ -235,6 +238,10 @@ new #[Layout('layouts.blank')] #[Title('Encuesta de Evaluación Docente')] class
 
     public function enviarEncuesta(): void
     {
+        if ($this->paso !== 'encuesta' || empty($this->respuestas)) {
+            return;
+        }
+
         if (! $this->pinValidado) {
             $this->paso = 'pin';
 
@@ -277,6 +284,16 @@ new #[Layout('layouts.blank')] #[Title('Encuesta de Evaluación Docente')] class
             $respuestasLimpias[$key] = $val;
         }
 
+        // Protección anti doble toque / reenvío concurrente desde la tablet
+        if ($this->intentoId !== '') {
+            if (! \Illuminate\Support\Facades\Cache::add("eval_docente_intento_{$this->intentoId}", true, 120)) {
+                $this->respuestas = [];
+                $this->paso = 'completado';
+
+                return;
+            }
+        }
+
         $totalPreguntas = count($preguntas);
         $respuestasValidas = array_filter($respuestasLimpias, fn (int $v) => $v >= 0);
         $cantidadValidas = count($respuestasValidas);
@@ -301,6 +318,8 @@ new #[Layout('layouts.blank')] #[Title('Encuesta de Evaluación Docente')] class
             'registrado_por_id' => auth()->id(),
         ]);
 
+        $this->respuestas = [];
+        $this->intentoId = '';
         $this->mensajeError = null;
         $this->paso = 'completado';
     }
@@ -308,6 +327,7 @@ new #[Layout('layouts.blank')] #[Title('Encuesta de Evaluación Docente')] class
     public function nuevaEncuestaMismoProfesor(): void
     {
         $this->respuestas = [];
+        $this->intentoId = (string) \Illuminate\Support\Str::uuid();
         $this->mensajeError = null;
         $this->paso = 'encuesta';
     }
@@ -738,10 +758,11 @@ new #[Layout('layouts.blank')] #[Title('Encuesta de Evaluación Docente')] class
                     Verifica que hayas respondido las <strong>{{ $totalPreguntas }} preguntas</strong> antes de enviar. Tu respuesta es totalmente anónima.
                 </p>
 
-                <button type="button" wire:click="enviarEncuesta"
-                    class="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-8 py-3.5 text-base shadow-md transition cursor-pointer shrink-0">
-                    <flux:icon.paper-airplane class="size-5" />
-                    Enviar Encuesta
+                <button type="button" wire:click="enviarEncuesta" wire:loading.attr="disabled" wire:target="enviarEncuesta"
+                    class="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold px-8 py-3.5 text-base shadow-md transition cursor-pointer shrink-0">
+                    <flux:icon.paper-airplane wire:loading.remove wire:target="enviarEncuesta" class="size-5" />
+                    <span wire:loading.remove wire:target="enviarEncuesta">Enviar Encuesta</span>
+                    <span wire:loading wire:target="enviarEncuesta">Enviando...</span>
                 </button>
             </div>
         </main>

@@ -139,6 +139,86 @@ new #[Title('Resultados y Administración — Encuesta Docente')] class extends 
         );
     }
 
+    public function eliminarRespuestaIndividual(int $evaluacionId): void
+    {
+        $user = auth()->user();
+        if (! $user || ! $user->hasRole(['superadmin', 'comision_ed'])) {
+            abort(403);
+        }
+
+        $schoolId = $user->current_school_id ?? School::first()?->id;
+        $eval = EvaluacionDocente::query()
+            ->where('school_id', $schoolId)
+            ->find($evaluacionId);
+
+        if ($eval) {
+            $eval->delete();
+            unset($this->kpis, $this->tablaResultados, $this->detalleProfesor);
+
+            Flux::toast(
+                heading: 'Respuesta eliminada',
+                text: 'La encuesta seleccionada fue eliminada correctamente.',
+                variant: 'success',
+            );
+        }
+    }
+
+    public function limpiarDuplicadas(): void
+    {
+        $user = auth()->user();
+        if (! $user || ! $user->hasRole(['superadmin', 'comision_ed'])) {
+            abort(403);
+        }
+
+        $schoolId = $user->current_school_id ?? School::first()?->id;
+        if (! $schoolId) {
+            return;
+        }
+
+        $todas = EvaluacionDocente::query()
+            ->where('school_id', $schoolId)
+            ->orderBy('profesor_id')
+            ->orderBy('tipo_respondente')
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->get();
+
+        $idsAEliminar = [];
+        /** @var EvaluacionDocente|null $prev */
+        $prev = null;
+
+        foreach ($todas as $actual) {
+            if (
+                $prev !== null
+                && $prev->profesor_id === $actual->profesor_id
+                && $prev->tipo_respondente === $actual->tipo_respondente
+                && json_encode($prev->respuestas) === json_encode($actual->respuestas)
+                && $prev->created_at
+                && $actual->created_at
+                && abs($actual->created_at->diffInSeconds($prev->created_at)) <= 30
+            ) {
+                $idsAEliminar[] = $actual->id;
+            } else {
+                $prev = $actual;
+            }
+        }
+
+        if (! empty($idsAEliminar)) {
+            EvaluacionDocente::whereIn('id', $idsAEliminar)->delete();
+        }
+
+        unset($this->kpis, $this->tablaResultados, $this->detalleProfesor);
+
+        $cant = count($idsAEliminar);
+        Flux::toast(
+            heading: $cant > 0 ? 'Duplicadas eliminadas' : 'Sin duplicadas detectadas',
+            text: $cant > 0
+                ? "Se detectaron y eliminaron {$cant} encuestas duplicadas por doble clic."
+                : 'No se encontraron encuestas idénticas enviadas con pocos segundos de diferencia.',
+            variant: $cant > 0 ? 'success' : 'info',
+        );
+    }
+
     public function cambiarVista(string $tipo): void
     {
         if (in_array($tipo, ['estudiante', 'apoderado'], true)) {
@@ -364,7 +444,34 @@ new #[Title('Resultados y Administración — Encuesta Docente')] class extends 
             ->where('school_id', $schoolId)
             ->where('profesor_id', $profesor->id)
             ->where('tipo_respondente', $this->tipoVista)
+            ->orderBy('created_at')
+            ->orderBy('id')
             ->get();
+
+        $evaluacionesIndividuales = [];
+        /** @var EvaluacionDocente|null $prevEval */
+        $prevEval = null;
+        foreach ($evals as $idx => $ev) {
+            $esDuplicada = $prevEval !== null
+                && json_encode($prevEval->respuestas) === json_encode($ev->respuestas)
+                && $prevEval->created_at
+                && $ev->created_at
+                && abs($ev->created_at->diffInSeconds($prevEval->created_at)) <= 30;
+
+            $evaluacionesIndividuales[] = [
+                'id' => $ev->id,
+                'numero' => $idx + 1,
+                'hora' => $ev->created_at?->timezone('America/Santiago')->format('d/m H:i:s') ?? '—',
+                'puntaje_obtenido' => $ev->puntaje_obtenido,
+                'puntaje_maximo' => $ev->puntaje_maximo,
+                'promedio' => $ev->promedio,
+                'es_duplicada' => $esDuplicada,
+            ];
+
+            if (! $esDuplicada) {
+                $prevEval = $ev;
+            }
+        }
 
         $preguntas = $this->preguntasVista;
         $desglose = [];
@@ -421,6 +528,7 @@ new #[Title('Resultados y Administración — Encuesta Docente')] class extends 
             'promedio_general' => $promedioGeneral ?? 0,
             'clasificacion' => $clasificacion,
             'desglose' => $desglose,
+            'evaluaciones_individuales' => $evaluacionesIndividuales,
         ];
     }
 };
@@ -472,6 +580,9 @@ new #[Title('Resultados y Administración — Encuesta Docente')] class extends 
             </flux:button>
             <flux:button size="xs" variant="filled" icon="key" wire:click="$set('modalAdminEncuesta', true)">
                 Modificar PINs
+            </flux:button>
+            <flux:button size="xs" variant="ghost" icon="sparkles" wire:click="limpiarDuplicadas">
+                Limpiar Duplicadas
             </flux:button>
             <flux:button size="xs" variant="ghost" icon="trash" class="!text-red-600 hover:!bg-red-50 dark:!text-red-400 dark:hover:!bg-red-950/40"
                 wire:click="$set('modalConfirmarReset', true)">
@@ -857,6 +968,40 @@ new #[Title('Resultados y Administración — Encuesta Docente')] class extends 
                             </div>
                         </div>
                     @endforeach
+
+                    {{-- Listado de Respuestas Individuales para eliminar duplicadas o sobrantes --}}
+                    <div class="rounded-xl border border-zinc-200 dark:border-zinc-800 p-3 space-y-2 bg-white dark:bg-zinc-900">
+                        <div class="flex items-center justify-between">
+                            <p class="text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-300">
+                                Registro de Envíos Individuales ({{ count($det['evaluaciones_individuales']) }})
+                            </p>
+                            <span class="text-[11px] text-zinc-500">Puedes eliminar envíos duplicados o sobrantes</span>
+                        </div>
+                        <div class="divide-y divide-zinc-100 dark:divide-zinc-800 max-h-44 overflow-y-auto">
+                            @foreach ($det['evaluaciones_individuales'] as $evInd)
+                                <div class="py-1.5 flex items-center justify-between gap-2 text-xs">
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-mono font-bold text-zinc-500">#{{ $evInd['numero'] }}</span>
+                                        <span class="font-mono text-[11px] text-zinc-600 dark:text-zinc-400">{{ $evInd['hora'] }}</span>
+                                        <span class="font-semibold text-zinc-800 dark:text-zinc-200">
+                                            {{ $evInd['puntaje_obtenido'] }}/{{ $evInd['puntaje_maximo'] }} pts ({{ number_format($evInd['promedio'], 2) }})
+                                        </span>
+                                        @if ($evInd['es_duplicada'])
+                                            <span class="inline-flex items-center rounded bg-amber-100 dark:bg-amber-950 px-1.5 py-0.5 text-[10px] font-bold text-amber-800 dark:text-amber-300">
+                                                Posible duplicada (doble toque)
+                                            </span>
+                                        @endif
+                                    </div>
+                                    <button type="button"
+                                        wire:click="eliminarRespuestaIndividual({{ $evInd['id'] }})"
+                                        class="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-semibold text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40 transition cursor-pointer">
+                                        <flux:icon.trash class="size-3.5" />
+                                        Eliminar
+                                    </button>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
                 </div>
 
                 <div class="flex justify-end pt-2 border-t border-zinc-200 dark:border-zinc-800">

@@ -40,6 +40,17 @@ class EvaluacionDocente extends Model
         0 => 'Por lograr',
     ];
 
+    public const VALOR_NO_APLICA = -1;
+
+    public const ETIQUETA_NO_APLICA = 'No me toca con el profesor en ese bloque';
+
+    /**
+     * Preguntas de la encuesta de estudiantes que permiten marcar "No me toca con el profesor en ese bloque".
+     *
+     * @var array<int, int>
+     */
+    public const PREGUNTAS_ESTUDIANTE_CON_NA = [3, 10];
+
     public const META_ESTUDIANTES = 20;
 
     public const META_APODERADOS = 2;
@@ -108,6 +119,15 @@ class EvaluacionDocente extends Model
         }
 
         return self::PREGUNTAS_ESTUDIANTE;
+    }
+
+    /**
+     * Determina si una pregunta específica permite la opción "No aplica / No me toca en ese bloque".
+     */
+    public static function permiteNoAplica(string $tipoRespondente, int $numeroPregunta): bool
+    {
+        return $tipoRespondente === 'estudiante'
+            && in_array($numeroPregunta, self::PREGUNTAS_ESTUDIANTE_CON_NA, true);
     }
 
     /**

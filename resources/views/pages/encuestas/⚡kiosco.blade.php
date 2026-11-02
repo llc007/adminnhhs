@@ -222,7 +222,10 @@ new #[Layout('layouts.blank')] #[Title('Encuesta de Evaluación Docente')] class
 
     public function responderPregunta(int $numero, int $puntaje): void
     {
-        if (! array_key_exists($puntaje, EvaluacionDocente::ALTERNATIVAS)) {
+        $esNoAplicaValido = $puntaje === EvaluacionDocente::VALOR_NO_APLICA
+            && EvaluacionDocente::permiteNoAplica($this->tipoRespondente, $numero);
+
+        if (! array_key_exists($puntaje, EvaluacionDocente::ALTERNATIVAS) && ! $esNoAplicaValido) {
             return;
         }
 
@@ -255,18 +258,36 @@ new #[Layout('layouts.blank')] #[Title('Encuesta de Evaluación Docente')] class
 
         foreach (array_keys($preguntas) as $num) {
             $key = (string) $num;
-            if (! isset($this->respuestas[$key]) || ! array_key_exists((int) $this->respuestas[$key], EvaluacionDocente::ALTERNATIVAS)) {
+            if (! isset($this->respuestas[$key])) {
                 $this->mensajeError = "Por favor responde todas las preguntas antes de enviar (falta la pregunta N° {$num}).";
 
                 return;
             }
-            $respuestasLimpias[$key] = (int) $this->respuestas[$key];
+
+            $val = (int) $this->respuestas[$key];
+            $esValida = array_key_exists($val, EvaluacionDocente::ALTERNATIVAS)
+                || ($val === EvaluacionDocente::VALOR_NO_APLICA && EvaluacionDocente::permiteNoAplica($this->tipoRespondente, $num));
+
+            if (! $esValida) {
+                $this->mensajeError = "Por favor responde todas las preguntas antes de enviar (falta la pregunta N° {$num}).";
+
+                return;
+            }
+
+            $respuestasLimpias[$key] = $val;
         }
 
         $totalPreguntas = count($preguntas);
-        $puntajeObtenido = array_sum($respuestasLimpias);
+        $respuestasValidas = array_filter($respuestasLimpias, fn (int $v) => $v >= 0);
+        $cantidadValidas = count($respuestasValidas);
+        $sumaValidas = array_sum($respuestasValidas);
+
         $puntajeMaximo = $totalPreguntas * 3;
-        $promedio = $totalPreguntas > 0 ? round($puntajeObtenido / $totalPreguntas, 2) : 0;
+        $promedio = $cantidadValidas > 0 ? round($sumaValidas / $cantidadValidas, 2) : 0.0;
+        // Puntaje total prorrateado sobre el máximo de la encuesta (ej. sobre 30 pts) para no perjudicar ni inflar al docente cuando una pregunta no aplica por horario
+        $puntajeObtenido = $cantidadValidas > 0
+            ? (int) round(($sumaValidas / $cantidadValidas) * $totalPreguntas)
+            : 0;
 
         EvaluacionDocente::create([
             'school_id' => $this->schoolId,
@@ -682,6 +703,26 @@ new #[Layout('layouts.blank')] #[Title('Encuesta de Evaluación Docente')] class
                             </button>
                         @endforeach
                     </div>
+
+                    @if (EvaluacionDocente::permiteNoAplica($tipoRespondente, $numero))
+                        @php
+                            $activaNoAplica = $respuestaActual !== null && (int) $respuestaActual === EvaluacionDocente::VALOR_NO_APLICA;
+                        @endphp
+                        <div class="mt-3">
+                            <button type="button"
+                                wire:click="responderPregunta({{ $numero }}, {{ EvaluacionDocente::VALOR_NO_APLICA }})"
+                                class="w-full flex items-center justify-center gap-2 rounded-xl border-2 px-4 py-3 text-xs sm:text-sm font-bold transition cursor-pointer {{ $activaNoAplica
+                                    ? 'border-zinc-700 bg-zinc-700 text-white shadow-sm dark:border-zinc-500 dark:bg-zinc-600'
+                                    : 'border-dashed border-zinc-300 dark:border-zinc-700 bg-zinc-50/70 dark:bg-zinc-800/40 text-zinc-600 dark:text-zinc-300 hover:border-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800' }}">
+                                @if ($activaNoAplica)
+                                    <flux:icon.check-circle class="size-5 shrink-0 text-emerald-300" />
+                                @else
+                                    <flux:icon.minus-circle class="size-4 shrink-0 text-zinc-400" />
+                                @endif
+                                <span>{{ EvaluacionDocente::ETIQUETA_NO_APLICA }}</span>
+                            </button>
+                        </div>
+                    @endif
                 </div>
             @endforeach
 

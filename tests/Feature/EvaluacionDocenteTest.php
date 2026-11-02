@@ -279,6 +279,38 @@ test('only users with docente role appear in kiosk selector and results table', 
         ->assertDontSee('PEDRO INSPECTOR GOMEZ');
 });
 
+test('questions 3 and 10 allow No me toca con el profesor en ese bloque and prorate score over valid questions', function () {
+    [$school, $encargada, $profesor] = createSchoolAndStaff();
+
+    $component = Livewire::test('pages::encuestas.kiosco', ['schoolId' => $school->id])
+        ->set('pinIngresado', '1234')
+        ->call('validarPin')
+        ->call('seleccionarProfesor', $profesor->id)
+        ->call('comenzarEncuesta')
+        ->assertSee(EvaluacionDocente::ETIQUETA_NO_APLICA);
+
+    // Respondemos Siempre (3 pts) en 8 preguntas, y "No me toca con el profesor en ese bloque" (-1) en P3 y P10
+    for ($i = 1; $i <= 10; $i++) {
+        if (in_array($i, [3, 10], true)) {
+            $component->call('responderPregunta', $i, EvaluacionDocente::VALOR_NO_APLICA);
+        } else {
+            $component->call('responderPregunta', $i, 3);
+        }
+    }
+
+    $component->call('enviarEncuesta')
+        ->assertSet('paso', 'completado');
+
+    $eval = EvaluacionDocente::first();
+    // 8 preguntas válidas con 3 pts = 24 / 8 = promedio 3.00 -> puntaje prorrateado sobre 10 preguntas = 30 / 30
+    expect($eval)->not->toBeNull()
+        ->and($eval->promedio)->toBe(3.0)
+        ->and($eval->puntaje_obtenido)->toBe(30)
+        ->and($eval->puntaje_maximo)->toBe(30)
+        ->and($eval->respuestas['3'])->toBe(EvaluacionDocente::VALOR_NO_APLICA)
+        ->and($eval->respuestas['10'])->toBe(EvaluacionDocente::VALOR_NO_APLICA);
+});
+
 test('unauthenticated guest scanning QR can see and search professors even with clean spatie team context', function () {
     [$school, $encargada, $profesor] = createSchoolAndStaff();
 

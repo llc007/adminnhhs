@@ -255,7 +255,7 @@ new #[Title('Resultados y Administración — Encuesta Docente')] class extends 
                 $key = (string) $num;
                 $valores = $evals
                     ->map(fn (EvaluacionDocente $e) => $e->respuestas[$key] ?? null)
-                    ->filter(fn ($v) => $v !== null);
+                    ->filter(fn ($v) => $v !== null && (int) $v >= 0);
 
                 $promediosPorPregunta[$num] = $valores->isNotEmpty()
                     ? round((float) $valores->avg(), 2)
@@ -371,15 +371,17 @@ new #[Title('Resultados y Administración — Encuesta Docente')] class extends 
 
         foreach ($preguntas as $num => $texto) {
             $key = (string) $num;
-            $valores = $evals
+            $todasRespuestas = $evals
                 ->map(fn (EvaluacionDocente $e) => $e->respuestas[$key] ?? null)
                 ->filter(fn ($v) => $v !== null);
 
-            $totalRespPregunta = $valores->count();
+            $valoresValidos = $todasRespuestas->filter(fn ($v) => (int) $v >= 0);
+            $totalRespPregunta = $todasRespuestas->count();
+            $totalValidas = $valoresValidos->count();
             $conteoAlternativas = [];
 
             foreach (EvaluacionDocente::ALTERNATIVAS as $pts => $label) {
-                $count = $valores->filter(fn ($v) => (int) $v === $pts)->count();
+                $count = $todasRespuestas->filter(fn ($v) => (int) $v === $pts)->count();
                 $conteoAlternativas[$pts] = [
                     'label' => $label,
                     'count' => $count,
@@ -387,11 +389,20 @@ new #[Title('Resultados y Administración — Encuesta Docente')] class extends 
                 ];
             }
 
+            if (EvaluacionDocente::permiteNoAplica($this->tipoVista, $num)) {
+                $countNa = $todasRespuestas->filter(fn ($v) => (int) $v === EvaluacionDocente::VALOR_NO_APLICA)->count();
+                $conteoAlternativas[EvaluacionDocente::VALOR_NO_APLICA] = [
+                    'label' => 'No aplica (Bloque)',
+                    'count' => $countNa,
+                    'porcentaje' => $totalRespPregunta > 0 ? round(($countNa / $totalRespPregunta) * 100) : 0,
+                ];
+            }
+
             $desglose[$num] = [
                 'numero' => $num,
                 'texto' => $texto,
                 'total_respuestas' => $totalRespPregunta,
-                'promedio' => $totalRespPregunta > 0 ? round((float) $valores->avg(), 2) : null,
+                'promedio' => $totalValidas > 0 ? round((float) $valoresValidos->avg(), 2) : null,
                 'alternativas' => $conteoAlternativas,
             ];
         }
@@ -831,11 +842,11 @@ new #[Title('Resultados y Administración — Encuesta Docente')] class extends 
                             <div class="space-y-1.5">
                                 @foreach ($item['alternativas'] as $pts => $alt)
                                     <div class="flex items-center gap-2 text-xs">
-                                        <span class="w-24 text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 shrink-0">
-                                            {{ $alt['label'] }} ({{ $pts }}p)
+                                        <span class="w-32 text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 shrink-0">
+                                            {{ $alt['label'] }} {{ $pts >= 0 ? "({$pts}p)" : '(N/A)' }}
                                         </span>
                                         <div class="flex-1 h-2.5 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
-                                            <div class="h-full rounded-full {{ $pts === 3 ? 'bg-emerald-500' : ($pts === 2 ? 'bg-blue-500' : ($pts === 1 ? 'bg-amber-500' : 'bg-red-500')) }}"
+                                            <div class="h-full rounded-full {{ $pts === 3 ? 'bg-emerald-500' : ($pts === 2 ? 'bg-blue-500' : ($pts === 1 ? 'bg-amber-500' : ($pts === 0 ? 'bg-red-500' : 'bg-zinc-400'))) }}"
                                                 style="width: {{ $alt['porcentaje'] }}%"></div>
                                         </div>
                                         <span class="w-16 text-right font-mono text-[11px] text-zinc-600 dark:text-zinc-400 shrink-0">

@@ -264,19 +264,7 @@ new class extends Component
 <div class="max-w-7xl mx-auto w-full pb-8 2xl:pb-12 space-y-5 2xl:space-y-8 tabular-nums">
 
     <x-header titulo="Dashboard de Entrevistas"
-        subtitulo="Seguimiento diario de atención a apoderados, participación docente y cumplimiento mensual." icono="chart-bar">
-        <div class="flex items-center gap-2">
-            <flux:button variant="ghost" size="sm" icon="arrow-path" wire:click="$refresh">
-                {{ __('Actualizar') }}
-            </flux:button>
-            <flux:button variant="filled" size="sm" icon="building-office-2" :href="route('entrevistas.recepcion')" wire:navigate>
-                {{ __('Recepción') }}
-            </flux:button>
-            <flux:button variant="primary" size="sm" icon="plus" :href="route('entrevistas.crear')" wire:navigate>
-                {{ __('Agendar entrevista') }}
-            </flux:button>
-        </div>
-    </x-header>
+        subtitulo="Seguimiento diario de atención a apoderados, participación docente y cumplimiento mensual." icono="chart-bar" />
 
     {{-- Banda de Pulso Operativo (Asimétrica, sin tarjetas repetitivas) --}}
     <section aria-label="Resumen operativo de entrevistas"

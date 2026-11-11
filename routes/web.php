@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AtrasoPrintController;
+use App\Http\Controllers\BitacoraPrintController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\MailWebhookController;
 use App\Http\Controllers\ReportesPrintController;
@@ -65,6 +66,10 @@ Route::middleware(['auth', 'verified', 'role_or_permission:superadmin|ver-entrev
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('/entrevistas/{entrevista}/bitacora', 'pages::entrevistas.bitacora')
         ->name('entrevistas.bitacora')
+        ->middleware('can:view,entrevista');
+
+    Route::get('/entrevistas/{entrevista}/imprimir-bitacora', [BitacoraPrintController::class, 'imprimir'])
+        ->name('entrevistas.imprimir_bitacora')
         ->middleware('can:view,entrevista');
 
     Route::livewire('/sin-permiso', 'pages::auth.sin-permiso')->name('sin-permiso');

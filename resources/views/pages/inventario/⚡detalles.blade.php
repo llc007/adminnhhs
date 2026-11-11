@@ -101,6 +101,7 @@ new class extends Component
             $this->editingItems['item_' . $item->id] = [
                 'id' => $item->id,
                 'codigo_patrimonial' => $item->codigo_patrimonial,
+                'numero_serie' => $item->numero_serie,
                 'estado_conservacion' => $item->estado_conservacion,
                 'responsable_user_id' => $item->responsable_user_id,
                 'fecha_baja' => $item->fecha_baja ? $item->fecha_baja->format('d/m/Y') : null,
@@ -108,13 +109,15 @@ new class extends Component
                 'ultima_revision' => $item->ultimaRevision ? $item->ultimaRevision->fecha->format('d/m/Y') : 'Nunca',
                 'cantidad' => $item->cantidad,
                 'ubicacion' => $item->ubicacion,
+                'ubicacion_id' => $item->ubicacion_id,
+                'observaciones' => $item->observaciones,
             ];
         }
     }
 
     public function updatedEditingItems($value, $key)
     {
-        // $key tiene el formato: "item_X.responsable_user_id" o "item_X.estado_conservacion"
+        // $key tiene el formato: "item_X.responsable_user_id", "item_X.estado_conservacion", o "item_X.ubicacion_id"
         $parts = explode('.', $key);
         if (count($parts) < 2) {
             return;
@@ -142,20 +145,36 @@ new class extends Component
             $this->validateOnly("editingItems.{$itemKey}.responsable_user_id", [
                 "editingItems.{$itemKey}.responsable_user_id" => 'nullable|exists:users,id',
             ]);
+        } elseif ($field === 'ubicacion_id') {
+            $this->validateOnly("editingItems.{$itemKey}.ubicacion_id", [
+                "editingItems.{$itemKey}.ubicacion_id" => 'required|exists:inventario_ubicaciones,id',
+            ]);
         } else {
             return;
         }
 
         $item = ArticuloInventario::find($data['id']);
         if ($item) {
-            $item->update([
-                $field => $value ?: null,
-            ]);
+            if ($field === 'ubicacion_id') {
+                $ubModel = \App\Models\InventarioUbicacion::find($value);
+                $ubicacionNombre = $ubModel ? $ubModel->nombre : $item->ubicacion;
 
-            // Registrar revisión automática
-            $desc = $field === 'estado_conservacion'
-                ? 'Actualización automática: Conservación cambiada a "' . ucfirst($value) . '".'
-                : 'Actualización automática: Custodio asignado a "' . ($value ? User::find($value)->nombreCompleto() : 'En Bodega') . '".';
+                $item->update([
+                    'ubicacion_id' => $value,
+                    'ubicacion' => $ubicacionNombre,
+                ]);
+                $this->editingItems[$itemKey]['ubicacion'] = $ubicacionNombre;
+                $desc = 'Actualización automática: Ubicación cambiada a "' . $ubicacionNombre . '".';
+            } else {
+                $item->update([
+                    $field => $value ?: null,
+                ]);
+
+                // Registrar revisión automática
+                $desc = $field === 'estado_conservacion'
+                    ? 'Actualización automática: Conservación cambiada a "' . ucfirst($value) . '".'
+                    : 'Actualización automática: Custodio asignado a "' . ($value ? User::find($value)->nombreCompleto() : 'En Bodega') . '".';
+            }
 
             RevisionInventario::create([
                 'articulo_inventario_id' => $item->id,
@@ -447,7 +466,7 @@ new class extends Component
             RevisionInventario::create([
                 'articulo_inventario_id' => $item->id,
                 'fecha' => now(),
-                'detalle' => 'Actualización de datos físicos: Ubicación a "' . $ubicacionNombre . '"' . ($this->editSerial ? ', S/N: ' . $this->editSerial : ''),
+                'detalle' => 'Actualización de datos físicos: Ubicación a "' . $ubicacionNombre . '"' . ($this->editSerial ? ', S/N: ' . $this->editSerial : '') . ($this->editObservaciones ? ' — Obs: ' . $this->editObservaciones : ''),
                 'realizado_por' => auth()->user()->nombreCompleto(),
                 'user_id' => auth()->id(),
             ]);
@@ -796,11 +815,12 @@ new class extends Component
                                 <th class="px-4 py-3 w-[15%] text-center">{{ __('Stock Disponible') }}</th>
                                 <th class="px-4 py-3 text-center w-[20%]">{{ __('Acciones') }}</th>
                             @else
-                                <th class="px-4 py-3 w-[20%]">{{ __('Código Patrimonial') }}</th>
-                                <th class="px-4 py-3 w-[15%] text-center">{{ __('Última Revisión') }}</th>
-                                <th class="px-4 py-3 w-[20%]">{{ __('Estado') }}</th>
-                                <th class="px-4 py-3 w-[30%]">{{ __('Responsable de Custodia') }}</th>
-                                <th class="px-4 py-3 text-center w-[15%]"></th>
+                                <th class="px-4 py-3 w-[16%]">{{ __('Código / Serie') }}</th>
+                                <th class="px-4 py-3 w-[22%]">{{ __('Ubicación / Notas') }}</th>
+                                <th class="px-4 py-3 w-[14%]">{{ __('Estado') }}</th>
+                                <th class="px-4 py-3 w-[24%]">{{ __('Responsable de Custodia') }}</th>
+                                <th class="px-4 py-3 w-[12%] text-center">{{ __('Últ. Revisión') }}</th>
+                                <th class="px-4 py-3 text-center w-[12%]">{{ __('Acciones') }}</th>
                             @endif
                         </tr>
                     </thead>
@@ -856,25 +876,58 @@ new class extends Component
                                         </button>
                                     </td>
                                 @else
-                                    <td class="px-4 py-2 font-mono font-bold align-middle">
-                                        <div class="flex items-center gap-2">
-                                            <span class="{{ $isBaja ? 'text-zinc-400 line-through' : 'text-zinc-950 dark:text-white' }}">
-                                                {{ $item['codigo_patrimonial'] }}
-                                            </span>
-                                            @if($isBaja)
-                                                <span 
-                                                    class="px-1.5 py-0.5 text-[9px] font-extrabold rounded bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 uppercase cursor-help"
-                                                    title="De baja el {{ $item['fecha_baja'] }}. Motivo: {{ $item['motivo_baja'] }}"
-                                                >
-                                                    {{ __('Baja') }}
+                                    <td class="px-4 py-2.5 align-middle">
+                                        <div class="flex flex-col gap-0.5">
+                                            <div class="flex items-center gap-2 font-mono font-bold">
+                                                <span class="{{ $isBaja ? 'text-zinc-400 line-through' : 'text-zinc-950 dark:text-white' }}">
+                                                    {{ $item['codigo_patrimonial'] }}
+                                                </span>
+                                                @if($isBaja)
+                                                    <span 
+                                                        class="px-1.5 py-0.5 text-[9px] font-extrabold rounded bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 uppercase cursor-help"
+                                                        title="De baja el {{ $item['fecha_baja'] }}. Motivo: {{ $item['motivo_baja'] }}"
+                                                    >
+                                                        {{ __('Baja') }}
+                                                    </span>
+                                                @endif
+                                            </div>
+                                            @if(!empty($item['numero_serie']))
+                                                <span class="text-[11px] font-mono text-zinc-500 dark:text-zinc-400 flex items-center gap-1" title="{{ __('Número de Serie') }}">
+                                                    <span class="text-[9px] uppercase font-sans font-semibold text-zinc-400">S/N:</span>
+                                                    {{ $item['numero_serie'] }}
                                                 </span>
                                             @endif
                                         </div>
                                     </td>
-                                    <td class="px-4 py-2 text-center text-zinc-500 font-medium align-middle">
-                                        {{ $item['ultima_revision'] }}
+                                    <td class="px-4 py-2.5 align-middle">
+                                        <div class="flex flex-col gap-1">
+                                            <select 
+                                                wire:model.live="editingItems.{{ $key }}.ubicacion_id" 
+                                                class="w-full px-2 py-1 text-xs border border-zinc-200 dark:border-zinc-700 rounded bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 disabled:opacity-50 font-medium"
+                                                @disabled($isBaja)
+                                            >
+                                                @if(!$item['ubicacion_id'] && $item['ubicacion'])
+                                                    <option value="">{{ $item['ubicacion'] }}</option>
+                                                @endif
+                                                @foreach($this->ubicaciones as $ub)
+                                                    <option value="{{ $ub->id }}">{{ $ub->nombre }}</option>
+                                                @endforeach
+                                            </select>
+
+                                            @if(!empty($item['observaciones']))
+                                                <button 
+                                                    type="button"
+                                                    wire:click="abrirFisicos({{ $itemId }})"
+                                                    class="text-left text-[11px] text-amber-700 dark:text-amber-300 bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200/70 dark:border-amber-800/60 px-2 py-0.5 rounded flex items-start gap-1 hover:bg-amber-100/70 dark:hover:bg-amber-900/40 transition"
+                                                    title="{{ __('Haga clic para editar detalles u observaciones') }}"
+                                                >
+                                                    <flux:icon.information-circle class="size-3.5 shrink-0 mt-0.5 text-amber-500" />
+                                                    <span class="line-clamp-2 leading-tight">{{ $item['observaciones'] }}</span>
+                                                </button>
+                                            @endif
+                                        </div>
                                     </td>
-                                    <td class="px-4 py-2 align-middle">
+                                    <td class="px-4 py-2.5 align-middle">
                                         <select 
                                             wire:model.live="editingItems.{{ $key }}.estado_conservacion" 
                                             class="w-full px-2 py-1 text-xs border border-zinc-200 dark:border-zinc-700 rounded bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 disabled:opacity-50"
@@ -887,7 +940,7 @@ new class extends Component
                                             <option value="malo">{{ __('Malo') }}</option>
                                         </select>
                                     </td>
-                                    <td class="px-4 py-2 align-middle">
+                                    <td class="px-4 py-2.5 align-middle">
                                         <select 
                                             wire:model.live="editingItems.{{ $key }}.responsable_user_id" 
                                             class="w-full px-2 py-1 text-xs border border-zinc-200 dark:border-zinc-700 rounded bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 disabled:opacity-50"
@@ -899,7 +952,10 @@ new class extends Component
                                             @endforeach
                                         </select>
                                     </td>
-                                    <td class="px-4 py-2 text-center align-middle space-x-1">
+                                    <td class="px-4 py-2.5 text-center text-zinc-500 font-medium align-middle">
+                                        {{ $item['ultima_revision'] }}
+                                    </td>
+                                    <td class="px-4 py-2.5 text-center align-middle space-x-1">
                                         <button 
                                             type="button" 
                                             wire:click="abrirFisicos({{ $itemId }})" 

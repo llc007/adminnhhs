@@ -676,3 +676,47 @@ test('tracks entradas and salidas in revisiones_inventario and details view', fu
         ->assertSee('Resma Papel Carta')
         ->assertSee('CON-PAP-001');
 });
+
+test('displays physical details in the asset row and allows inline location update', function () {
+    [$user, $schoolId] = setupInventarioTestUser(['administrador']);
+    $this->actingAs($user);
+
+    $cat = InventarioCategoria::create(['school_id' => $schoolId, 'nombre' => 'Tecnología']);
+    $ubBodega = InventarioUbicacion::create(['school_id' => $schoolId, 'nombre' => 'Bodega']);
+    $ubSala = InventarioUbicacion::create(['school_id' => $schoolId, 'nombre' => 'Salas de Clases']);
+
+    $proyector = ArticuloInventario::create([
+        'school_id' => $schoolId,
+        'tipo' => 'activo',
+        'codigo_patrimonial' => 'TEC-PRO-010',
+        'nombre' => 'Proyector Epson X49',
+        'categoria' => 'Tecnología',
+        'categoria_id' => $cat->id,
+        'cantidad' => 1,
+        'estado_conservacion' => 'excelente',
+        'ubicacion' => 'Bodega',
+        'ubicacion_id' => $ubBodega->id,
+        'fecha_ingreso' => now(),
+    ]);
+
+    // Update physical details via modal
+    Livewire::test('pages::inventario.detalles', ['id' => $proyector->id])
+        ->call('abrirFisicos', $proyector->id)
+        ->set('editSerial', 'XE4W5X01822')
+        ->set('editUbicacionId', $ubSala->id)
+        ->set('editObservaciones', 'Se cambio por proyector en mal estado, Curso 2°C')
+        ->call('guardarFisicos')
+        ->assertHasNoErrors()
+        ->assertSee('XE4W5X01822')
+        ->assertSee('Salas de Clases')
+        ->assertSee('Se cambio por proyector en mal estado, Curso 2°C');
+
+    // Also test inline location select update
+    Livewire::test('pages::inventario.detalles', ['id' => $proyector->id])
+        ->set("editingItems.item_{$proyector->id}.ubicacion_id", $ubBodega->id)
+        ->assertHasNoErrors();
+
+    $proyector->refresh();
+    expect($proyector->ubicacion)->toBe('Bodega')
+        ->and($proyector->ubicacion_id)->toBe($ubBodega->id);
+});

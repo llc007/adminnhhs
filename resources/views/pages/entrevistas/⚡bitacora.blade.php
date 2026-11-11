@@ -701,6 +701,18 @@ new class extends Component {
                     <flux:badge color="emerald" icon="check-circle" class="p-2 text-xs font-bold">
                         {{ __('Entrevista Realizada') }}
                     </flux:badge>
+                    <flux:button 
+                        as="a" 
+                        :href="route('entrevistas.imprimir_bitacora', $entrevista->id)" 
+                        target="_blank" 
+                        icon="printer" 
+                        size="sm" 
+                        variant="filled" 
+                        class="bg-[#00376e] text-white hover:bg-blue-900 border-none font-bold cursor-pointer"
+                        title="Imprimir / Descargar PDF de la bitácora"
+                    >
+                        {{ __('Imprimir PDF') }}
+                    </flux:button>
                 @else
                     <flux:badge color="red" icon="x-circle" class="p-2 text-xs font-bold">
                         {{ __('Entrevista ' . ucfirst($entrevista->estado)) }}
@@ -1032,9 +1044,20 @@ new class extends Component {
                             </button>
                         @else
                             @if($entrevista->estado === 'realizada')
-                                <div class="w-full flex items-center justify-center gap-2 py-2.5 bg-emerald-600 text-white rounded-lg text-xs font-bold">
-                                    <flux:icon.check-circle class="size-4" />
-                                    <span>Entrevista Finalizada</span>
+                                <div class="flex items-center gap-2">
+                                    <div class="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-emerald-600 text-white rounded-lg text-xs font-bold shadow-2xs">
+                                        <flux:icon.check-circle class="size-4 shrink-0" />
+                                        <span>Entrevista Finalizada</span>
+                                    </div>
+                                    <a 
+                                        href="{{ route('entrevistas.imprimir_bitacora', $entrevista->id) }}" 
+                                        target="_blank"
+                                        class="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 bg-[#00376e] hover:bg-blue-900 text-white rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer shrink-0"
+                                        title="Imprimir / Descargar reporte de la bitácora en PDF"
+                                    >
+                                        <flux:icon.printer class="size-4 shrink-0" />
+                                        <span>Imprimir PDF</span>
+                                    </a>
                                 </div>
                             @else
                                 <div class="w-full flex items-center justify-center gap-2 py-2.5 bg-red-600 text-white rounded-lg text-xs font-bold">

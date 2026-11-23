@@ -33,6 +33,8 @@ class School extends Model
             'encuesta_habilitada' => true,
             'encuesta_pin_estudiante' => '1234',
             'encuesta_pin_apoderado' => '5678',
+            'encuesta_directivos_habilitada' => true,
+            'encuesta_pin_directivos' => '9012',
         ];
 
         if (is_null($value)) {
@@ -93,6 +95,35 @@ class School extends Model
         $modulos['encuesta_habilitada'] = $habilitada;
         $modulos['encuesta_pin_estudiante'] = trim($pinEstudiante);
         $modulos['encuesta_pin_apoderado'] = trim($pinApoderado);
+
+        $this->modulos_publicados = $modulos;
+        $this->save();
+    }
+
+    /**
+     * Check if department/directive evaluation surveys are currently enabled for this school.
+     */
+    public function encuestasDirectivosHabilitadas(): bool
+    {
+        return filter_var($this->modulos_publicados['encuesta_directivos_habilitada'] ?? true, FILTER_VALIDATE_BOOLEAN);
+    }
+
+    /**
+     * Get the access PIN for the department/directive survey answered by teachers.
+     */
+    public function pinEncuestaDirectivos(): string
+    {
+        return (string) ($this->modulos_publicados['encuesta_pin_directivos'] ?? '9012');
+    }
+
+    /**
+     * Update department/directive evaluation survey configuration for this school.
+     */
+    public function actualizarConfigEncuestaDirectivos(bool $habilitada, string $pinDirectivos): void
+    {
+        $modulos = $this->modulos_publicados;
+        $modulos['encuesta_directivos_habilitada'] = $habilitada;
+        $modulos['encuesta_pin_directivos'] = trim($pinDirectivos);
 
         $this->modulos_publicados = $modulos;
         $this->save();

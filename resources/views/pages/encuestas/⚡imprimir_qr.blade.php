@@ -52,6 +52,20 @@ new #[Layout('layouts.blank')] #[Title('Imprimir Códigos QR — Evaluación Doc
     {
         return EvaluacionDocente::generarQrSvg($this->urlApoderados, 220);
     }
+
+    #[Computed]
+    public function urlDirectivos(): string
+    {
+        return route('encuestas.directivos.kiosco', [
+            'schoolId' => $this->school?->id,
+        ]);
+    }
+
+    #[Computed]
+    public function qrDirectivosSvg(): string
+    {
+        return EvaluacionDocente::generarQrSvg($this->urlDirectivos, 220);
+    }
 };
 ?>
 
@@ -145,6 +159,36 @@ new #[Layout('layouts.blank')] #[Title('Imprimir Códigos QR — Evaluación Doc
 
                 <p class="text-[10px] font-mono text-zinc-400 break-all">
                     {{ $this->urlApoderados }}
+                </p>
+            </div>
+
+            {{-- Tarjeta 3: Encuesta Directivos y Departamentos (Responden Docentes) --}}
+            <div class="bg-white rounded-2xl border-2 border-zinc-300 p-6 flex flex-col items-center text-center space-y-4 md:col-span-2 print:col-span-2">
+                <span class="inline-flex items-center rounded-full bg-emerald-100 px-3.5 py-1 text-xs font-extrabold uppercase tracking-wider text-emerald-800">
+                    Encuesta Cuerpo Docente
+                </span>
+                <h2 class="text-lg font-extrabold text-zinc-900">
+                    Evaluación de Directivos y Departamentos (8 Áreas)
+                </h2>
+                <p class="text-xs text-zinc-500 max-w-lg">
+                    Escanea este código QR para que los profesores evalúen de forma anónima a Capellanía, Convivencia Escolar, Evaluadores, Orientadoras, Psicólogas, Psicopedagogas y UTP.
+                </p>
+
+                <div class="p-3 bg-white rounded-xl border border-zinc-200 shadow-xs">
+                    {!! $this->qrDirectivosSvg !!}
+                </div>
+
+                <div class="w-full max-w-xs rounded-xl bg-zinc-100 border border-zinc-300 p-3">
+                    <p class="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                        PIN de Acceso Evaluación Directivos
+                    </p>
+                    <p class="text-3xl font-mono font-extrabold tracking-[0.25em] text-emerald-800 mt-0.5">
+                        {{ $this->school?->pinEncuestaDirectivos() }}
+                    </p>
+                </div>
+
+                <p class="text-[10px] font-mono text-zinc-400 break-all">
+                    {{ $this->urlDirectivos }}
                 </p>
             </div>
         </div>

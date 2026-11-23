@@ -150,6 +150,22 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the directive/department evaluations received by this user.
+     */
+    public function evaluacionesDirectivo(): HasMany
+    {
+        return $this->hasMany(EvaluacionDirectivo::class, 'evaluado_id');
+    }
+
+    /**
+     * Get the directive/department evaluation assignments for this user.
+     */
+    public function asignacionesDirectivo(): HasMany
+    {
+        return $this->hasMany(EvaluacionDirectivoAsignacion::class, 'user_id');
+    }
+
+    /**
      * Get the entrevistas assigned to this user.
      */
     public function entrevistas(): HasMany

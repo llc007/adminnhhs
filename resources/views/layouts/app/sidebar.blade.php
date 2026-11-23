@@ -182,7 +182,11 @@
                 <flux:sidebar.group :heading="__('Evaluación Docente')" class="grid mt-4">
                     <flux:sidebar.item icon="chart-bar-square" :href="route('encuestas.resultados')"
                         :current="request()->routeIs('encuestas.resultados')" wire:navigate>
-                        {{ __('Resultados y Admin.') }}
+                        {{ __('Resultados Docentes') }}
+                    </flux:sidebar.item>
+                    <flux:sidebar.item icon="building-library" :href="route('encuestas.directivos.resultados')"
+                        :current="request()->routeIs('encuestas.directivos.resultados')" wire:navigate>
+                        {{ __('Resultados Directivos') }}
                     </flux:sidebar.item>
                     <flux:sidebar.item icon="qr-code" :href="route('encuestas.imprimir_qr')"
                         :current="request()->routeIs('encuestas.imprimir_qr')">
@@ -190,7 +194,11 @@
                     </flux:sidebar.item>
                     <flux:sidebar.item icon="computer-desktop" :href="route('encuestas.kiosco')"
                         :current="request()->routeIs('encuestas.kiosco')">
-                        {{ __('Abrir Encuesta (Tablet)') }}
+                        {{ __('Encuesta Docentes (QR)') }}
+                    </flux:sidebar.item>
+                    <flux:sidebar.item icon="clipboard-document-check" :href="route('encuestas.directivos.kiosco')"
+                        :current="request()->routeIs('encuestas.directivos.kiosco')">
+                        {{ __('Encuesta Directivos (QR)') }}
                     </flux:sidebar.item>
                 </flux:sidebar.group>
             @endif
